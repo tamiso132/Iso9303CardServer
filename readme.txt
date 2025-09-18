@@ -1,4 +1,4 @@
-#CardSecurity EF
+##CardSecurity EF
 
 The file EF.CardSecurity contained in the Master File is REQUIRED if
 - PACE with Chip Authentication Mapping is supported by the eMRTD chip, or
