@@ -5,6 +5,7 @@ using Type;
 using WebSocketSharp;
 using Parser;
 using Helper;
+using Encryption;
 namespace App;
 
 
@@ -24,29 +25,16 @@ public class ClientSession(ICommunicator comm)
                 Console.WriteLine("Error: " + result.Error.GetMessage());
                 return;
             }
+
             var response = result.Value;
-            Console.WriteLine(BitConverter.ToString(response.data));
-            var parsed = new ImplCardAccess().ParseFromBytes(response.data);
+            var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
 
+            result = await _cmd.MseSetAT(info.OrgOid, TestClass.MappingGm(info), info.OrgParameterID);
 
-            result = await _cmd.ReadBinary(EfIdGlobal.Dir);
-            if (result.Value.status != SwStatus.Success) // if missing, then only 
-            {
-                if (result.Value.status == SwStatus.FileNotFound)
-                {
-
-                }
-                else
-                {
-                    Console.WriteLine("NFC Error: " + result.Value.status.Message);
-                }
-            }
             if (!result.IsSuccess)
-            {
-
-                Console.WriteLine("Error: " + result.Error.GetMessage());
                 return;
-            }
+
+            Log.Info("it was ok?");
 
 
 

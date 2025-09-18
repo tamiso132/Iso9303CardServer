@@ -102,7 +102,7 @@ public static class MyErrorExtensions
         // Writes raw bytes
         public Task WriteAsync(byte[] data)
         {
-            Console.WriteLine("Sending: " + BitConverter.ToString(data[5..]));
+            //Console.WriteLine("Sending: " + BitConverter.ToString(data[5..]));
             _socket.Send(data);
             return Task.CompletedTask;
         }

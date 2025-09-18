@@ -24,6 +24,11 @@ public class Dg1Info
 
 public class ImplEfDg1TD1 : IEfParser<Dg1Info>
 {
+    public string Name()
+    {
+        return "DG1";
+    }
+
     public Dg1Info ParseFromBytes(byte[] bytes)
     {
         var ef = new Dg1Info();
@@ -66,6 +71,11 @@ public class EfComInfo
 
 public class ImplEfCom : IEfParser<EfComInfo>
 {
+    public string Name()
+    {
+        return "Com";
+    }
+
     public EfComInfo ParseFromBytes(byte[] bytes)
     {
         // var ef = new EfComInfo();
@@ -93,12 +103,14 @@ public class ImplEfCom : IEfParser<EfComInfo>
     }
 }
 
-
-
-public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
+public struct ImplDG14 : IEfParser<ImplDG14.Info>
 {
+    public string Name()
+    {
+        return "DG14";
+    }
 
-    public Info ParseFromBytes(byte[] bytes)
+    public readonly Info ParseFromBytes(byte[] bytes)
     {
         var ef = new Info();
         var allNodes = AsnNode.Parse(new ByteReader(bytes));
@@ -106,6 +118,23 @@ public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
         {
             node.PrintTree();
         }
+        return ef;
+    }
+
+    public struct Info { }
+}
+
+public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
+{
+    public string Name()
+    {
+        return "CardAccess";
+    }
+
+    public Info ParseFromBytes(byte[] bytes)
+    {
+        var ef = new Info();
+        var allNodes = AsnNode.Parse(new ByteReader(bytes));
 
         foreach (var set in allNodes.Filter(TagID.Set))
         {
@@ -143,6 +172,11 @@ public struct ImplEFDir : IEfParser<ImplEFDir.Info>
         return ef;
     }
 
+    string IEfParser<Info>.Name()
+    {
+        return "Dir";
+    }
+
     public class Info
     {
 
@@ -159,6 +193,11 @@ public class EFSodInfo
 
 public class ImplEfSod : IEfParser<EFSodInfo>
 {
+    public string Name()
+    {
+        return "Sod";
+    }
+
     public EFSodInfo ParseFromBytes(byte[] bytes)
     {
         // var ef = new EFSodInfo();

@@ -2,6 +2,7 @@
 
 
 using System.Collections;
+using Helper;
 using Interfaces;
 
 namespace Type;
@@ -59,11 +60,14 @@ public sealed class EfIdGlobal : IEfID
 {
     public byte ShortID { get; }
     private readonly byte[] _fullID;
+    public string Name;
 
-    private EfIdGlobal(byte shortId, byte[] fullID)
+    private EfIdGlobal(byte shortId, byte[] fullID, string name)
     {
         ShortID = shortId;
         _fullID = fullID;
+        Name = name;
+
     }
 
     public byte[] GetFullID() => (byte[])_fullID.Clone();
@@ -72,13 +76,19 @@ public sealed class EfIdGlobal : IEfID
 
     AppID? IEfID.AppIdentifier()
     {
-        throw new NotImplementedException();
+        return null;
     }
 
-    public static readonly EfIdGlobal CardAccess = new(0x1C, [0x01, 0x1C]);
-    public static readonly EfIdGlobal CardSecurity = new(0x1D, [0x01, 0x1D]);
-    public static readonly EfIdGlobal AtrInfo = new(0x01, [0x2F, 0x01]);
-    public static readonly EfIdGlobal Dir = new(0x1E, [0x2F, 0x00]);
+    public string GetName()
+    {
+        return Name;
+    }
+
+    public static readonly EfIdGlobal CardAccess = new(0x1C, new byte[] { 0x01, 0x1C }, "CardAccess");
+    public static readonly EfIdGlobal CardSecurity = new(0x1D, new byte[] { 0x01, 0x1D }, "CardSecurity");
+    public static readonly EfIdGlobal AtrInfo = new(0x01, new byte[] { 0x2F, 0x01 }, "AtrInfo");
+    public static readonly EfIdGlobal Dir = new(0x1E, new byte[] { 0x2F, 0x00 }, "Dir");
+
 }
 
 // EF IDs specific to an application
@@ -86,51 +96,60 @@ public sealed class EfIdAppSpecific : IEfID
 {
     public byte ShortID { get; }
     private readonly byte[] _fullID;
+    public readonly string Name;
 
-    private EfIdAppSpecific(byte shortId, byte[] fullID)
+    private EfIdAppSpecific(byte shortId, byte[] fullID, string name)
     {
         ShortID = shortId;
         _fullID = fullID;
+        Name = name;
     }
 
     public byte[] GetFullID() => (byte[])_fullID.Clone();
 
     public AppID? AppIdentifier() => AppID.IdLDS1;
 
+    public string GetName()
+    {
+        return Name;
+    }
 
-    public static readonly EfIdAppSpecific Com = new(0x1E, [0x01, 0x1E]);
-    public static readonly EfIdAppSpecific Dg1 = new(0x01, [0x01, 0x01]);
-    public static readonly EfIdAppSpecific Dg2 = new(0x02, [0x01, 0x02]);
-    public static readonly EfIdAppSpecific Dg3 = new(0x03, [0x01, 0x03]);
-    public static readonly EfIdAppSpecific Dg4 = new(0x04, [0x01, 0x04]);
-    public static readonly EfIdAppSpecific Dg5 = new(0x05, [0x01, 0x05]);
-    public static readonly EfIdAppSpecific Dg6 = new(0x06, [0x01, 0x06]);
-    public static readonly EfIdAppSpecific Dg7 = new(0x07, [0x01, 0x07]);
-    public static readonly EfIdAppSpecific Dg8 = new(0x08, [0x01, 0x08]);
-    public static readonly EfIdAppSpecific Dg9 = new(0x09, [0x01, 0x09]);
-    public static readonly EfIdAppSpecific Dg10 = new(0x0A, [0x01, 0x0A]);
-    public static readonly EfIdAppSpecific Dg11 = new(0x0B, [0x01, 0x0B]);
-    public static readonly EfIdAppSpecific Dg12 = new(0x0C, [0x01, 0x0C]);
-    public static readonly EfIdAppSpecific Dg13 = new(0x0D, [0x01, 0x0D]);
-    public static readonly EfIdAppSpecific Dg14 = new(0x0E, [0x01, 0x0E]);
-    public static readonly EfIdAppSpecific Dg15 = new(0x0F, [0x01, 0x0F]);
-    public static readonly EfIdAppSpecific Dg16 = new(0x10, [0x01, 0x10]);
-    public static readonly EfIdAppSpecific Sod = new(0x1D, [0x01, 0x1D]);
+    public static readonly EfIdAppSpecific Com = new(0x1E, [0x01, 0x1E], "Com");
+    public static readonly EfIdAppSpecific Dg1 = new(0x01, [0x01, 0x01], "Dg1");
+    public static readonly EfIdAppSpecific Dg2 = new(0x02, [0x01, 0x02], "Dg2");
+    public static readonly EfIdAppSpecific Dg3 = new(0x03, [0x01, 0x03], "Dg3");
+    public static readonly EfIdAppSpecific Dg4 = new(0x04, [0x01, 0x04], "Dg4");
+    public static readonly EfIdAppSpecific Dg5 = new(0x05, [0x01, 0x05], "Dg5");
+    public static readonly EfIdAppSpecific Dg6 = new(0x06, [0x01, 0x06], "Dg6");
+    public static readonly EfIdAppSpecific Dg7 = new(0x07, [0x01, 0x07], "Dg7");
+    public static readonly EfIdAppSpecific Dg8 = new(0x08, [0x01, 0x08], "Dg8");
+    public static readonly EfIdAppSpecific Dg9 = new(0x09, [0x01, 0x09], "Dg9");
+    public static readonly EfIdAppSpecific Dg10 = new(0x0A, [0x01, 0x0A], "Dg10");
+    public static readonly EfIdAppSpecific Dg11 = new(0x0B, [0x01, 0x0B], "Dg11");
+    public static readonly EfIdAppSpecific Dg12 = new(0x0C, [0x01, 0x0C], "Dg12");
+    public static readonly EfIdAppSpecific Dg13 = new(0x0D, [0x01, 0x0D], "Dg13");
+    public static readonly EfIdAppSpecific Dg14 = new(0x0E, [0x01, 0x0E], "Dg14");
+    public static readonly EfIdAppSpecific Dg15 = new(0x0F, [0x01, 0x0F], "Dg15");
+    public static readonly EfIdAppSpecific Dg16 = new(0x10, [0x01, 0x10], "Dg16");
+    public static readonly EfIdAppSpecific Sod = new(0x1D, [0x01, 0x1D], "Sod");
+
 }
 
 public sealed class AppID
 {
     private readonly byte[] _id;
+    public readonly string Name;
 
-    private AppID(byte[] id)
+    private AppID(byte[] id, string name)
     {
         _id = id;
+        Name = name;
     }
 
     public byte[] GetID() => (byte[])_id.Clone();
 
-    // Predefined instances
-    public static readonly AppID IdLDS1 = new([0xA0, 0x00, 0x00, 0x02, 0x47, 0x10, 0x01]);
+    // Predefined instances// [0xA0, 0x00, 0x00, 0x02, 0x47, 0x10, 0x01];
+    public static readonly AppID IdLDS1 = new([0xA0, 0x00, 0x00, 0x02, 0x47, 0x10, 0x01], "Logical Data Structure version 1");
 
     public override string ToString() => "Logical Data Structure version 1 (LDS1)";
 }
@@ -185,7 +204,7 @@ public sealed class SwStatus
         Message = message;
     }
 
-    private Dictionary<(int sw1, int sw2), SwStatus> StatusMap = new()
+    private static Dictionary<(int sw1, int sw2), SwStatus> StatusMap = new()
     {
         { (Success.Sw1, Success.Sw2), Success },
         { (MoreDataAvailable.Sw1, MoreDataAvailable.Sw2), MoreDataAvailable },
@@ -247,6 +266,13 @@ public sealed class SwStatus
 
 public struct ResponseCommand(int sw1, int sw2, byte[]? data = null)
 {
+    public readonly E Parse<T, E>() where T : IEfParser<E>, new()
+    {
+        var t = new T();
+        Log.Info("Parsing Elemental File: " + t.Name());
+        return t.ParseFromBytes(data);
+    }
+
     public static ResponseCommand FromBytes(byte[] bytes)
     {
         int sw1 = bytes[^2];

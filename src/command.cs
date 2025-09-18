@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Interfaces;
 using Type;
 using Asn1;
+using Helper;
 
 
 public class Command<T, E>(ICommunicator communicator, T encryption)
@@ -16,33 +17,46 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
     public bool IsActiveApp { get; private set; } = false;
 
     public async Task<Result<ResponseCommand, E>> ReadBinary(IEfID efID, byte offset = 0x00, byte le = 0x00, byte cla = 0x00)
-        => await ReadBinaryFullID(efID.GetFullID(), offset, le);
+    {
+        var app = efID.AppIdentifier();
+        if (_appSelected == app || app == null)
+        {
+            return await ReadBinaryFullID(efID, offset, le);
 
+        }
+        else
+        {
+            await SelectApplication(app);
+            _appSelected = app;
+            return await ReadBinaryFullID(efID, offset, le);
+        }
+    }
     public async Task<Result<ResponseCommand, E>> SelectApplication(AppID app)
     {
-        byte[] appLDS1ID = [0xA0, 0x00, 0x00, 0x02, 0x47, 0x10, 0x01];
-        return await ApplicationSelect(appLDS1ID);
+        return await ApplicationSelect(app);
     }
 
-    private async Task<Result<ResponseCommand, E>> ElementFileSelect(byte[] fileID, byte cla = 0x00)
+    private async Task<Result<ResponseCommand, E>> ElementFileSelect(IEfID fileID, byte cla = 0x00)
     {
-        byte[] cmd = FormatCommand(cla, 0xA4, 0x02, 0x0C, fileID);
+        Log.Info("Selecting EF File: " + fileID.GetName());
+        byte[] cmd = FormatCommand(cla, 0xA4, 0x02, 0x0C, fileID.GetFullID());
         var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
-        return Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
-    private async Task<Result<ResponseCommand, E>> ApplicationSelect(byte[] appID)
+    private async Task<Result<ResponseCommand, E>> ApplicationSelect(AppID appID)
     {
-        byte[] cmd = FormatCommand(0x00, 0xA4, 0x04, 0x0C, appID);
+        Log.Info("Selecting Application: " + appID.Name);
+        byte[] cmd = FormatCommand(0x00, 0xA4, 0x04, 0x0C, appID.GetID());
         var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
 
         if (!result.IsSuccess) return Fail(result.Error);
 
         IsActiveApp = true;
-        return Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
-    private async Task<Result<ResponseCommand, E>> ReadBinaryFullID(byte[] efID, byte offset, byte le, byte cla = 0x00)
+    private async Task<Result<ResponseCommand, E>> ReadBinaryFullID(IEfID efID, byte offset, byte le, byte cla = 0x00)
     {
         var selectResult = await ElementFileSelect(efID);
         if (!selectResult.IsSuccess)
@@ -51,13 +65,13 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
             return selectResult;
         }
 
-
+        Log.Info("Reading EF File: " + efID.GetName());
         byte[] cmd = FormatCommand(0x00, 0xB0, 0x00, 0x00, le: le);
         var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
 
         if (!result.IsSuccess) return Fail(result.Error);
 
-        return Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
     public async Task<Result<ResponseCommand, E>> ReadBinaryShort(IEfID efID, byte offset, byte le, byte cla = 0x00)
@@ -67,7 +81,7 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
 
         if (!result.IsSuccess) return Fail(result.Error);
 
-        return Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
     public async Task<Result<ResponseCommand, E>> MseSetAT(byte[] oid, byte[] password, int parameterID, byte[]? chat = null, byte cla = 0x00)
@@ -85,7 +99,7 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
             return Fail(result.Error);
 
 
-        return Success(ResponseCommand.FromBytes(result.Value));
+        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Value));
     }
 
     private static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, byte? le = null)
@@ -101,9 +115,9 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
         return [.. cmd];
     }
 
-    private Result<ResponseCommand, E> Success(ResponseCommand cmd) => Result<ResponseCommand, E>.Success(cmd);
-    private Result<ResponseCommand, E> Fail(E e) => Result<ResponseCommand, E>.Fail(e);
-
+    private static Result<ResponseCommand, E> Success(ResponseCommand cmd) => Result<ResponseCommand, E>.Success(cmd);
+    private static Result<ResponseCommand, E> Fail(E e) => Result<ResponseCommand, E>.Fail(e);
+    private AppID? _appSelected;
     private readonly ICommunicator _communicator = communicator;
     private readonly T _encryption = encryption;
 }

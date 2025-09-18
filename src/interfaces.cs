@@ -9,8 +9,9 @@ namespace Interfaces;
 /// T represents the type of object returned after parsing.
 /// </summary>
 /// <typeparam name="T">Type produced by the parser</typeparam>
-public interface IEfParser<T>
+public interface IEfParser<out T>
 {
+    string Name();
     T ParseFromBytes(byte[] bytes);
 }
 
@@ -28,6 +29,8 @@ public interface IEfID
 
     /// <summary>Associated application ID, if any</summary>
     AppID? AppIdentifier();
+
+    string GetName();
 }
 
 /// <summary>

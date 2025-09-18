@@ -1,9 +1,21 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.Intrinsics.Arm;
+using System.Security.Cryptography;
+using System.Text;
+using Helper;
+
 
 namespace Encryption;
 
-
+public class TestClass
+{
+    static public byte[] MappingGm(EncryptionInfo info)
+    {
+        var bytes = Encoding.ASCII.GetBytes(MrzUtils.GetMrz("35172541", "010813", "250820"));
+        return SHA1.Create().ComputeHash(bytes);
+    }
+}
 
 public class AlgorithmIdentifier(AlgorithmType type, int bitLength, int? modPrimeOrder = null)
 {
@@ -68,12 +80,7 @@ public class EncryptionInfo
 
     public void PrintInfo()
     {
-        Console.WriteLine();
-        Console.WriteLine(AgreementType);
-        Console.WriteLine(EncryptType);
-        Console.WriteLine(MappingType);
-        Console.WriteLine(MacType);
-        Console.WriteLine();
+        Log.Info($"{AgreementType} {EncryptType} {MappingType} {MacType}");
     }
 
 }

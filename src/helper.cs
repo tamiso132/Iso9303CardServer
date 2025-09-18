@@ -1,9 +1,11 @@
+using Microsoft.Extensions.Logging;
+using Serilog;
+using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Type;
-
 namespace Helper;
 
 public static class MrzUtils
@@ -22,7 +24,7 @@ public static class MrzUtils
         return fullStr;
     }
 
-    public static string GetCheckDigit(string s)
+    internal static string GetCheckDigit(string s)
     {
         int[] lookupWeight = [7, 3, 1];
         int lookupIndex = 0;
@@ -158,3 +160,25 @@ public static class HexUtils
         return result;
     }
 }
+
+
+
+public static class Log
+{
+    static Log()
+    {
+
+        // Configure Serilog once
+        Serilog.Log.Logger = new LoggerConfiguration()
+        .WriteTo.Console(
+            outputTemplate: "{Timestamp:HH:mm:ss} {Message:lj}{NewLine}", // remove {Level}
+            theme: AnsiConsoleTheme.Code)
+        .MinimumLevel.Information()
+        .CreateLogger();
+    }
+    public static void Info(string message) => Serilog.Log.Information("[INF] {Message}", message);
+    public static void Warn(string message) => Serilog.Log.Warning("[WRN] {Message}", message);
+    public static void Error(string message) => Serilog.Log.Error("[ERR] {Message}", message);
+
+}
+

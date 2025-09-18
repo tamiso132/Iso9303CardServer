@@ -31,7 +31,7 @@ public class WsSession : WebSocketBehavior
 
     protected override void OnMessage(MessageEventArgs e)
     {
-        Console.WriteLine("Message from client: " + e.Data);
+        // Console.WriteLine("Message from client: " + e.Data);
     }
 
     protected override void OnClose(CloseEventArgs e)
