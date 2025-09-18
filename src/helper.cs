@@ -24,7 +24,7 @@ public static class MrzUtils
 
     public static string GetCheckDigit(string s)
     {
-        int[] lookupWeight = { 7, 3, 1 };
+        int[] lookupWeight = [7, 3, 1];
         int lookupIndex = 0;
         int sum = 0;
 

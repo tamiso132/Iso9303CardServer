@@ -173,7 +173,7 @@ public sealed class SwStatus
     #region fields
     public readonly int Sw1;
     public readonly int Sw2;
-    public string Message { get; }
+    public readonly string Message;
 
     #endregion
 
@@ -185,7 +185,7 @@ public sealed class SwStatus
         Message = message;
     }
 
-    private static readonly Dictionary<(int sw1, int sw2), SwStatus> StatusMap = new()
+    private Dictionary<(int sw1, int sw2), SwStatus> StatusMap = new()
     {
         { (Success.Sw1, Success.Sw2), Success },
         { (MoreDataAvailable.Sw1, MoreDataAvailable.Sw2), MoreDataAvailable },
@@ -249,10 +249,13 @@ public struct ResponseCommand(int sw1, int sw2, byte[]? data = null)
 {
     public static ResponseCommand FromBytes(byte[] bytes)
     {
+        int sw1 = bytes[^2];
+        int sw2 = bytes[^1];
 
-        int sw1 = bytes[bytes.Length - 2];
-        int sw2 = bytes[bytes.Length - 1];
-        byte[] data = bytes[1..(bytes.Length - 2)];
+        if (bytes.Length <= 2)
+            return new ResponseCommand(sw1, sw2, []);
+
+        byte[] data = bytes[0..(bytes.Length - 2)];
 
         return new ResponseCommand(sw1, sw2, data);
 

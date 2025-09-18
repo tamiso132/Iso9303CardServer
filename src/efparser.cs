@@ -7,166 +7,191 @@ using Helper;
 using Interfaces;
 using Type;
 
-namespace Cmd
+namespace Parser;
+
+public class Dg1Info
 {
-    public class Dg1Info
+    public int DocumentCode { get; set; }
+    public int State { get; set; }
+    public List<byte> DocumentNumber { get; } = new();
+    public byte[] DateOfBirth { get; set; } = Array.Empty<byte>();
+    public int Gender { get; set; }
+    public byte[] DateExpire { get; set; } = Array.Empty<byte>();
+    public byte[] Nationality { get; set; } = Array.Empty<byte>();
+    public string Name { get; set; } = "";
+    internal Dg1Info() { }
+}
+
+public class ImplEfDg1TD1 : IEfParser<Dg1Info>
+{
+    public Dg1Info ParseFromBytes(byte[] bytes)
     {
-        public int DocumentCode { get; set; }
-        public int State { get; set; }
-        public List<byte> DocumentNumber { get; } = new();
-        public byte[] DateOfBirth { get; set; } = Array.Empty<byte>();
-        public int Gender { get; set; }
-        public byte[] DateExpire { get; set; } = Array.Empty<byte>();
-        public byte[] Nationality { get; set; } = Array.Empty<byte>();
-        public string Name { get; set; } = "";
-        internal Dg1Info() { }
+        var ef = new Dg1Info();
+        var reader = new ByteReader(bytes);
+        int tag = reader.ReadInt(1);
+        if (tag != 0x61) throw new Exception($"Unexpected tag: 0x{tag:X2}");
+
+        int length = reader.ReadLength();
+        int innerTag = reader.ReadInt(2);
+        if (innerTag != 0x5F1F) throw new Exception($"Wrong inner tag: 0x{innerTag:X2}");
+
+        ef.DocumentCode = reader.ReadInt(2);
+        ef.State = reader.ReadInt(3);
+        ef.DocumentNumber.AddRange(reader.ReadBytes(14));
+
+        int isExtended = reader.ReadInt(1);
+        if (isExtended == 1) ef.DocumentNumber.AddRange(reader.ReadBytes(15));
+        else reader.PaddingNext(15);
+
+        ef.DateOfBirth = reader.ReadBytes(6);
+        int checkBirth = reader.ReadInt(1);
+        ef.Gender = reader.ReadInt(1);
+        ef.DateExpire = reader.ReadBytes(6);
+        int checkExpire = reader.ReadInt(1);
+        ef.Nationality = reader.ReadBytes(3);
+
+        reader.PaddingNext(12);
+        ef.Name = reader.ReadString(30);
+
+        return ef;
     }
+}
 
-    public class ImplEfDg1TD1 : IEfParser<Dg1Info>
+public class EfComInfo
+{
+    public string LdsVersion { get; set; } = "";
+    public string UnicodeVersion { get; set; } = "";
+    public List<int> DgTags { get; set; } = new();
+}
+
+public class ImplEfCom : IEfParser<EfComInfo>
+{
+    public EfComInfo ParseFromBytes(byte[] bytes)
     {
-        public Dg1Info ParseFromBytes(byte[] bytes)
+        // var ef = new EfComInfo();
+        // var reader = new ByteReader(bytes);
+
+        // int tag = reader.ReadInt(1);
+        // if (tag != 0x60) throw new Exception("Not a valid EF.COM file");
+
+        // int length = reader.ReadLength();
+        // while (reader.HasRemaining())
+        // {
+        //     int innerTag = reader.ReadInt(1);
+        //     int innerLength = reader.ReadLength();
+        //     var value = reader.ReadBytes(innerLength);
+
+        //     switch (innerTag)
+        //     {
+        //         case 0x5F01: ef.LdsVersion = Encoding.ASCII.GetString(value); break;
+        //         case 0x5F36: ef.UnicodeVersion = Encoding.ASCII.GetString(value); break;
+        //         case 0x5C: ef.DgTags = new List<int>(value); break;
+        //         default: break;
+        //     }
+        // }
+        throw new NotImplementedException();
+    }
+}
+
+
+
+public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
+{
+
+    public Info ParseFromBytes(byte[] bytes)
+    {
+        var ef = new Info();
+        var allNodes = AsnNode.Parse(new ByteReader(bytes));
+        foreach (var node in allNodes.GetAllNodes())
         {
-            var ef = new Dg1Info();
-            var reader = new ByteReader(bytes);
-            int tag = reader.ReadInt(1);
-            if (tag != 0x61) throw new Exception($"Unexpected tag: 0x{tag:X2}");
-
-            int length = reader.ReadLength();
-            int innerTag = reader.ReadInt(2);
-            if (innerTag != 0x5F1F) throw new Exception($"Wrong inner tag: 0x{innerTag:X2}");
-
-            ef.DocumentCode = reader.ReadInt(2);
-            ef.State = reader.ReadInt(3);
-            ef.DocumentNumber.AddRange(reader.ReadBytes(14));
-
-            int isExtended = reader.ReadInt(1);
-            if (isExtended == 1) ef.DocumentNumber.AddRange(reader.ReadBytes(15));
-            else reader.PaddingNext(15);
-
-            ef.DateOfBirth = reader.ReadBytes(6);
-            int checkBirth = reader.ReadInt(1);
-            ef.Gender = reader.ReadInt(1);
-            ef.DateExpire = reader.ReadBytes(6);
-            int checkExpire = reader.ReadInt(1);
-            ef.Nationality = reader.ReadBytes(3);
-
-            reader.PaddingNext(12);
-            ef.Name = reader.ReadString(30);
-
-            return ef;
+            node.PrintTree();
         }
-    }
 
-    public class EfComInfo
-    {
-        public string LdsVersion { get; set; } = "";
-        public string UnicodeVersion { get; set; } = "";
-        public List<int> DgTags { get; set; } = new();
-    }
-
-    public class ImplEfCom : IEfParser<EfComInfo>
-    {
-        public EfComInfo ParseFromBytes(byte[] bytes)
+        foreach (var set in allNodes.Filter(TagID.Set))
         {
-            // var ef = new EfComInfo();
-            // var reader = new ByteReader(bytes);
-
-            // int tag = reader.ReadInt(1);
-            // if (tag != 0x60) throw new Exception("Not a valid EF.COM file");
-
-            // int length = reader.ReadLength();
-            // while (reader.HasRemaining())
-            // {
-            //     int innerTag = reader.ReadInt(1);
-            //     int innerLength = reader.ReadLength();
-            //     var value = reader.ReadBytes(innerLength);
-
-            //     switch (innerTag)
-            //     {
-            //         case 0x5F01: ef.LdsVersion = Encoding.ASCII.GetString(value); break;
-            //         case 0x5F36: ef.UnicodeVersion = Encoding.ASCII.GetString(value); break;
-            //         case 0x5C: ef.DgTags = new List<int>(value); break;
-            //         default: break;
-            //     }
-            // }
-            throw new NotImplementedException();
-        }
-    }
-
-    public class CardAccessInfo
-    {
-        public List<EncryptionInfo> EncryptInfos { get; } = new();
-    }
-
-    public class ImplCardAccess : IEfParser<CardAccessInfo>
-    {
-        public CardAccessInfo ParseFromBytes(byte[] bytes)
-        {
-            var ef = new CardAccessInfo();
-            var allNodes = AsnNode.Parse(new ByteReader(bytes));
-
-            foreach (var set in allNodes.Filter(TagID.Set))
+            foreach (var paceInfo in set.Filter(TagID.Sequence))
             {
-                foreach (var paceInfo in set.Filter(TagID.Sequence))
-                {
-                    byte[] oid = paceInfo.GetChildNode(0).GetValueAsOID();
-                    var ver = paceInfo.GetChildNode(1).GetValueAsInt();
-                    var paramID = paceInfo.GetChildNode(2).GetValueAsInt();
+                byte[] oid = paceInfo.GetChildNode(0).GetValueAsOID();
+                var ver = paceInfo.GetChildNode(1).GetValueAsInt();
+                var paramID = paceInfo.GetChildNode(2).GetValueAsInt();
 
-                    var info = EncryptionInfo.Get(oid, paramID);
-                    ef.EncryptInfos.Add(info);
-                    info.PrintInfo();
-                }
+                var info = EncryptionInfo.Get(oid, paramID);
+                ef.EncryptInfos.Add(info);
+                info.PrintInfo();
             }
-
-            return ef;
         }
-    }
 
-    public class EFSodInfo
-    {
-        public string LdsVersion { get; set; } = "";
-        public string DigestAlgorithm { get; set; } = "";
-        public Dictionary<int, byte[]> DgHashes { get; } = new();
-        public byte[] Signature { get; set; } = Array.Empty<byte>();
+        return ef;
     }
-
-    public class ImplEfSod : IEfParser<EFSodInfo>
+    public class Info
     {
-        public EFSodInfo ParseFromBytes(byte[] bytes)
+        internal Info() { }
+        public readonly List<EncryptionInfo> EncryptInfos = [];
+    }
+}
+
+public struct ImplEFDir : IEfParser<ImplEFDir.Info>
+{
+    public readonly Info ParseFromBytes(byte[] bytes)
+    {
+        var ef = new Info();
+        var allNodes = AsnNode.Parse(new ByteReader(bytes));
+        foreach (var node in allNodes.GetAllNodes())
         {
-            // var ef = new EFSodInfo();
-            // var reader = new ByteReader(bytes);
-
-            // int tag = reader.ReadInt(1);
-            // if (tag != 0x77) throw new Exception("Not a valid EF.SOD");
-
-            // int length = reader.ReadLength();
-            // int versionTag = reader.ReadInt(1);
-            // int versionLength = reader.ReadLength();
-            // ef.LdsVersion = Encoding.ASCII.GetString(reader.ReadBytes(versionLength));
-
-            // int digestTag = reader.ReadInt(1);
-            // int digestLength = reader.ReadLength();
-            // ef.DigestAlgorithm = Encoding.ASCII.GetString(reader.ReadBytes(digestLength));
-
-            // int dgHashTag = reader.ReadInt(1);
-            // int dgHashLength = reader.ReadLength();
-            // int dgHashEnd = reader.Offset + dgHashLength;
-
-            // while (reader.Offset < dgHashEnd)
-            // {
-            //     int dgNumber = reader.ReadInt(1);
-            //     int hashLen = reader.ReadLength();
-            //     ef.DgHashes[dgNumber] = reader.ReadBytes(hashLen);
-            // }
-
-            // int signatureTag = reader.ReadInt(1);
-            // int signatureLength = reader.ReadLength();
-            // ef.Signature = reader.ReadBytes(signatureLength);
-
-            // return ef;
-            throw new NotImplementedException();
+            node.PrintTree();
         }
+        return ef;
+    }
+
+    public class Info
+    {
+
+    }
+}
+
+public class EFSodInfo
+{
+    public string LdsVersion { get; set; } = "";
+    public string DigestAlgorithm { get; set; } = "";
+    public Dictionary<int, byte[]> DgHashes { get; } = new();
+    public byte[] Signature { get; set; } = Array.Empty<byte>();
+}
+
+public class ImplEfSod : IEfParser<EFSodInfo>
+{
+    public EFSodInfo ParseFromBytes(byte[] bytes)
+    {
+        // var ef = new EFSodInfo();
+        // var reader = new ByteReader(bytes);
+
+        // int tag = reader.ReadInt(1);
+        // if (tag != 0x77) throw new Exception("Not a valid EF.SOD");
+
+        // int length = reader.ReadLength();
+        // int versionTag = reader.ReadInt(1);
+        // int versionLength = reader.ReadLength();
+        // ef.LdsVersion = Encoding.ASCII.GetString(reader.ReadBytes(versionLength));
+
+        // int digestTag = reader.ReadInt(1);
+        // int digestLength = reader.ReadLength();
+        // ef.DigestAlgorithm = Encoding.ASCII.GetString(reader.ReadBytes(digestLength));
+
+        // int dgHashTag = reader.ReadInt(1);
+        // int dgHashLength = reader.ReadLength();
+        // int dgHashEnd = reader.Offset + dgHashLength;
+
+        // while (reader.Offset < dgHashEnd)
+        // {
+        //     int dgNumber = reader.ReadInt(1);
+        //     int hashLen = reader.ReadLength();
+        //     ef.DgHashes[dgNumber] = reader.ReadBytes(hashLen);
+        // }
+
+        // int signatureTag = reader.ReadInt(1);
+        // int signatureLength = reader.ReadLength();
+        // ef.Signature = reader.ReadBytes(signatureLength);
+
+        // return ef;
+        throw new NotImplementedException();
     }
 }

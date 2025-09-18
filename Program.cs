@@ -14,8 +14,9 @@ wssv.AddWebSocketService<WsSession>("/");
 // Start the server
 wssv.Start();
 Console.WriteLine("WebSocket server started, waiting for connections...");
-Console.ReadKey(true);
+Console.ReadLine();
 wssv.Stop();
+//Console.ReadKey(true);
 
 // Define a WebSocket behavior for each client
 public class WsSession : WebSocketBehavior
