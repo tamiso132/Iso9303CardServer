@@ -155,7 +155,6 @@ public sealed class AppID
 }
 
 
-
 public sealed class SwStatus
 {
 
@@ -260,6 +259,16 @@ public sealed class SwStatus
         Console.WriteLine($"Warning: Unknown SW code: SW1=0x{sw1:X2}, SW2=0x{sw2:X2}");
         return Unknown;
     }
+
+    public bool IsSuccess()
+    {
+        if (this == Success)
+            return true;
+
+        Log.Error("SW ErrorCode: " + this.Message);
+        return false;
+    }
+
     #endregion
 }
 

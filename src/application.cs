@@ -29,14 +29,24 @@ public class ClientSession(ICommunicator comm)
             var response = result.Value;
             var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
 
-            result = await _cmd.MseSetAT(info.OrgOid, TestClass.MappingGm(info), info.OrgParameterID);
+            //  result = await _cmd.MseSetAT(info.OrgOid, TestClass.MappingGm(info), info.OrgParameterID);
 
             if (!result.IsSuccess)
                 return;
 
-            Log.Info("it was ok?");
 
 
+            var key = TestClass.DerivePaceKey(info);
+
+            result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
+
+            if (!result.IsSuccess)
+                return;
+
+            if (!result.Value.status.IsSuccess())
+                return;
+
+            Log.Info("All commands completed without a problem");
 
 
 

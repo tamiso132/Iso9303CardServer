@@ -84,12 +84,12 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
         return Command<T, E>.Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
-    public async Task<Result<ResponseCommand, E>> MseSetAT(byte[] oid, byte[] password, int parameterID, byte[]? chat = null, byte cla = 0x00)
+    public async Task<Result<ResponseCommand, E>> MseSetAT(byte[] oid, int parameterID, byte cla = 0x00)
     {
         byte[] data = new AsnBuilder()
-            .AddCustomTag(0x80, oid)
-            .AddCustomTag(0x83, password)
-            .AddCustomTag(0x84, [(byte)parameterID])
+            .AddCustomTag(0x80, oid) // object identifier
+            .AddCustomTag(0x83, [0x01]) // MRZ
+            .AddCustomTag(0x84, [(byte)parameterID]) // parameter id
             .Build();
 
         byte[] cmd = FormatCommand(cla, 0x22, 0xC1, 0xA4, data);

@@ -144,7 +144,7 @@ public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
                 var ver = paceInfo.GetChildNode(1).GetValueAsInt();
                 var paramID = paceInfo.GetChildNode(2).GetValueAsInt();
 
-                var info = EncryptionInfo.Get(oid, paramID);
+                var info = new EncryptionInfo(oid, paramID);
                 ef.EncryptInfos.Add(info);
                 info.PrintInfo();
             }

@@ -1,9 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Runtime.Intrinsics.Arm;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Unicode;
+using System.Threading.Tasks;
 using Helper;
+using Interfaces;
 
 
 namespace Encryption;
@@ -16,10 +20,31 @@ public class TestClass
         return SHA1.Create().ComputeHash(bytes);
     }
 
-    static void DerivePaceKey(){
+    public static byte[] DerivePaceKey(EncryptionInfo info)
+    {
         // get mrz
         // SHA1 the mrz
-        
+        var mrz = MrzUtils.GetMrz("35172541", "010813", "250820");
+        byte[] shaMrz = SHA1.HashData(Encoding.UTF8.GetBytes(mrz));
+
+        byte[] PACEMODE = [0x00, 0x00, 0x00, 0x03];
+
+        byte[] data = [.. shaMrz, .. PACEMODE];
+        byte[] key = [];
+
+        // TODO, implement for DESEDE2, cause it works different when creating key.
+
+        if (info.KeySize > 128)
+        {
+            key = SHA1.HashData(data);
+        }
+        else
+        {
+            key = SHA256.HashData(data);
+        }
+
+        return key;
+
 
         // the counter is 4 bytes long and ends in either of these
         // case ENC_MODE = 0x01
@@ -59,16 +84,17 @@ public class TestClass
         */
     }
 
-    static void SendMSEAT(){
-        // Asn1 Encryption
-        // oid with tag 0x80
-        // if mrz or can  with tag 0x83
-        // the parameter id with tag 0x84
-        // then the data is written as   oid->keytype->parameterid
-    }
 
-    static void PerformKeyAgreement(){
-        // Compute decrypted Nounce
+
+    static void PerformKeyAgreement()
+    {
+        // Compute decrypted Nounce By 
+        //Send general Authenticate,  with tag 0x7C and no data
+        // Parse the response and get the nounce from it
+        // decrypt it, using the paceKey with the encryption algoritm
+
+
+
         // Compute EphermeralParams
         //Perform Key agreement
     }
@@ -92,7 +118,7 @@ public class EncryptionInfo
         {6, (KeyAgreement.EcDh, Mapping.Cam)}
     };
 
-    private static readonly Dictionary<int, (CipherEncryption, MacType, int)> cryptoMap = new()
+    private static readonly Dictionary<int, (CipherEncryption, MacType, uint)> cryptoMap = new()
     {
         {1, (CipherEncryption.E3Des, MacType.Cbc, 0)},
         {2, (CipherEncryption.Aes, MacType.CMAC, 128)},
@@ -100,45 +126,45 @@ public class EncryptionInfo
         {4, (CipherEncryption.Aes, MacType.CMAC, 256)}
     };
 
+
+
+    public EncryptionInfo(byte[] oid, int parameterId)
+    {
+        int lastID = oid[^1];
+        int paceID = oid[^2];
+
+        this.OrgOid = oid;
+        this.OrgParameterID = parameterId;
+
+        var pace = paceMap[paceID];
+        this.AgreementType = pace.Item1;
+        this.MappingType = pace.Item2;
+
+        var crypto = cryptoMap[lastID];
+        this.EncryptType = crypto.Item1;
+        this.MacType = crypto.Item2;
+        this.KeySize = crypto.Item3;
+
+        if (this.AgreementType == KeyAgreement.Unknown) throw new Exception("Invalid KeyAgreement");
+        if (this.EncryptType == CipherEncryption.Unknown) throw new Exception("Invalid CipherEncryption");
+        if (this.MappingType == Mapping.Unknown) throw new Exception("Invalid Mapping");
+        if (this.MacType == MacType.Unknown) throw new Exception("Invalid MacType");
+
+    }
+
+    public void PrintInfo()
+    {
+        Log.Info($"{AgreementType} {EncryptType}{KeySize} {MappingType} {MacType}");
+    }
+
     public KeyAgreement AgreementType { get; set; } = KeyAgreement.Unknown;
     public CipherEncryption EncryptType { get; set; } = CipherEncryption.Unknown;
     public Mapping MappingType { get; set; } = Mapping.Unknown;
     public MacType MacType { get; set; } = MacType.Unknown;
     public AlgorithmIdentifier AlgoIdent { get; set; } = null!;
-    public int Len { get; set; }
-    public byte[] OrgOid { get; set; } = [];
-    public int OrgParameterID { get; set; }
-
-    public static EncryptionInfo Get(byte[] oid, int parameterId)
-    {
-        int lastID = oid[^1];
-        int paceID = oid[^2];
-
-        EncryptionInfo info = new();
-        info.OrgOid = oid;
-        info.OrgParameterID = parameterId;
-
-        var pace = paceMap[paceID];
-        info.AgreementType = pace.Item1;
-        info.MappingType = pace.Item2;
-
-        var crypto = cryptoMap[lastID];
-        info.EncryptType = crypto.Item1;
-        info.MacType = crypto.Item2;
-        info.Len = crypto.Item3;
-
-        if (info.AgreementType == KeyAgreement.Unknown) throw new Exception("Invalid KeyAgreement");
-        if (info.EncryptType == CipherEncryption.Unknown) throw new Exception("Invalid CipherEncryption");
-        if (info.MappingType == Mapping.Unknown) throw new Exception("Invalid Mapping");
-        if (info.MacType == MacType.Unknown) throw new Exception("Invalid MacType");
-
-        return info;
-    }
-
-    public void PrintInfo()
-    {
-        Log.Info($"{AgreementType} {EncryptType} {MappingType} {MacType}");
-    }
+    public byte[] OrgOid { get; } = [];
+    public int OrgParameterID { get; }
+    public uint KeySize { get; }
 
 }
 
