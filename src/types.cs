@@ -36,7 +36,7 @@ public sealed class TagID
     public static readonly TagID Integer = new(TagType.Integer, "Integer");
     public static readonly TagID OctetString = new(TagType.OctetString, "OctetString");
     public static readonly TagID ObjectIdentifier = new(TagType.ObjectIdentifier, "ObjectIdentifier");
-    public static readonly TagID Boolean = new TagID(TagType.Boolean, "Boolean");
+    public static readonly TagID Boolean = new(TagType.Boolean, "Boolean");
 
     public override string ToString() => TagName;
 

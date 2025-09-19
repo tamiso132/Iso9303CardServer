@@ -6,6 +6,7 @@ using WebSocketSharp;
 using Parser;
 using Helper;
 using Encryption;
+using Command;
 namespace App;
 
 
@@ -22,7 +23,7 @@ public class ClientSession(ICommunicator comm)
             var result = await _cmd.ReadBinary(EfIdGlobal.CardAccess);
             if (!result.IsSuccess)
             {
-                Console.WriteLine("Error: " + result.Error.GetMessage());
+                Console.WriteLine("Error: " + result.Error.GetDescription());
                 return;
             }
 
@@ -54,11 +55,11 @@ public class ClientSession(ICommunicator comm)
     }
 
     private readonly ICommunicator _comm = comm;
-    private readonly Command<ServerEncryption, CommandType> _cmd = new(comm, new ServerEncryption());
+    private readonly Command<ServerEncryption> _cmd = new(comm, new ServerEncryption());
 }
 
 
-public class ServerEncryption : IServerEncryption<CommandType>
+public class ServerEncryption : IServerEncryption<CommandError>
 {
 
     public byte[] Encrypt(byte[] input)
@@ -71,15 +72,15 @@ public class ServerEncryption : IServerEncryption<CommandType>
     }
 
 
-    public Result<byte[], CommandType> Decode(byte[] input)
+    public Result<byte[], CommandError> Decode(byte[] input)
     {
         var packet = CommandPacket.TryFromBytes(input);
         if (packet.Type == CommandType.Package)
         {
-            return Result<byte[], CommandType>.Success(packet.Data);
+            return Result<byte[], CommandError>.Success(packet.Data);
         }
         Console.WriteLine("Error: " + packet.Type.ToString());
-        return Result<byte[], CommandType>.Fail(CommandType.Error);
+        return Result<byte[], CommandError>.Fail(CommandError.EncryptError);
     }
 };
 

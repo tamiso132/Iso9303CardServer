@@ -6,11 +6,16 @@ using Interfaces;
 using Type;
 using Asn1;
 using Helper;
+using System.ComponentModel;
 
+namespace Command;
 
-public class Command<T, E>(ICommunicator communicator, T encryption)
+using E = CommandError;
+
+// TODO, add a command that keeps asking for more bytes if we get error SW that all the bytes has not been sent yet
+// TODO, should also add error check for when parsing to Response Command fails
+public class Command<T>(ICommunicator communicator, T encryption)
     where T : IServerEncryption<E>
-    where E : Enum
 {
 
 
@@ -41,7 +46,7 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
         Log.Info("Selecting EF File: " + fileID.GetName());
         byte[] cmd = FormatCommand(cla, 0xA4, 0x02, 0x0C, fileID.GetFullID());
         var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
-        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
     private async Task<Result<ResponseCommand, E>> ApplicationSelect(AppID appID)
@@ -53,7 +58,7 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
         if (!result.IsSuccess) return Fail(result.Error);
 
         IsActiveApp = true;
-        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
     private async Task<Result<ResponseCommand, E>> ReadBinaryFullID(IEfID efID, byte offset, byte le, byte cla = 0x00)
@@ -71,7 +76,7 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
 
         if (!result.IsSuccess) return Fail(result.Error);
 
-        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
     public async Task<Result<ResponseCommand, E>> ReadBinaryShort(IEfID efID, byte offset, byte le, byte cla = 0x00)
@@ -81,7 +86,7 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
 
         if (!result.IsSuccess) return Fail(result.Error);
 
-        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
     public async Task<Result<ResponseCommand, E>> MseSetAT(byte[] oid, int parameterID, byte cla = 0x00)
@@ -99,7 +104,19 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
             return Fail(result.Error);
 
 
-        return Command<T, E>.Success(ResponseCommand.FromBytes(result.Value));
+        return Success(ResponseCommand.FromBytes(result.Value));
+    }
+
+    public async Task<Result<ResponseCommand, E>> GeneralAuthenticate()
+    {
+        byte[] data = new AsnBuilder().AddCustomTag(0x7C, []).Build();
+        byte[] cmd = FormatCommand(0x10, 0x86, 0x00, 0x00, data: data);
+
+        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
+        if (!result.IsSuccess)
+            return Fail(result.Error);
+
+        return Success(ResponseCommand.FromBytes(result.Unwrap()));
     }
 
     private static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, byte? le = null)
@@ -115,9 +132,40 @@ public class Command<T, E>(ICommunicator communicator, T encryption)
         return [.. cmd];
     }
 
+
+
+
     private static Result<ResponseCommand, E> Success(ResponseCommand cmd) => Result<ResponseCommand, E>.Success(cmd);
     private static Result<ResponseCommand, E> Fail(E e) => Result<ResponseCommand, E>.Fail(e);
     private AppID? _appSelected;
     private readonly ICommunicator _communicator = communicator;
     private readonly T _encryption = encryption;
 }
+
+public static class CommandErrorExtension
+{
+    public static string GetDescription(this CommandError value)
+    {
+        var field = value.GetType().GetField(value.ToString());
+        var attr = (DescriptionAttribute?)Attribute.GetCustomAttribute(field!, typeof(DescriptionAttribute));
+        return attr?.Description ?? value.ToString();
+    }
+}
+
+public enum CommandError
+{
+    [Description("NFC connection lost")]
+    NFCLost,
+
+    [Description("Invalid status word")]
+    SWError,
+
+    [Description("Encryption failed")]
+    EncryptError,
+
+    [Description("Parse to ResponseCommand Fail")]
+    ResponseParseFail,
+
+}
+
+
