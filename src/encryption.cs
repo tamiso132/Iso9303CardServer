@@ -15,6 +15,63 @@ public class TestClass
         var bytes = Encoding.ASCII.GetBytes(MrzUtils.GetMrz("35172541", "010813", "250820"));
         return SHA1.Create().ComputeHash(bytes);
     }
+
+    static void DerivePaceKey(){
+        // get mrz
+        // SHA1 the mrz
+        
+
+        // the counter is 4 bytes long and ends in either of these
+        // case ENC_MODE = 0x01
+        //case MAC_MODE = 0x02
+        //case PACE_MODE = 0x03 
+
+        // the data for the command is prepared by 
+        // keyseed -> data counter
+
+        // then that data is getting another encryption depending on 
+        // key derivation is SHA1 if .AES128  or DES and DESEDE2
+        // AES more then 128 bits is SHA256
+
+        /* Then this and u get the key
+         let key: [UInt8] = switch securityConfig.encryption {
+        case .DESEDE2:
+            
+            // Actually DES-EDE2 is used, so it requires 3 DES keys k1, k2, k3 where k1 = k3.
+            // For this reason, the key length is 192 bit (or 156 bit without parity bits) but
+            // the actual length is 128 bit (or 112 bit without parity bits): 64 (or 56) bit for each key.
+            //
+            // NOTE: DES-EDE is a 3DES where the encryption is performed as ENC(k1, DEC(k2, ENC(k3, M))).
+            // Each operation (ENC/DEC) is a DES operation and this 3DES version is used to make interoperability
+            // with DES smarter.
+            //
+            // Here, the first and the second  octects are used as k1 (for ENC operation) and k2 (for DEC operation).
+            // Then, the first octect is extracted again for k3, known k3 has to be equal to k1 for ENC operation.
+            
+            [UInt8].init(
+                digest[0..<securityConfig.encryption.params.keySize * 8 / 12]
+                + digest[0..<securityConfig.encryption.params.keySize * 8 / 24])
+        default:
+            [UInt8](digest[0..<securityConfig.encryption.params.keySize * 8 / 8])
+        }
+        
+        return key
+        */
+    }
+
+    static void SendMSEAT(){
+        // Asn1 Encryption
+        // oid with tag 0x80
+        // if mrz or can  with tag 0x83
+        // the parameter id with tag 0x84
+        // then the data is written as   oid->keytype->parameterid
+    }
+
+    static void PerformKeyAgreement(){
+        // Compute decrypted Nounce
+        // Compute EphermeralParams
+        //Perform Key agreement
+    }
 }
 
 public class AlgorithmIdentifier(AlgorithmType type, int bitLength, int? modPrimeOrder = null)

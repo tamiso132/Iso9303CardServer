@@ -4,9 +4,32 @@ using App;
 using Server;
 
 
+var config = File.ReadAllLines("config.txt");
+string ip = null;
+string port = null;
+
+foreach (var line in config)
+{
+    var parts = line.Split('=', 2);
+    if (parts.Length != 2) continue;
+
+    var key = parts[0].Trim();
+    var value = parts[1].Trim();
+
+    if (key.Equals("IP", StringComparison.OrdinalIgnoreCase))
+        ip = value;
+    else if (key.Equals("Port", StringComparison.OrdinalIgnoreCase))
+        port = value;
+}
+
+if (ip == null || port == null)
+{
+    Console.WriteLine("IP or Port not found in config.");
+    return;
+}
 
 // Create a WebSocket server on your LAN IP and port
-var wssv = new WebSocketServer("ws://192.168.0.108:5000");
+var wssv = new WebSocketServer($"ws://{ip}:{port}");
 
 // Add a service for all clients ("/" path)
 wssv.AddWebSocketService<WsSession>("/");
