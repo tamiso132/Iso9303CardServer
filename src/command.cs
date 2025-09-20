@@ -91,6 +91,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public async Task<Result<ResponseCommand, E>> MseSetAT(byte[] oid, int parameterID, byte cla = 0x00)
     {
+        Log.Info("Sending MseSetAT Command");
         byte[] data = new AsnBuilder()
             .AddCustomTag(0x80, oid) // object identifier
             .AddCustomTag(0x83, [0x01]) // MRZ
@@ -107,12 +108,13 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return Success(ResponseCommand.FromBytes(result.Value));
     }
 
-    public async Task<Result<ResponseCommand, E>> GeneralAuthenticate()
+    public async Task<Result<ResponseCommand, E>> GeneralAuthenticate(byte cla = 0x10)
     {
+        Log.Info("Sending General Authenticate Command");
         byte[] data = new AsnBuilder().AddCustomTag(0x7C, []).Build();
-        byte[] cmd = FormatCommand(0x10, 0x86, 0x00, 0x00, data: data);
+        byte[] raw = [cla, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
 
-        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
+        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(raw)));
         if (!result.IsSuccess)
             return Fail(result.Error);
 
@@ -166,6 +168,11 @@ public enum CommandError
     [Description("Parse to ResponseCommand Fail")]
     ResponseParseFail,
 
+}
+
+enum MSEType // p1 p2
+{
+    MutualAuthentication = 0xC1A4,
 }
 
 

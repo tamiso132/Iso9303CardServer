@@ -256,7 +256,7 @@ public sealed class SwStatus
                 return kv.Value;
         }
 
-        Console.WriteLine($"Warning: Unknown SW code: SW1=0x{sw1:X2}, SW2=0x{sw2:X2}");
+        Log.Error($"Warning: Unknown SW code: SW1=0x{sw1:X2}, SW2=0x{sw2:X2}");
         return Unknown;
     }
 

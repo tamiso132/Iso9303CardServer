@@ -34,7 +34,7 @@ public class TestClass
 
         // TODO, implement for DESEDE2, cause it works different when creating key.
 
-        if (info.KeySize > 128)
+        if (info.KeySize <= 128/8)
         {
             key = SHA1.HashData(data);
         }
@@ -43,7 +43,7 @@ public class TestClass
             key = SHA256.HashData(data);
         }
 
-        return key;
+        return key[0..info.KeySize];
 
 
         // the counter is 4 bytes long and ends in either of these
@@ -118,7 +118,7 @@ public class EncryptionInfo
         {6, (KeyAgreement.EcDh, Mapping.Cam)}
     };
 
-    private static readonly Dictionary<int, (CipherEncryption, MacType, uint)> cryptoMap = new()
+    private static readonly Dictionary<int, (CipherEncryption, MacType, int)> cryptoMap = new()
     {
         {1, (CipherEncryption.E3Des, MacType.Cbc, 0)},
         {2, (CipherEncryption.Aes, MacType.CMAC, 128)},
@@ -143,7 +143,7 @@ public class EncryptionInfo
         var crypto = cryptoMap[lastID];
         this.EncryptType = crypto.Item1;
         this.MacType = crypto.Item2;
-        this.KeySize = crypto.Item3;
+        this._keybits = crypto.Item3;
 
         if (this.AgreementType == KeyAgreement.Unknown) throw new Exception("Invalid KeyAgreement");
         if (this.EncryptType == CipherEncryption.Unknown) throw new Exception("Invalid CipherEncryption");
@@ -154,7 +154,7 @@ public class EncryptionInfo
 
     public void PrintInfo()
     {
-        Log.Info($"{AgreementType} {EncryptType}{KeySize} {MappingType} {MacType}");
+        Log.Info($"{AgreementType} {EncryptType}{_keybits} {MappingType} {MacType}");
     }
 
     public KeyAgreement AgreementType { get; set; } = KeyAgreement.Unknown;
@@ -164,7 +164,8 @@ public class EncryptionInfo
     public AlgorithmIdentifier AlgoIdent { get; set; } = null!;
     public byte[] OrgOid { get; } = [];
     public int OrgParameterID { get; }
-    public uint KeySize { get; }
+    private int _keybits { get; }
+    public int KeySize => _keybits / 8;
 
 }
 

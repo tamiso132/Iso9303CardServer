@@ -79,6 +79,17 @@
       ],
       "MIMode": "gdb",
       "miDebuggerPath": "C:/msys64/mingw64/bin/gdb.exe"
+    },
+    {
+      "name": "Debug in External Console",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet build",
+      "program": "${workspaceFolder}/bin/Debug/net9.0/Backend.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "externalTerminal",
+      "stopAtEntry": false
     }
   ]
 }

@@ -46,6 +46,20 @@
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "dotnet build",
+      "type": "shell",
+      "command": "dotnet build --configuration Debug",
+      "args": [],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
     }
   ]
 }

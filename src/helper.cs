@@ -165,20 +165,28 @@ public static class HexUtils
 
 public static class Log
 {
+    public static readonly ILoggerFactory LoggerFactory;
+    public static readonly Microsoft.Extensions.Logging.ILogger Logger;
+
     static Log()
     {
+        LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
+        {
+            builder
+                .AddSimpleConsole(options =>
+                {
+                    options.IncludeScopes = false;
+                    options.SingleLine = true;
+                    options.TimestampFormat = "HH:mm:ss ";
+                })
+                .SetMinimumLevel(LogLevel.Information);
+        });
 
-        // Configure Serilog once
-        Serilog.Log.Logger = new LoggerConfiguration()
-        .WriteTo.Console(
-            outputTemplate: "{Timestamp:HH:mm:ss} {Message:lj}{NewLine}", // remove {Level}
-            theme: AnsiConsoleTheme.Code)
-        .MinimumLevel.Information()
-        .CreateLogger();
+        Logger = LoggerFactory.CreateLogger("");
     }
-    public static void Info(string message) => Serilog.Log.Information("[INF] {Message}", message);
-    public static void Warn(string message) => Serilog.Log.Warning("[WRN] {Message}", message);
-    public static void Error(string message) => Serilog.Log.Error("[ERR] {Message}", message);
 
+    public static void Info(string message) => Logger.LogInformation(message);
+    public static void Warn(string message) => Logger.LogWarning(message);
+    public static void Error(string message) => Logger.LogError(message);
 }
 

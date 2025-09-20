@@ -41,12 +41,24 @@ public class ClientSession(ICommunicator comm)
 
             result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
 
+
+
             if (!result.IsSuccess)
                 return;
 
             if (!result.Value.status.IsSuccess())
                 return;
 
+            result = await _cmd.GeneralAuthenticate();
+
+
+            if (!result.IsSuccess)
+                return;
+
+            if (!result.Value.status.IsSuccess())
+                return;
+
+            result.Unwrap().Parse<ImplGeneralAuthentication, ImplGeneralAuthentication.Info>();
             Log.Info("All commands completed without a problem");
 
 

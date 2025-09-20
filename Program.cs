@@ -2,6 +2,7 @@ using WebSocketSharp;
 using WebSocketSharp.Server;
 using App;
 using Server;
+using System.Collections.Concurrent;
 
 
 var config = File.ReadAllLines("config.txt");
@@ -37,9 +38,19 @@ wssv.AddWebSocketService<WsSession>("/");
 // Start the server
 wssv.Start();
 Console.WriteLine("WebSocket server started, waiting for connections...");
-Console.ReadLine();
+bool isQuit = false;
+
+
+while (!isQuit)
+{
+    if (Console.KeyAvailable)
+    {
+        isQuit = Console.ReadKey(true).Key == ConsoleKey.Escape;
+    }
+
+    await WsSession.AwaitAll();
+}
 wssv.Stop();
-//Console.ReadKey(true);
 
 // Define a WebSocket behavior for each client
 public class WsSession : WebSocketBehavior
@@ -48,8 +59,11 @@ public class WsSession : WebSocketBehavior
     {
         Console.WriteLine("Client connected");
         var app = new ClientSession(new WebSocketTransport(Context.WebSocket));
-        apps.Add(app);
-        _ = app.Start(); // Start asynchronously
+        string id = Guid.NewGuid().ToString();
+
+        clients[id] = app;
+        _running[id] = app.Start();
+
     }
 
     protected override void OnMessage(MessageEventArgs e)
@@ -62,5 +76,20 @@ public class WsSession : WebSocketBehavior
         Console.WriteLine("Client disconnected");
     }
 
-    readonly List<ClientSession> apps = [];
+    /*Should only be used in debug*/
+    public static async Task AwaitAll()
+    {
+        foreach (var kvp in _running.ToArray()) // snapshot
+        {
+            await kvp.Value;
+            _running.TryRemove(kvp.Key, out _);
+            clients.TryRemove(kvp.Key, out _);
+        }
+
+
+
+    }
+
+    private static readonly ConcurrentDictionary<string, ClientSession> clients = new();
+    private static readonly ConcurrentDictionary<string, Task> _running = new();
 }
