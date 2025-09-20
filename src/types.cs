@@ -2,10 +2,13 @@
 
 
 using System.Collections;
+using ErrorHandling;
 using Helper;
 using Interfaces;
 
 namespace Type;
+
+using TResult = Result<Type.ResponseCommand>;
 
 
 public enum TagType : byte
@@ -282,17 +285,26 @@ public struct ResponseCommand(int sw1, int sw2, byte[]? data = null)
         return t.ParseFromBytes(data);
     }
 
-    public static ResponseCommand FromBytes(byte[] bytes)
+    public static TResult FromBytes(byte[] bytes)
     {
+        if (bytes.Length < 2)
+            return TResult.Fail(new Error.ClientErrorFormat("Client response was incorrect: " + bytes));
+
         int sw1 = bytes[^2];
         int sw2 = bytes[^1];
 
-        if (bytes.Length <= 2)
-            return new ResponseCommand(sw1, sw2, []);
 
-        byte[] data = bytes[0..(bytes.Length - 2)];
+        ResponseCommand resp;
+        if (bytes.Length == 2)
+            resp = new ResponseCommand(sw1, sw2, []);
+        else
+        {
+            byte[] data = bytes[0..(bytes.Length - 2)];
+            resp = new ResponseCommand(sw1, sw2, data);
+        }
 
-        return new ResponseCommand(sw1, sw2, data);
+
+        return TResult.Success(resp);
 
     }
 

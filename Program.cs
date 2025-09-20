@@ -85,9 +85,6 @@ public class WsSession : WebSocketBehavior
             _running.TryRemove(kvp.Key, out _);
             clients.TryRemove(kvp.Key, out _);
         }
-
-
-
     }
 
     private static readonly ConcurrentDictionary<string, ClientSession> clients = new();

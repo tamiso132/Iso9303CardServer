@@ -159,34 +159,9 @@ public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
     }
 }
 
-public struct ImplGeneralAuthentication : IEfParser<ImplGeneralAuthentication.Info>
-{
-
-    string IEfParser<Info>.Name()
-    {
-        return "General Authentication";
-    }
-
-
-    Info IEfParser<Info>.ParseFromBytes(byte[] bytes)
-    {
-        var ef = new Info();
-        var allNodes = AsnNode.Parse(new ByteReader(bytes));
-        foreach (var node in allNodes.GetAllNodes())
-        {
-            node.PrintBare();
-        }
-
-        return ef;
-    }
 
 
 
-    public struct Info
-    {
-        public readonly byte[] EncryptedNounce;
-    }
-}
 
 public struct ImplEFDir : IEfParser<ImplEFDir.Info>
 {

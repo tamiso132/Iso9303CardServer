@@ -1,9 +1,12 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Console;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Type;
 namespace Helper;
@@ -165,28 +168,42 @@ public static class HexUtils
 
 public static class Log
 {
-    public static readonly ILoggerFactory LoggerFactory;
-    public static readonly Microsoft.Extensions.Logging.ILogger Logger;
 
-    static Log()
+    public static void Info(string message, [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "")
+    {  // Color the file/line/member prefix
+        InternalLog(message, ConsoleColor.Green, file, line, member);
+    }
+    public static void Warn(string message, [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "")
     {
-        LoggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
-        {
-            builder
-                .AddSimpleConsole(options =>
-                {
-                    options.IncludeScopes = false;
-                    options.SingleLine = true;
-                    options.TimestampFormat = "HH:mm:ss ";
-                })
-                .SetMinimumLevel(LogLevel.Information);
-        });
-
-        Logger = LoggerFactory.CreateLogger("");
+        InternalLog(message, ConsoleColor.Yellow, file, line, member);
+    }
+    public static void Error(string message,
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "")
+    {
+        InternalLog(message, ConsoleColor.Red, file, line, member);
     }
 
-    public static void Info(string message) => Logger.LogInformation(message);
-    public static void Warn(string message) => Logger.LogWarning(message);
-    public static void Error(string message) => Logger.LogError(message);
+    private static void InternalLog(string message, ConsoleColor color,
+        [CallerFilePath] string file = "",
+        [CallerLineNumber] int line = 0,
+        [CallerMemberName] string member = "")
+    {
+        Console.Write($"{file}({line})\n");
+        Console.ResetColor();
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.Write("Info: ");
+
+        Console.ResetColor();
+
+        // Log the actual message normally
+        Console.WriteLine(message + "\n");
+    }
 }
+
 

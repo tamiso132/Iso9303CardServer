@@ -1,13 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Runtime.Intrinsics.Arm;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Unicode;
-using System.Threading.Tasks;
+using Asn1;
+using Command;
 using Helper;
 using Interfaces;
+using Org.BouncyCastle.Crypto.Engines;
+using Org.BouncyCastle.Crypto.Macs;
+using Org.BouncyCastle.Crypto.Modes;
+using Org.BouncyCastle.Crypto.Paddings;
+using Org.BouncyCastle.Crypto.Parameters;
 
 
 namespace Encryption;
@@ -19,7 +20,7 @@ public class TestClass
         var bytes = Encoding.ASCII.GetBytes(MrzUtils.GetMrz("35172541", "010813", "250820"));
         return SHA1.Create().ComputeHash(bytes);
     }
-
+    // TODO, read more. so I can support stuff
     public static byte[] DerivePaceKey(EncryptionInfo info)
     {
         // get mrz
@@ -34,7 +35,7 @@ public class TestClass
 
         // TODO, implement for DESEDE2, cause it works different when creating key.
 
-        if (info.KeySize <= 128/8)
+        if (info.KeySize <= 128 / 8)
         {
             key = SHA1.HashData(data);
         }
@@ -85,6 +86,47 @@ public class TestClass
     }
 
 
+    public static async Task ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info, byte[] key)
+    where T : IServerEncryption
+    {
+        var response = await command.GeneralAuthenticate();
+        if (!response.IsSuccess)
+        {
+            Log.Error(response.Error.ErrorMessage());
+            return;
+        }
+
+        var tree = AsnNode.Parse(new ByteReader(response.Value.data));
+
+        var nodes = tree.GetAllNodes();
+        nodes[0].PrintBare();
+        // TODO, check length
+
+        // ERROR
+        if (nodes[0].Id != 0x7C)
+        { }
+
+        if (nodes[0].Children[0].Id != 0x80)
+        {
+            // error
+        }
+
+        var encrypted_nounce = nodes[0].Children[0].GetValueAsOID();
+
+        var aes = Aes.Create();
+        aes.KeySize = info.KeySize * 8;
+        aes.BlockSize = 128; // TODO, support other
+        byte[] iv = [.. Enumerable.Repeat<byte>(0x00, 16)];
+
+        byte[] actualCmac = AesHelper.ComputeCmac(key, encrypted_nounce);
+
+        byte[] cipherTxt = AesHelper.Process(encrypted_nounce, key, iv, info.MacType, false);
+
+
+
+
+
+    }
 
     static void PerformKeyAgreement()
     {
@@ -135,6 +177,7 @@ public class EncryptionInfo
 
         this.OrgOid = oid;
         this.OrgParameterID = parameterId;
+
 
         var pace = paceMap[paceID];
         this.AgreementType = pace.Item1;
@@ -204,4 +247,54 @@ public enum AlgorithmType
     BrainPool,
     Nist,
     ModPrime
+}
+
+
+
+public static class AesHelper
+{
+    public static byte[] EncryptAesCbc(byte[] plainText, byte[] key, byte[] iv)
+    {
+        var cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()), new Pkcs7Padding());
+        cipher.Init(true, new ParametersWithIV(new KeyParameter(key), iv)); // true = encryption
+
+        byte[] output = new byte[cipher.GetOutputSize(plainText.Length)];
+        int len = cipher.ProcessBytes(plainText, 0, plainText.Length, output, 0);
+        len += cipher.DoFinal(output, len);
+
+        return output[..len];
+    }
+
+    public static byte[] DecryptAesCbc(byte[] cipherText, byte[] key, byte[] iv)
+    {
+        var cipher = new PaddedBufferedBlockCipher(new CbcBlockCipher(new AesEngine()), new Pkcs7Padding());
+        cipher.Init(false, new ParametersWithIV(new KeyParameter(key), iv)); // false = decryption
+
+        byte[] output = new byte[cipher.GetOutputSize(cipherText.Length)];
+        int len = cipher.ProcessBytes(cipherText, 0, cipherText.Length, output, 0);
+        len += cipher.DoFinal(output, len);
+
+        return output[..len];
+    }
+
+    public static byte[] ComputeCmac(byte[] key, byte[] message)
+    {
+        var mac = new CMac(new AesEngine());
+        mac.Init(new KeyParameter(key));
+        mac.BlockUpdate(message, 0, message.Length);
+
+        byte[] output = new byte[mac.GetMacSize()];
+        mac.DoFinal(output, 0);
+        return output;
+    }
+
+    public static byte[] Process(byte[] data, byte[] key, byte[] iv, MacType macType, bool encrypt = true)
+    {
+        return macType switch
+        {
+            MacType.Cbc => encrypt ? EncryptAesCbc(data, key, iv) : DecryptAesCbc(data, key, iv),
+            MacType.CMAC => ComputeCmac(key, data),
+            _ => throw new NotImplementedException()
+        };
+    }
 }

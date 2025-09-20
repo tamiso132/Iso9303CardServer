@@ -7,21 +7,24 @@ using Type;
 using Asn1;
 using Helper;
 using System.ComponentModel;
+using ErrorHandling;
+using Microsoft.AspNetCore.Authentication;
 
 namespace Command;
 
-using E = CommandError;
+using TResult = Result<ResponseCommand>;
+
 
 // TODO, add a command that keeps asking for more bytes if we get error SW that all the bytes has not been sent yet
 // TODO, should also add error check for when parsing to Response Command fails
 public class Command<T>(ICommunicator communicator, T encryption)
-    where T : IServerEncryption<E>
+    where T : IServerEncryption
 {
 
 
     public bool IsActiveApp { get; private set; } = false;
 
-    public async Task<Result<ResponseCommand, E>> ReadBinary(IEfID efID, byte offset = 0x00, byte le = 0x00, byte cla = 0x00)
+    public async Task<TResult> ReadBinary(IEfID efID, byte offset = 0x00, byte le = 0x00, byte cla = 0x00)
     {
         var app = efID.AppIdentifier();
         if (_appSelected == app || app == null)
@@ -36,32 +39,30 @@ public class Command<T>(ICommunicator communicator, T encryption)
             return await ReadBinaryFullID(efID, offset, le);
         }
     }
-    public async Task<Result<ResponseCommand, E>> SelectApplication(AppID app)
+    public async Task<TResult> SelectApplication(AppID app)
     {
         return await ApplicationSelect(app);
     }
 
-    private async Task<Result<ResponseCommand, E>> ElementFileSelect(IEfID fileID, byte cla = 0x00)
+    private async Task<TResult> ElementFileSelect(IEfID fileID, byte cla = 0x00)
     {
         Log.Info("Selecting EF File: " + fileID.GetName());
         byte[] cmd = FormatCommand(cla, 0xA4, 0x02, 0x0C, fileID.GetFullID());
-        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
-        return Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return await SendPackageDecodeResponse(cmd);
     }
 
-    private async Task<Result<ResponseCommand, E>> ApplicationSelect(AppID appID)
+    private async Task<TResult> ApplicationSelect(AppID appID)
     {
         Log.Info("Selecting Application: " + appID.Name);
         byte[] cmd = FormatCommand(0x00, 0xA4, 0x04, 0x0C, appID.GetID());
-        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
+        var result = await SendPackageDecodeResponse(cmd);
+        if (result.IsSuccess)
+            this._appSelected = appID;
 
-        if (!result.IsSuccess) return Fail(result.Error);
-
-        IsActiveApp = true;
-        return Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return result;
     }
 
-    private async Task<Result<ResponseCommand, E>> ReadBinaryFullID(IEfID efID, byte offset, byte le, byte cla = 0x00)
+    private async Task<TResult> ReadBinaryFullID(IEfID efID, byte offset, byte le, byte cla = 0x00)
     {
         var selectResult = await ElementFileSelect(efID);
         if (!selectResult.IsSuccess)
@@ -72,24 +73,16 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         Log.Info("Reading EF File: " + efID.GetName());
         byte[] cmd = FormatCommand(0x00, 0xB0, 0x00, 0x00, le: le);
-        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
-
-        if (!result.IsSuccess) return Fail(result.Error);
-
-        return Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return await SendPackageDecodeResponse(cmd);
     }
 
-    public async Task<Result<ResponseCommand, E>> ReadBinaryShort(IEfID efID, byte offset, byte le, byte cla = 0x00)
+    public async Task<TResult> ReadBinaryShort(IEfID efID, byte offset, byte le, byte cla = 0x00)
     {
         byte[] cmd = FormatCommand(cla, 0xB0, efID.ShortID, offset);
-        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
-
-        if (!result.IsSuccess) return Fail(result.Error);
-
-        return Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return await SendPackageDecodeResponse(cmd);
     }
 
-    public async Task<Result<ResponseCommand, E>> MseSetAT(byte[] oid, int parameterID, byte cla = 0x00)
+    public async Task<TResult> MseSetAT(byte[] oid, int parameterID, byte cla = 0x00)
     {
         Log.Info("Sending MseSetAT Command");
         byte[] data = new AsnBuilder()
@@ -99,26 +92,16 @@ public class Command<T>(ICommunicator communicator, T encryption)
             .Build();
 
         byte[] cmd = FormatCommand(cla, 0x22, 0xC1, 0xA4, data);
-        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
-
-        if (!result.IsSuccess)
-            return Fail(result.Error);
-
-
-        return Success(ResponseCommand.FromBytes(result.Value));
+        return await SendPackageDecodeResponse(cmd);
     }
 
-    public async Task<Result<ResponseCommand, E>> GeneralAuthenticate(byte cla = 0x10)
+    public async Task<TResult> GeneralAuthenticate(byte cla = 0x10)
     {
         Log.Info("Sending General Authenticate Command");
-        byte[] data = new AsnBuilder().AddCustomTag(0x7C, []).Build();
+        // byte[] data = new AsnBuilder().AddCustomTag(0x7C, []).Build();
         byte[] raw = [cla, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
 
-        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(raw)));
-        if (!result.IsSuccess)
-            return Fail(result.Error);
-
-        return Success(ResponseCommand.FromBytes(result.Unwrap()));
+        return await SendPackageDecodeResponse(raw);
     }
 
     private static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, byte? le = null)
@@ -134,45 +117,43 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return [.. cmd];
     }
 
+    private async Task<TResult> SendPackageDecodeResponse(byte[] cmd)
+    {
+        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
+        if (!result.IsSuccess)
+            return Fail(result.Error);
+
+        var response = ResponseCommand.FromBytes(result.Unwrap());
+        if (!response.IsSuccess)
+            return response;
+
+        if (!response.Value.status.IsSuccess())
+        {
+            return Fail(new Error.SwError(response.Value.status));
+        }
+
+        return response;
+    }
 
 
 
-    private static Result<ResponseCommand, E> Success(ResponseCommand cmd) => Result<ResponseCommand, E>.Success(cmd);
-    private static Result<ResponseCommand, E> Fail(E e) => Result<ResponseCommand, E>.Fail(e);
+
+    private static TResult Success(ResponseCommand cmd) => TResult.Success(cmd);
+    private static TResult Fail(Error e) => TResult.Fail(e);
     private AppID? _appSelected;
     private readonly ICommunicator _communicator = communicator;
     private readonly T _encryption = encryption;
 }
 
-public static class CommandErrorExtension
-{
-    public static string GetDescription(this CommandError value)
-    {
-        var field = value.GetType().GetField(value.ToString());
-        var attr = (DescriptionAttribute?)Attribute.GetCustomAttribute(field!, typeof(DescriptionAttribute));
-        return attr?.Description ?? value.ToString();
-    }
-}
 
-public enum CommandError
-{
-    [Description("NFC connection lost")]
-    NFCLost,
 
-    [Description("Invalid status word")]
-    SWError,
-
-    [Description("Encryption failed")]
-    EncryptError,
-
-    [Description("Parse to ResponseCommand Fail")]
-    ResponseParseFail,
-
-}
 
 enum MSEType // p1 p2
 {
     MutualAuthentication = 0xC1A4,
 }
+
+
+
 
 

@@ -1,5 +1,6 @@
 
 using System.Data;
+using ErrorHandling;
 using Type;
 
 namespace Interfaces;
@@ -62,10 +63,10 @@ public interface ICommunicator
     }
 }
 
-public interface IServerEncryption<E> where E : Enum
+public interface IServerEncryption
 {
     public byte[] Encrypt(byte[] input);
-    public Result<byte[], E> Decode(byte[] input);
+    public Result<byte[]> Decode(byte[] input);
 
 }
 

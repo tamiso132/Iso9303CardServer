@@ -7,6 +7,7 @@ using Parser;
 using Helper;
 using Encryption;
 using Command;
+using ErrorHandling;
 namespace App;
 
 
@@ -21,23 +22,24 @@ public class ClientSession(ICommunicator comm)
         if (packet.Type == CommandType.NewNFCScan)
         {
             var result = await _cmd.ReadBinary(EfIdGlobal.CardAccess);
+
             if (!result.IsSuccess)
             {
-                Console.WriteLine("Error: " + result.Error.GetDescription());
-                return;
+                Log.Error(result.Error.ErrorMessage());
             }
 
             var response = result.Value;
             var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
 
-            //  result = await _cmd.MseSetAT(info.OrgOid, TestClass.MappingGm(info), info.OrgParameterID);
-
             if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
                 return;
+            }
 
 
 
-            var key = TestClass.DerivePaceKey(info);
+            byte[] key = TestClass.DerivePaceKey(info);
 
             result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
 
@@ -49,19 +51,22 @@ public class ClientSession(ICommunicator comm)
             if (!result.Value.status.IsSuccess())
                 return;
 
-            result = await _cmd.GeneralAuthenticate();
-
 
             if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
                 return;
+            }
 
             if (!result.Value.status.IsSuccess())
+            {
+                Log.Error(result.Error.ErrorMessage());
                 return;
+            }
 
-            result.Unwrap().Parse<ImplGeneralAuthentication, ImplGeneralAuthentication.Info>();
+                await TestClass.ComputeDecryptedNounce(_cmd, info, key);
+
             Log.Info("All commands completed without a problem");
-
-
 
         }
     }
@@ -71,10 +76,10 @@ public class ClientSession(ICommunicator comm)
 }
 
 
-public class ServerEncryption : IServerEncryption<CommandError>
+public class ServerEncryption : IServerEncryption
 {
 
-    public byte[] Encrypt(byte[] input)
+    byte[] IServerEncryption.Encrypt(byte[] input)
     {
         byte[] lengthBytes = BitConverter.GetBytes(input.Length);
         if (BitConverter.IsLittleEndian)
@@ -83,17 +88,17 @@ public class ServerEncryption : IServerEncryption<CommandError>
         return [(byte)CommandType.Package, .. lengthBytes, .. input];
     }
 
-
-    public Result<byte[], CommandError> Decode(byte[] input)
+    Result<byte[]> IServerEncryption.Decode(byte[] input)
     {
         var packet = CommandPacket.TryFromBytes(input);
         if (packet.Type == CommandType.Package)
         {
-            return Result<byte[], CommandError>.Success(packet.Data);
+            return Result<byte[]>.Success(packet.Data);
         }
         Console.WriteLine("Error: " + packet.Type.ToString());
-        return Result<byte[], CommandError>.Fail(CommandError.EncryptError);
+        return Result<byte[]>.Fail(new Error.Parse("Decoding packet failed, does not have correct server format"));
     }
+
 };
 
 
