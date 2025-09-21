@@ -25,6 +25,14 @@ public class Result<T>
     }
 }
 
+public readonly struct RVoid
+{
+    public static Result<RVoid> Success() => Result<RVoid>.Success(new());
+    public static Result<RVoid> Fail(Error e) => Result<RVoid>.Fail(e);
+}
+
+
+
 public enum ErrorSeverity
 {
     /*
@@ -62,6 +70,12 @@ public abstract record Error(ErrorSeverity Severity)
 
     public sealed record ClientErrorFormat(string Message, ErrorSeverity Severity = ErrorSeverity.Recoverable)
         : Error(Severity)
+    {
+        public override string ErrorMessage() => Message;
+    }
+
+    public sealed record Other(string Message, ErrorSeverity Severity = ErrorSeverity.Fatal)
+       : Error(Severity)
     {
         public override string ErrorMessage() => Message;
     }

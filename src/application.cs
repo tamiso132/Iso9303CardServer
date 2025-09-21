@@ -18,7 +18,7 @@ public class ClientSession(ICommunicator comm)
 
 
         byte[] buffer = await _comm.ReadAsync();
-        var packet = CommandPacket.TryFromBytes(buffer);
+        var packet = ServerPacket.TryFromBytes(buffer);
         if (packet.Type == CommandType.NewNFCScan)
         {
             var result = await _cmd.ReadBinary(EfIdGlobal.CardAccess);
@@ -64,7 +64,7 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-                await TestClass.ComputeDecryptedNounce(_cmd, info, key);
+            await TestClass.ComputeDecryptedNounce(_cmd, info, key);
 
             Log.Info("All commands completed without a problem");
 
@@ -90,11 +90,10 @@ public class ServerEncryption : IServerEncryption
 
     Result<byte[]> IServerEncryption.Decode(byte[] input)
     {
-        var packet = CommandPacket.TryFromBytes(input);
+        var packet = ServerPacket.TryFromBytes(input);
         if (packet.Type == CommandType.Package)
-        {
             return Result<byte[]>.Success(packet.Data);
-        }
+
         Console.WriteLine("Error: " + packet.Type.ToString());
         return Result<byte[]>.Fail(new Error.Parse("Decoding packet failed, does not have correct server format"));
     }

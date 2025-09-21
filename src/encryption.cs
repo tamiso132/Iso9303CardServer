@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Asn1;
 using Command;
+using ErrorHandling;
 using Helper;
 using Interfaces;
 using Org.BouncyCastle.Crypto.Engines;
@@ -86,15 +87,17 @@ public class TestClass
     }
 
 
-    public static async Task ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info, byte[] key)
+    public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info, byte[] key)
     where T : IServerEncryption
     {
         var response = await command.GeneralAuthenticate();
         if (!response.IsSuccess)
         {
             Log.Error(response.Error.ErrorMessage());
-            return;
+            return RVoid.Fail(response.Error);
         }
+
+        Log.Info("Does it come here?");
 
         var tree = AsnNode.Parse(new ByteReader(response.Value.data));
 
@@ -123,7 +126,7 @@ public class TestClass
         byte[] cipherTxt = AesHelper.Process(encrypted_nounce, key, iv, info.MacType, false);
 
 
-
+        return RVoid.Success();
 
 
     }

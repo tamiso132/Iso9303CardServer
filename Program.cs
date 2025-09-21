@@ -6,8 +6,8 @@ using System.Collections.Concurrent;
 
 
 var config = File.ReadAllLines("config.txt");
-string ip = null;
-string port = null;
+string? ip = null;
+string? port = null;
 
 foreach (var line in config)
 {
@@ -29,13 +29,10 @@ if (ip == null || port == null)
     return;
 }
 
-// Create a WebSocket server on your LAN IP and port
 var wssv = new WebSocketServer($"ws://{ip}:{port}");
 
-// Add a service for all clients ("/" path)
 wssv.AddWebSocketService<WsSession>("/");
 
-// Start the server
 wssv.Start();
 Console.WriteLine("WebSocket server started, waiting for connections...");
 bool isQuit = false;
@@ -52,7 +49,7 @@ while (!isQuit)
 }
 wssv.Stop();
 
-// Define a WebSocket behavior for each client
+
 public class WsSession : WebSocketBehavior
 {
     protected override void OnOpen()

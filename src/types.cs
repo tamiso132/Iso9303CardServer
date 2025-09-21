@@ -288,7 +288,7 @@ public struct ResponseCommand(int sw1, int sw2, byte[]? data = null)
     public static TResult FromBytes(byte[] bytes)
     {
         if (bytes.Length < 2)
-            return TResult.Fail(new Error.ClientErrorFormat("Client response was incorrect: " + bytes));
+            return TResult.Fail(new Error.ClientErrorFormat("Client response was incorrect (length " + bytes.Length + ": " + BitConverter.ToString(bytes)));
 
         int sw1 = bytes[^2];
         int sw2 = bytes[^1];

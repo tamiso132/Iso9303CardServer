@@ -99,9 +99,17 @@ public class Command<T>(ICommunicator communicator, T encryption)
     {
         Log.Info("Sending General Authenticate Command");
         // byte[] data = new AsnBuilder().AddCustomTag(0x7C, []).Build();
-        byte[] raw = [cla, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
+        // According to example should give encrypted nounce
+        byte[] raw = [cla, 0x86, 0x00, 0x00, 0x7C, 0x00, 0x00];
 
-        return await SendPackageDecodeResponse(raw);
+        var result = await SendPackageDecodeResponse(raw);
+
+        if (result.IsSuccess)
+            if (result.Value.data.Length == 0)
+                return TResult.Fail(new Error.Other("Genral Authentication not sending the encrypted nounce!"));
+
+
+        return result;
     }
 
     private static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, byte? le = null)
