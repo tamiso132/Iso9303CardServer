@@ -1,67 +1,72 @@
 using System;
 using System.Collections.Generic;
-using System.Security.Cryptography.Pkcs;
-using System.Security.Cryptography.X509Certificates;
-using Org.BouncyCastle.X509;
-using Org.BouncyCastle.Security;
 using System.IO;
+using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Asn1.Cms;
+using Org.BouncyCastle.X509;
 
 namespace EpassValidation
 {
     public static class MasterListHelper
     {
-        const string mlPath = "C:/Users/foffe/ICAO_ml_July2025.ml";
-
-        /// <summary>
-        /// Läser en ICAO Master List (.ml) och returnerar alla certifikat.
-        /// </summary>
-        public static List<X509Certificate2> ReadMasterList(string mlPath)
+        public static List<Org.BouncyCastle.X509.X509Certificate> ReadAllCertificatesFromMl(string mlPath)
         {
-            byte[] data = File.ReadAllBytes(mlPath);
+            byte[] mlBytes = File.ReadAllBytes(mlPath);
 
-            // SignedCms används eftersom ML är en PKCS#7-signerad container
-            SignedCms cms = new SignedCms();
-            cms.Decode(data);
+            // Parse top-level ASN.1
+            Asn1Object top = Asn1Object.FromByteArray(mlBytes);
+            ContentInfo ci = ContentInfo.GetInstance(top);
+            SignedData sd = SignedData.GetInstance(ci.Content);
 
-            var certs = new List<X509Certificate2>();
-            foreach (var cert in cms.Certificates)
+            Asn1Set certSet = sd.Certificates;
+            var parser = new X509CertificateParser();
+            var all = new List<Org.BouncyCastle.X509.X509Certificate>();
+
+            if (certSet == null)
+                return all;
+
+            foreach (Asn1Encodable enc in certSet)
             {
-                certs.Add(cert);
+                var obj = enc.ToAsn1Object();
+                Console.WriteLine($"ASN.1 type: {obj.GetType().Name}");
+
+                if (obj is Asn1TaggedObject tagged)
+                {
+                    obj = tagged.GetObject().ToAsn1Object();
+                    Console.WriteLine("  Unwrapped tagged object -> " + obj.GetType().Name);
+                }
+
+                try
+                {
+                    var cert = parser.ReadCertificate(obj.GetEncoded());
+                    if (cert != null)
+                    {
+                        Console.WriteLine("  ✅ Parsed certificate: " + cert.SubjectDN);
+                        all.Add(cert);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("  ⚠️ Could not parse: " + ex.Message);
+                }
             }
 
-            return certs;
+
+            return all;
         }
 
-        /// <summary>
-        /// Läser en CRL (Certificate Revocation List) och returnerar alla spärrade serienummer.
-        /// </summary>
-        public static List<string> ReadCRL(string crlPath)
+        public static void PrintBcCerts(IEnumerable<Org.BouncyCastle.X509.X509Certificate> certs)
         {
-            var crlBytes = File.ReadAllBytes(crlPath);
-            var parser = new X509CrlParser();
-            var crl = parser.ReadCrl(crlBytes);
-
-            var revoked = new List<string>();
-            foreach (X509CrlEntry entry in crl.GetRevokedCertificates())
+            int i = 1;
+            foreach (var cert in certs)
             {
-                revoked.Add(entry.SerialNumber.ToString(16));
+                Console.WriteLine($"=== Cert #{i++} ===");
+                Console.WriteLine($"Subject: {cert.SubjectDN}");
+                Console.WriteLine($"Issuer:  {cert.IssuerDN}");
+                Console.WriteLine($"Valid:   {cert.NotBefore} – {cert.NotAfter}");
+                Console.WriteLine($"Serial:  {cert.SerialNumber}");
+                Console.WriteLine();
             }
-
-            return revoked;
-        }
-
-        /// <summary>
-        /// Hjälpmetod för att skriva ut info om ett certifikat.
-        /// </summary>
-        public static void PrintCertInfo(X509Certificate2 cert)
-        {
-            Console.WriteLine("================================");
-            Console.WriteLine($"Subject: {cert.Subject}");
-            Console.WriteLine($"Issuer: {cert.Issuer}");
-            Console.WriteLine($"Giltig från: {cert.NotBefore}");
-            Console.WriteLine($"Giltig till: {cert.NotAfter}");
-            Console.WriteLine($"Thumbprint: {cert.Thumbprint}");
-            Console.WriteLine("================================");
         }
     }
 }

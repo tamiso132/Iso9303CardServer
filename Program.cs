@@ -11,15 +11,6 @@ using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Asn1.Cms;
 using Helper;
 
-// Load the ML file (DER encoded)
-byte[] mlBytes = File.ReadAllBytes("C://Users/tom/Downloads/ICAO_ml_July2025.ml");
-
-var d = Asn1.AsnNode.Parse(new ByteReader(mlBytes));
-
-foreach (var e in d.GetAllNodes())
-{
-    e.PrintBare();
-}
 
 
 // // Parse CMS SignedData
@@ -165,39 +156,30 @@ public class WsSession : WebSocketBehavior
 }
 */
 // Reading lists 
+// Maybe baby:
 
 
+// string mlPath = "C:/Users/foffe/ICAO_ml_July2025.ml";
 
-string mlPath = "C:/Users/foffe/ICAO_ml_July2025.ml";
+// try
+// {
+//     var allCerts = MasterListHelper.ReadAllCerificates(mlPath);
+//     Console.WriteLine($"Totalt antal certifikat i Master List: {allCerts.Count}\n");
 
-//Console.WriteLine("=== ICAO Master List validering ===");
+//     MasterListHelper.PrintCertificates(allCerts);
+// }
+// catch (Exception ex)
+// {
+//     Console.WriteLine("Fel vid läsning av Master List:");
+//     Console.WriteLine(ex.Message);
+// }
 
-try
-{
-    // Läs certifikaten från Master List
-    /* List<X509Certificate2> certs = MasterListHelper.ReadMasterList(mlPath);
-     Console.WriteLine($"{certs.Count}");
-     Console.WriteLine($"Hittade {certs.Count} certifikat i Master List.\n");
- */
-    CertInfo.ShowCertificateInfo(mlPath);
+// Console.WriteLine("\nKlar!");
+// Console.ReadLine();
 
-
-    // Skriv ut lite info om de första certifikaten
-    // for (int i = 0; i < Math.Min(5, certs.Count); i++)
-    // {
-    //     MasterListHelper.PrintCertInfo(certs[i]);
-    // }
-    //     Console.WriteLine($"{certs.Count}");
-
-}
-catch (Exception ex)
-{
-    Console.WriteLine("Fel vid läsning av Master List:");
-    Console.WriteLine(ex.Message);
-}
-
-Console.WriteLine("\nKlar!");
-Console.ReadLine();
+var certs = MasterListHelper.ReadAllCertificatesFromMl("C:/Users/foffe/ICAO_ml_July2025.ml");
+Console.WriteLine($"Hittade {certs.Count} certifikat i ML.");
+MasterListHelper.PrintBcCerts(certs);
 
 
 
@@ -214,4 +196,7 @@ class Select : ISelector<X509Certificate>
         return true;
     }
 }
+
+
+
 
