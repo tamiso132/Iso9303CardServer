@@ -27,7 +27,7 @@ foreach (var cert in certStore.EnumerateMatches(selector: (ISelector<X509Certifi
 }
 
 
-
+/*
 var config = File.ReadAllLines("config.txt");
 string? ip = null;
 string? port = null;
@@ -96,7 +96,7 @@ public class WsSession : WebSocketBehavior
         Console.WriteLine("Client disconnected");
     }
 
-    /*Should only be used in debug*/
+    /*Should only be used in debug*/ /*
     public static async Task AwaitAll()
     {
         foreach (var kvp in _running.ToArray()) // snapshot
@@ -110,36 +110,42 @@ public class WsSession : WebSocketBehavior
     private static readonly ConcurrentDictionary<string, ClientSession> clients = new();
     private static readonly ConcurrentDictionary<string, Task> _running = new();
 }
-
+*/
 // Reading lists 
 
-/*
+
 
 string mlPath = "C:/Users/foffe/ICAO_ml_July2025.ml";
 
-Console.WriteLine("=== ICAO Master List validering ===");
+//Console.WriteLine("=== ICAO Master List validering ===");
 
-            try
-            {
-                // Läs certifikaten från Master List
-                List<X509Certificate2> certs = MasterListHelper.ReadMasterList(mlPath);
-                Console.WriteLine($"Hittade {certs.Count} certifikat i Master List.\n");
+try
+{
+    // Läs certifikaten från Master List
+   /* List<X509Certificate2> certs = MasterListHelper.ReadMasterList(mlPath);
+    Console.WriteLine($"{certs.Count}");
+    Console.WriteLine($"Hittade {certs.Count} certifikat i Master List.\n");
+*/
+    CertInfo.ShowCertificateInfo(mlPath);
+    
 
-                // Skriv ut lite info om de första certifikaten
-                for (int i = 0; i < Math.Min(5, certs.Count); i++)
-                {
-                    MasterListHelper.PrintCertInfo(certs[i]);
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Fel vid läsning av Master List:");
-                Console.WriteLine(ex.Message);
-            }
+    // Skriv ut lite info om de första certifikaten
+    // for (int i = 0; i < Math.Min(5, certs.Count); i++)
+    // {
+    //     MasterListHelper.PrintCertInfo(certs[i]);
+    // }
+    //     Console.WriteLine($"{certs.Count}");
+            
+             }
+catch (Exception ex)
+{
+    Console.WriteLine("Fel vid läsning av Master List:");
+    Console.WriteLine(ex.Message);
+}
 
             Console.WriteLine("\nKlar!");
             Console.ReadLine();
-            */
+            
 
 
 class Select : ISelector<X509Certificate>
@@ -154,3 +160,4 @@ class Select : ISelector<X509Certificate>
         return true;
     }
 }
+            
