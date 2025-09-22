@@ -7,24 +7,77 @@ using EpassValidation;
 using Org.BouncyCastle.Cms;
 using Org.BouncyCastle.Utilities.Collections;
 using Org.BouncyCastle.X509;
+using Org.BouncyCastle.Asn1;
+using Org.BouncyCastle.Asn1.Cms;
+using Helper;
 
 // Load the ML file (DER encoded)
 byte[] mlBytes = File.ReadAllBytes("C://Users/tom/Downloads/ICAO_ml_July2025.ml");
 
-Console.WriteLine("Bytes: " + mlBytes.Length);
+var d = Asn1.AsnNode.Parse(new ByteReader(mlBytes));
 
-// Parse CMS SignedData
-CmsSignedData cms = new CmsSignedData(mlBytes);
-
-// Extract certificates
-var certStore = cms.GetCertificates();
-foreach (var cert in certStore.EnumerateMatches(selector: (ISelector<X509Certificate>)new Select()))
+foreach (var e in d.GetAllNodes())
 {
-    Console.WriteLine("Issuer: " + cert.IssuerDN);
-    Console.WriteLine("Subject: " + cert.SubjectDN);
-    Console.WriteLine("Valid from: " + cert.NotBefore + " to " + cert.NotAfter);
-    Console.WriteLine();
+    e.PrintBare();
 }
+
+
+// // Parse CMS SignedData
+// CmsSignedData cms = new CmsSignedData(mlBytes);
+
+// cms.GetAttributeCertificates();
+
+// // Extract certificates
+// var certStore = cms.GetCertificates();
+// foreach (var cert in certStore.EnumerateMatches(selector: (ISelector<X509Certificate>)new Select()))
+// {
+//     Console.WriteLine("Issuer: " + cert.IssuerDN);
+//     Console.WriteLine("Subject: " + cert.SubjectDN);
+//     Console.WriteLine("Valid from: " + cert.NotBefore + " to " + cert.NotAfter);
+//     Console.WriteLine();
+// }
+// // Low-level ASN.1 parse of ContentInfo -> SignedData -> certificates
+// try
+// {
+//     var parser = new X509CertificateParser();
+//     Asn1Object top = Asn1Object.FromByteArray(mlBytes);
+//     ContentInfo ci = ContentInfo.GetInstance(top);
+//     SignedData sd = SignedData.GetInstance(ci.Content);
+//     Asn1Set certSet = sd.Certificates;
+
+//     var all = new List<Org.BouncyCastle.X509.X509Certificate>();
+//     if (certSet != null)
+//     {
+//         foreach (Asn1Encodable enc in certSet)
+//         {
+//             Asn1Object obj = enc.ToAsn1Object();
+
+//             // Unwrap tagged CertificateChoices if present
+//             if (obj is Asn1TaggedObject tagged)
+//                 obj = tagged.GetObject().ToAsn1Object();
+
+//             try
+//             {
+//                 byte[] der = obj.GetEncoded();
+//                 var bcCert = parser.ReadCertificate(der);
+//                 if (bcCert != null)
+//                     all.Add(bcCert);
+//             }
+//             catch
+//             {
+//                 // ignore non-X509/corrupt entries
+//             }
+//         }
+//     }
+
+//     Console.WriteLine($"Low-level parsed count: {all.Count}");
+//     foreach (var c in all)
+//         Console.WriteLine("Subject: " + c.SubjectDN);
+// }
+// catch (Exception ex)
+// {
+//     Console.WriteLine("Low-level parse failed: " + ex.Message);
+// }
 
 
 /*
@@ -122,12 +175,12 @@ string mlPath = "C:/Users/foffe/ICAO_ml_July2025.ml";
 try
 {
     // Läs certifikaten från Master List
-   /* List<X509Certificate2> certs = MasterListHelper.ReadMasterList(mlPath);
-    Console.WriteLine($"{certs.Count}");
-    Console.WriteLine($"Hittade {certs.Count} certifikat i Master List.\n");
-*/
+    /* List<X509Certificate2> certs = MasterListHelper.ReadMasterList(mlPath);
+     Console.WriteLine($"{certs.Count}");
+     Console.WriteLine($"Hittade {certs.Count} certifikat i Master List.\n");
+ */
     CertInfo.ShowCertificateInfo(mlPath);
-    
+
 
     // Skriv ut lite info om de första certifikaten
     // for (int i = 0; i < Math.Min(5, certs.Count); i++)
@@ -135,17 +188,17 @@ try
     //     MasterListHelper.PrintCertInfo(certs[i]);
     // }
     //     Console.WriteLine($"{certs.Count}");
-            
-             }
+
+}
 catch (Exception ex)
 {
     Console.WriteLine("Fel vid läsning av Master List:");
     Console.WriteLine(ex.Message);
 }
 
-            Console.WriteLine("\nKlar!");
-            Console.ReadLine();
-            
+Console.WriteLine("\nKlar!");
+Console.ReadLine();
+
 
 
 class Select : ISelector<X509Certificate>
@@ -157,7 +210,8 @@ class Select : ISelector<X509Certificate>
 
     public bool Match(X509Certificate candidate)
     {
+        Console.WriteLine("hellO?");
         return true;
     }
 }
-            
+
