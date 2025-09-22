@@ -4,7 +4,27 @@ using App;
 using Server;
 using System.Collections.Concurrent;
 using EpassValidation;
-using System.Security.Cryptography.X509Certificates;
+using Org.BouncyCastle.Cms;
+using Org.BouncyCastle.Utilities.Collections;
+using Org.BouncyCastle.X509;
+
+// Load the ML file (DER encoded)
+byte[] mlBytes = File.ReadAllBytes("C://Users/tom/Downloads/ICAO_ml_July2025.ml");
+
+Console.WriteLine("Bytes: " + mlBytes.Length);
+
+// Parse CMS SignedData
+CmsSignedData cms = new CmsSignedData(mlBytes);
+
+// Extract certificates
+var certStore = cms.GetCertificates();
+foreach (var cert in certStore.EnumerateMatches(selector: (ISelector<X509Certificate>)new Select()))
+{
+    Console.WriteLine("Issuer: " + cert.IssuerDN);
+    Console.WriteLine("Subject: " + cert.SubjectDN);
+    Console.WriteLine("Valid from: " + cert.NotBefore + " to " + cert.NotAfter);
+    Console.WriteLine();
+}
 
 
 
@@ -120,3 +140,17 @@ Console.WriteLine("=== ICAO Master List validering ===");
             Console.WriteLine("\nKlar!");
             Console.ReadLine();
             */
+
+
+class Select : ISelector<X509Certificate>
+{
+    public object Clone()
+    {
+        throw new NotImplementedException();
+    }
+
+    public bool Match(X509Certificate candidate)
+    {
+        return true;
+    }
+}

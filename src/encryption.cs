@@ -10,6 +10,10 @@ using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Paddings;
 using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Math;
+
+
+
 
 
 namespace Encryption;
@@ -120,6 +124,11 @@ public class TestClass
         aes.KeySize = info.KeySize * 8;
         aes.BlockSize = 128; // TODO, support other
         byte[] iv = [.. Enumerable.Repeat<byte>(0x00, 16)];
+
+        BigInteger bigInt = new BigInteger(
+         "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B412B1DA197FB71123ACD3A729901D1A71874700133107EC5",
+         16
+     );
 
         // byte[] actualCmac = AesHelper.ComputeCmac(key, encrypted_nounce);
 
@@ -300,4 +309,16 @@ public static class AesHelper
             _ => throw new NotImplementedException()
         };
     }
+}
+
+sealed record DomainParameter(BigInteger p, BigInteger a, BigInteger b, BigInteger g, BigInteger n, BigInteger h)
+{
+    BigInteger P;
+    BigInteger A;
+    BigInteger B;
+    BigInteger G;
+    BigInteger n;
+    BigInteger h;
+
+    static readonly DomainParameter BrainpoolP384r1 = new DomainParameter(BigInteger.Five, BigInteger.Four, BigInteger.Four, BigInteger.Four, BigInteger.Four, BigInteger.Four);
 }

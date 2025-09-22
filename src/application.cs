@@ -40,7 +40,7 @@ public class ClientSession(ICommunicator comm)
 
             var response = result.Value;
             var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
-            Log.Info("");
+            Log.Info("Parameter ID: " + info.OrgParameterID);
 
             if (!result.IsSuccess)
             {

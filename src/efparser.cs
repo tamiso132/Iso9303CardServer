@@ -146,7 +146,6 @@ public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
 
                 var info = new EncryptionInfo(oid, paramID);
                 ef.EncryptInfos.Add(info);
-                Log.Info("Print oid: " + BitConverter.ToString(oid));
             }
         }
 
