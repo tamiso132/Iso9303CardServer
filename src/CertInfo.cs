@@ -1,9 +1,10 @@
 using System;
 using System.IO;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 // In order to read and write from a specific cerificate
-class CertInfo
+public class CertInfo
 {
     // Reads a file into byte array
     internal static byte[] ReadFile(string fileName)
@@ -20,43 +21,36 @@ class CertInfo
     public static void ShowCertificateInfo(string filePath)
     {
 
-        if (filePath.Length < 1)
-        {
-            Console.WriteLine("Usage: CertInfo <filename>");
-            return;
-        }
-        try
-        {
-            byte[] rawData = ReadFile(filePath);
-            X509Certificate2 x509 = new X509Certificate2(rawData);
+       X509Store store = new X509Store("MY",StoreLocation.CurrentUser);
+        store.Open(OpenFlags.ReadOnly | OpenFlags.OpenExistingOnly);
 
-            // TODO Skriva allt i konselen??????
-            Console.WriteLine("=== Certifikat-info ===");
-            Console.WriteLine($"Subject: {x509.Subject}");
-            Console.WriteLine($"Issuer: {x509.Issuer}");
-            Console.WriteLine($"Version: {x509.Version}");
-            Console.WriteLine($"Valid Date: {x509.NotBefore}");
-            Console.WriteLine($"Expiry Date: {x509.NotAfter}");
-            Console.WriteLine($"Thumbprint: {x509.Thumbprint}");
-            Console.WriteLine($"Serial Number: {x509.SerialNumber}");
-            Console.WriteLine($"Public Key Format: {x509.PublicKey.Oid.FriendlyName}");
-            Console.WriteLine($"Raw Data Length: {x509.RawData.Length}");
+        X509Certificate2Collection collection = (X509Certificate2Collection)store.Certificates;
+        X509Certificate2Collection fcollection = (X509Certificate2Collection)collection.Find(X509FindType.FindByTimeValid,DateTime.Now,false);
+      //  X509Certificate2Collection scollection = X509Certificate2UI.SelectFromCollection(fcollection, "Test Certificate Select","Select a certificate from the following list to get information on that certificate",X509SelectionFlag.MultiSelection);
+        Console.WriteLine("Number of certificates: {0}{1}",fcollection.Count,Environment.NewLine);
 
-            //Samma?
-            Console.WriteLine("{0}Certificate to string: {1}{0}", Environment.NewLine, x509.ToString(true));
-            Console.WriteLine("{0}Certificate to XML String: {1}{0}", Environment.NewLine, x509.PublicKey.Key.ToXmlString(false));
-            //Samma?
-            Console.WriteLine($"ToString: {x509.ToString(true)}");
-            Console.WriteLine("========================\n");
-
-            X509Store store = new X509Store();
-            store.Open(OpenFlags.MaxAllowed);
-            store.Add(x509);
-            store.Close();
-        }
-        catch (Exception ex)
+       foreach (X509Certificate2 x509 in fcollection)
         {
-            Console.WriteLine($"Fel vid läsning av certifikat: {ex.Message}");
+            try
+            {
+                byte[] rawdata = x509.RawData;
+                Console.WriteLine("Content Type: {0}{1}",X509Certificate2.GetCertContentType(rawdata),Environment.NewLine);
+                Console.WriteLine("Friendly Name: {0}{1}",x509.FriendlyName,Environment.NewLine);
+                Console.WriteLine("Certificate Verified?: {0}{1}",x509.Verify(),Environment.NewLine);
+                Console.WriteLine("Simple Name: {0}{1}",x509.GetNameInfo(X509NameType.SimpleName,true),Environment.NewLine);
+                Console.WriteLine("Signature Algorithm: {0}{1}",x509.SignatureAlgorithm.FriendlyName,Environment.NewLine);
+                Console.WriteLine("Public Key: {0}{1}",x509.PublicKey.Key.ToXmlString(false),Environment.NewLine);
+                Console.WriteLine("Certificate Archived?: {0}{1}",x509.Archived,Environment.NewLine);
+                Console.WriteLine("Length of Raw Data: {0}{1}",x509.RawData.Length,Environment.NewLine);
+              //  X509Certificate2UI.DisplayCertificate(x509);
+                x509.Reset();
+            }
+            catch (CryptographicException)
+            {
+                Console.WriteLine("Information could not be written out for this certificate.");
+            }
         }
+        store.Close();
     }
 }
+
