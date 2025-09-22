@@ -3,6 +3,9 @@ using WebSocketSharp.Server;
 using App;
 using Server;
 using System.Collections.Concurrent;
+using EpassValidation;
+using System.Security.Cryptography.X509Certificates;
+
 
 
 var config = File.ReadAllLines("config.txt");
@@ -87,3 +90,33 @@ public class WsSession : WebSocketBehavior
     private static readonly ConcurrentDictionary<string, ClientSession> clients = new();
     private static readonly ConcurrentDictionary<string, Task> _running = new();
 }
+
+// Reading lists 
+
+/*
+
+string mlPath = "C:/Users/foffe/ICAO_ml_July2025.ml";
+
+Console.WriteLine("=== ICAO Master List validering ===");
+
+            try
+            {
+                // Läs certifikaten från Master List
+                List<X509Certificate2> certs = MasterListHelper.ReadMasterList(mlPath);
+                Console.WriteLine($"Hittade {certs.Count} certifikat i Master List.\n");
+
+                // Skriv ut lite info om de första certifikaten
+                for (int i = 0; i < Math.Min(5, certs.Count); i++)
+                {
+                    MasterListHelper.PrintCertInfo(certs[i]);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Fel vid läsning av Master List:");
+                Console.WriteLine(ex.Message);
+            }
+
+            Console.WriteLine("\nKlar!");
+            Console.ReadLine();
+            */
