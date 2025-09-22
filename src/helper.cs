@@ -169,35 +169,50 @@ public static class HexUtils
 public static class Log
 {
 
+    private enum LogType
+    {
+        Info,
+        Warning,
+        Error,
+    }
+
     public static void Info(string message, [CallerFilePath] string file = "",
         [CallerLineNumber] int line = 0,
         [CallerMemberName] string member = "")
     {  // Color the file/line/member prefix
-        InternalLog(message, ConsoleColor.Green, file, line, member);
+        InternalLog(message, LogType.Info, file, line, member);
     }
     public static void Warn(string message, [CallerFilePath] string file = "",
         [CallerLineNumber] int line = 0,
         [CallerMemberName] string member = "")
     {
-        InternalLog(message, ConsoleColor.Yellow, file, line, member);
+        InternalLog(message, LogType.Warning, file, line, member);
     }
     public static void Error(string message,
         [CallerFilePath] string file = "",
         [CallerLineNumber] int line = 0,
         [CallerMemberName] string member = "")
     {
-        InternalLog(message, ConsoleColor.Red, file, line, member);
+        InternalLog(message, LogType.Error, file, line, member);
     }
 
-    private static void InternalLog(string message, ConsoleColor color,
+    private static void InternalLog(string message, LogType logType,
         [CallerFilePath] string file = "",
         [CallerLineNumber] int line = 0,
         [CallerMemberName] string member = "")
+
     {
+        var logMeta = logType switch
+        {
+            LogType.Info => (ConsoleColor.Green, "Info"),
+            LogType.Warning => (ConsoleColor.Yellow, "Warning"),
+            LogType.Error => (ConsoleColor.Red, "Error"),
+            _ => throw new Exception("Undefined LogType: " + logType),
+        };
         Console.Write($"{file}({line})\n");
         Console.ResetColor();
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.Write("Info: ");
+        Console.ForegroundColor = logMeta.Item1;
+        Console.Write(logMeta.Item2 + ": ");
 
         Console.ResetColor();
 

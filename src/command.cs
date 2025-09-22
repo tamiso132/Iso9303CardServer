@@ -18,7 +18,7 @@ using TResult = Result<ResponseCommand>;
 // TODO, add a command that keeps asking for more bytes if we get error SW that all the bytes has not been sent yet
 // TODO, should also add error check for when parsing to Response Command fails
 public class Command<T>(ICommunicator communicator, T encryption)
-    where T : IServerEncryption
+    where T : IServerFormat
 {
 
 
@@ -44,6 +44,13 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return await ApplicationSelect(app);
     }
 
+    public async Task<TResult> SelectDefaultMF()
+    {
+        Log.Info("Selecting Default MF");
+        byte[] cmd = FormatCommand(0x00, 0xA4, 0x00, 0x0C);
+        return await SendPackageDecodeResponse(cmd);
+    }
+
     private async Task<TResult> ElementFileSelect(IEfID fileID, byte cla = 0x00)
     {
         Log.Info("Selecting EF File: " + fileID.GetName());
@@ -61,6 +68,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         return result;
     }
+
+
 
     private async Task<TResult> ReadBinaryFullID(IEfID efID, byte offset, byte le, byte cla = 0x00)
     {
@@ -88,7 +97,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] data = new AsnBuilder()
             .AddCustomTag(0x80, oid) // object identifier
             .AddCustomTag(0x83, [0x01]) // MRZ
-            .AddCustomTag(0x84, [(byte)parameterID]) // parameter id
+                                        //  .AddCustomTag(0x84, [(byte)parameterID]) // parameter id
             .Build();
 
         byte[] cmd = FormatCommand(cla, 0x22, 0xC1, 0xA4, data);
@@ -100,7 +109,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         Log.Info("Sending General Authenticate Command");
         // byte[] data = new AsnBuilder().AddCustomTag(0x7C, []).Build();
         // According to example should give encrypted nounce
-        byte[] raw = [cla, 0x86, 0x00, 0x00, 0x7C, 0x00, 0x00];
+        byte[] raw = [0x10, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
 
         var result = await SendPackageDecodeResponse(raw);
 
@@ -127,7 +136,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     private async Task<TResult> SendPackageDecodeResponse(byte[] cmd)
     {
-        var result = _encryption.Decode(await _communicator.TransceiveAsync(_encryption.Encrypt(cmd)));
+        var result = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(cmd)));
         if (!result.IsSuccess)
             return Fail(result.Error);
 
@@ -150,7 +159,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private static TResult Fail(Error e) => TResult.Fail(e);
     private AppID? _appSelected;
     private readonly ICommunicator _communicator = communicator;
-    private readonly T _encryption = encryption;
+    private readonly T _serverFormat = encryption;
 }
 
 

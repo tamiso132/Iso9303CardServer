@@ -21,15 +21,26 @@ public class ClientSession(ICommunicator comm)
         var packet = ServerPacket.TryFromBytes(buffer);
         if (packet.Type == CommandType.NewNFCScan)
         {
-            var result = await _cmd.ReadBinary(EfIdGlobal.CardAccess);
+            var result = await _cmd.SelectDefaultMF();
 
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
+                return;
             }
+
+            result = await _cmd.ReadBinary(EfIdGlobal.CardAccess);
+
+            if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
+                return;
+            }
+
 
             var response = result.Value;
             var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
+            Log.Info("");
 
             if (!result.IsSuccess)
             {
@@ -37,15 +48,16 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
             //  byte[] key = TestClass.DerivePaceKey(info);
-
+            Log.Info("orgID: " + BitConverter.ToString(info.OrgOid));
             result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
 
 
 
             if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
                 return;
-
-
+            }
 
 
             if (!result.IsSuccess)
@@ -72,10 +84,10 @@ public class ClientSession(ICommunicator comm)
 }
 
 
-public class ServerEncryption : IServerEncryption
+public class ServerEncryption : IServerFormat
 {
 
-    byte[] IServerEncryption.Encrypt(byte[] input)
+    byte[] IServerFormat.Format(byte[] input)
     {
         byte[] lengthBytes = BitConverter.GetBytes(input.Length);
         if (BitConverter.IsLittleEndian)
@@ -84,7 +96,7 @@ public class ServerEncryption : IServerEncryption
         return [(byte)CommandType.Package, .. lengthBytes, .. input];
     }
 
-    Result<byte[]> IServerEncryption.Decode(byte[] input)
+    Result<byte[]> IServerFormat.DeFormat(byte[] input)
     {
         var packet = ServerPacket.TryFromBytes(input);
         if (packet.Type == CommandType.Package)
