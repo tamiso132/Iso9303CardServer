@@ -63,10 +63,15 @@ public interface ICommunicator
     }
 }
 
-public interface IServerEncryption
+/// <summary>
+///Different server formats should implement this
+///How a certain server format data during communication with a client
+/// SHOULD NOT BE CONFUSED WITH ANY pace/bac encryption or APDU.
+/// </summary>
+public interface IServerFormat
 {
-    public byte[] Encrypt(byte[] input);
-    public Result<byte[]> Decode(byte[] input);
+    public byte[] Format(byte[] input);
+    public Result<byte[]> DeFormat(byte[] input);
 
 }
 
