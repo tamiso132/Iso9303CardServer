@@ -87,7 +87,7 @@ public class TestClass
     }
 
 
-    public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info, byte[] key)
+    public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info)
     where T : IServerEncryption
     {
         var response = await command.GeneralAuthenticate();
@@ -121,9 +121,9 @@ public class TestClass
         aes.BlockSize = 128; // TODO, support other
         byte[] iv = [.. Enumerable.Repeat<byte>(0x00, 16)];
 
-        byte[] actualCmac = AesHelper.ComputeCmac(key, encrypted_nounce);
+       // byte[] actualCmac = AesHelper.ComputeCmac(key, encrypted_nounce);
 
-        byte[] cipherTxt = AesHelper.Process(encrypted_nounce, key, iv, info.MacType, false);
+       // byte[] cipherTxt = AesHelper.Process(encrypted_nounce, key, iv, info.MacType, false);
 
 
         return RVoid.Success();
