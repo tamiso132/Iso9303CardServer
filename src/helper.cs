@@ -97,12 +97,14 @@ public class AsnInfo(byte tag, byte[] data)
 public class ByteReader(byte[] data)
 {
     private readonly byte[] _data = data;
-    private int _offset = 0;
+    private int _position = 0;
+
+    public int Offset => _position;
 
     public byte[] ReadBytes(int len)
     {
-        var sub = _data[_offset..(_offset + len)];
-        _offset += len;
+        var sub = _data[_position..(_position + len)];
+        _position += len;
         return sub;
     }
 
@@ -119,14 +121,14 @@ public class ByteReader(byte[] data)
 
     public string ReadString(int len)
     {
-        string s = Encoding.ASCII.GetString(_data, _offset, len);
-        _offset += len;
+        string s = Encoding.ASCII.GetString(_data, _position, len);
+        _position += len;
         return s;
     }
 
-    public void PaddingNext(int len) => _offset += len;
+    public void PaddingNext(int len) => _position += len;
 
-    public bool HasRemaining() => _offset < _data.Length;
+    public bool HasRemaining() => _position < _data.Length;
 
     public int ReadLength()
     {

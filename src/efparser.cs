@@ -193,6 +193,8 @@ public struct ImplEFDir : IEfParser<ImplEFDir.Info>
     }
 }
 
+// -- EF.SOD -- 
+
 public class EFSodInfo
 {
     public string LdsVersion { get; set; } = "";
@@ -210,16 +212,39 @@ public class ImplEfSod : IEfParser<EFSodInfo>
 
     public EFSodInfo ParseFromBytes(byte[] bytes)
     {
-        // var ef = new EFSodInfo();
-        // var reader = new ByteReader(bytes);
+        var ef = new EFSodInfo();
+        //var reader = new ByteReader(bytes);
+        var reader = new AsnReader(bytes, AsnEncodingRules.DER);
+        //int tag = reader.ReadInt(1);
+        //if (tag != 0x77) throw new Exception("Not a valid EF.SOD");
 
-        // int tag = reader.ReadInt(1);
-        // if (tag != 0x77) throw new Exception("Not a valid EF.SOD");
+        var sodSeq = reader.ReadSequence(); // Outer sequence   
+        ef.LdsVersion = sodSeq.ReadInteger().ToString(); // Version
 
         // int length = reader.ReadLength();
         // int versionTag = reader.ReadInt(1);
         // int versionLength = reader.ReadLength();
         // ef.LdsVersion = Encoding.ASCII.GetString(reader.ReadBytes(versionLength));
+
+        // Digest Algorithm
+        var digestSeq = sodSeq.ReadSequence();
+        var digestOid = digestSeq.ReadObjectIdentifier();
+        ef.DigestAlgorithm = digestOid;
+        if (digestSeq.HasData)
+            digestSeq.ReadNull();
+
+        // Sequence of sequence
+        var dgHashesSeq = sodSeq.ReadSequence();
+        while (dgHashesSeq.HasData)
+        {
+            var dgSeq = dgHashesSeq.ReadSequence();
+            int dgNumber = (int)dgSeq.ReadInteger();
+            byte[] hashValue = dgSeq.ReadOctetString();
+            ef.DgHashes[dgNumber] = hashValue;
+            
+        }
+
+        ef.Signature = sodSeq.ReadOctetString();
 
         // int digestTag = reader.ReadInt(1);
         // int digestLength = reader.ReadLength();
@@ -239,8 +264,21 @@ public class ImplEfSod : IEfParser<EFSodInfo>
         // int signatureTag = reader.ReadInt(1);
         // int signatureLength = reader.ReadLength();
         // ef.Signature = reader.ReadBytes(signatureLength);
+        
+        // Utskrift
+        Console.WriteLine("LDS Version: " + ef.LdsVersion);
+        Console.WriteLine("Digest Algorithm: " + ef.DigestAlgorithm);
 
-        // return ef;
-        throw new NotImplementedException();
+        foreach (var kvp in ef.DgHashes)
+        {
+        Console.WriteLine($"DG{kvp.Key} Hash: {BitConverter.ToString(kvp.Value)}");
+        }
+
+        Console.WriteLine("Signature: " + BitConverter.ToString(ef.Signature));
+
+        return ef;
+        // throw new NotImplementedException();
+        
+
     }
 }
