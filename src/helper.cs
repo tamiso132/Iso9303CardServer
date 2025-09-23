@@ -87,9 +87,9 @@ public static class MrzUtils
     }
 }
 
-public class AsnInfo(TagID tag, byte[] data)
+public class AsnInfo(byte tag, byte[] data)
 {
-    public TagID Tag { get; } = tag;
+    public byte Tag { get; } = tag;
     public byte[] Data { get; } = data;
 }
 
@@ -138,7 +138,7 @@ public class ByteReader(byte[] data)
 
     public AsnInfo ReadASN1()
     {
-        TagID tag = TagID.FromInt(ReadInt(1));
+        byte tag = (byte)ReadInt(1);
         int len = ReadLength();
         byte[] data = ReadBytes(len);
         return new AsnInfo(tag, data);

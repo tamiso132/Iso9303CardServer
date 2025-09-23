@@ -11,52 +11,6 @@ namespace Type;
 using TResult = Result<Type.ResponseCommand>;
 
 
-public enum TagType : byte
-{
-    Boolean = 0x01,
-    Integer = 0x02,
-    OctetString = 0x04,
-    ObjectIdentifier = 0x06,
-    Sequence = 0x30,
-    Set = 0x31,
-}
-
-public sealed class TagID
-{
-
-    public TagType Id { get; }
-    public string TagName { get; }
-
-    private TagID(TagType id, string tagName)
-    {
-        Id = id;
-        TagName = tagName;
-    }
-
-
-    public static readonly TagID Sequence = new(TagType.Boolean, "Sequence");
-    public static readonly TagID Set = new(TagType.Set, "Set");
-    public static readonly TagID Integer = new(TagType.Integer, "Integer");
-    public static readonly TagID OctetString = new(TagType.OctetString, "OctetString");
-    public static readonly TagID ObjectIdentifier = new(TagType.ObjectIdentifier, "ObjectIdentifier");
-    public static readonly TagID Boolean = new(TagType.Boolean, "Boolean");
-
-    public override string ToString() => TagName;
-
-    internal static TagID FromInt(int rawID)
-    {
-        return (TagType)rawID switch
-        {
-            TagType.Integer => Integer,
-            TagType.OctetString => OctetString,
-            TagType.ObjectIdentifier => ObjectIdentifier,
-            TagType.Boolean => Boolean,
-            TagType.Sequence => Sequence,
-            TagType.Set => Set,
-            _ => throw new NotImplementedException(), // catch-all
-        };
-    }
-}
 
 
 public sealed class EfIdGlobal : IEfID
