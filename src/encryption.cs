@@ -115,14 +115,14 @@ public class TestClass
             n.PrintBare();
         }
 
-        var nounce = allNodes.GetAllNodes()[0].Children[0].GetValueAsBytes();
+        var encrypted_nounce = allNodes.GetAllNodes()[0].Children[0].GetValueAsBytes();
 
-        Log.Info(BitConverter.ToString(nounce));
+        Log.Info(BitConverter.ToString(encrypted_nounce));
 
 
-        var tree = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
-        var nodes = tree.GetAllNodes();
-        var encrypted_nounce = nodes[0].Children[0].GetValueAsBytes();
+        // var tree = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
+        // var nodes = tree.GetAllNodes();
+        // var encrypted_nounce = nodes[0].Children[0].GetValueAsBytes();
 
         byte[] concatenated = password;
         if (passwordType == PasswordType.MRZ)
@@ -130,15 +130,15 @@ public class TestClass
 
         concatenated = [.. concatenated, .. new byte[] { 0, 0, 0, 3 }];
 
-        byte[] hash;
-        if (info.KeySize == 16) // AES 128
-            hash = SHA1.HashData(concatenated).Take(16).ToArray();
-        else if (info.KeySize == 24) // AES 192 
-            hash = SHA256.HashData(concatenated).Take(24).ToArray();
-        else if (info.KeySize == 32) // AES 256 
-            hash = SHA256.HashData(concatenated).Take(32).ToArray();
-        else
-            throw new NotImplementedException("Unsupported key size");
+        // byte[] hash;
+        // if (info.KeySize == 16) // AES 128
+        //     hash = SHA1.HashData(concatenated).Take(16).ToArray();
+        // else if (info.KeySize == 24) // AES 192 
+        //     hash = SHA256.HashData(concatenated).Take(24).ToArray();
+        // else if (info.KeySize == 32) // AES 256 
+        //     hash = SHA256.HashData(concatenated).Take(32).ToArray();
+        // else
+        //     throw new NotImplementedException("Unsupported key size");
 
 
         // -- Decrypt-- 
@@ -148,7 +148,7 @@ public class TestClass
         aes.BlockSize = 128;
         aes.Mode = CipherMode.CBC;
         aes.Padding = PaddingMode.None;
-        aes.Key = hash;
+        aes.Key = password;
         aes.IV = new byte[16];
 
         using var dectryptor = aes.CreateDecryptor();
