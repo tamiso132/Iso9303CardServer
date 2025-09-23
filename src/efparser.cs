@@ -141,7 +141,6 @@ public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
 
         foreach (var n in allNodes.GetAllNodes())
         {
-            Log.Info("??");
             n.PrintBare();
         }
 

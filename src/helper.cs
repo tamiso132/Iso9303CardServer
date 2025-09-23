@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
 using System.Text;
 using Type;
 namespace Helper;
@@ -218,6 +219,16 @@ public static class Log
 
         // Log the actual message normally
         Console.WriteLine(message + "\n");
+    }
+}
+public class RandomNumberProvider
+{
+    private readonly RandomNumberGenerator _generator = RandomNumberGenerator.Create();
+    public byte[] GetNextBytes(int count)
+    {
+        byte[] bytes = new byte[count];
+        _generator.GetBytes(bytes);
+        return bytes;
     }
 }
 

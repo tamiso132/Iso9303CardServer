@@ -117,7 +117,13 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
             }
             else
             {
-
+                if (customSeq != null)
+                {
+                    foreach (var s in customSeq)
+                    {
+                        
+                    }
+                }
                 Log.Info("other");
                 var encodedData = asnReader.ReadEncodedValue().ToArray();
 

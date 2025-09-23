@@ -98,7 +98,7 @@ public class TestClass
     public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info, byte[] password, PasswordType passwordType)
     where T : IServerFormat
     {
-        var response = await command.GeneralAuthenticate();
+        var response = await command.GeneralAuthenticate(new GenAuthType.EncryptedNounce());
         if (!response.IsSuccess)
         {
             Log.Error(response.Error.ErrorMessage());
