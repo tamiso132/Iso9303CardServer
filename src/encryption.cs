@@ -94,7 +94,7 @@ public class TestClass
     public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info)
     where T : IServerFormat
     {
-        var response = await command.GeneralAuthenticate();
+        var response = await command.GeneralAuthenticate(new GenAuthType.EncryptedNounce());
         if (!response.IsSuccess)
         {
             Log.Error(response.Error.ErrorMessage());
@@ -118,17 +118,17 @@ public class TestClass
         //     // error
         // }
 
-    //     var encrypted_nounce = nodes[0].Children[0].GetValueAsOID();
+        //     var encrypted_nounce = nodes[0].Children[0].GetValueAsOID();
 
-    //     var aes = Aes.Create();
-    //     aes.KeySize = info.KeySize * 8;
-    //     aes.BlockSize = 128; // TODO, support other
-    //     byte[] iv = [.. Enumerable.Repeat<byte>(0x00, 16)];
+        //     var aes = Aes.Create();
+        //     aes.KeySize = info.KeySize * 8;
+        //     aes.BlockSize = 128; // TODO, support other
+        //     byte[] iv = [.. Enumerable.Repeat<byte>(0x00, 16)];
 
-    //     BigInteger bigInt = new BigInteger(
-    //      "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B412B1DA197FB71123ACD3A729901D1A71874700133107EC5",
-    //      16
-    //  );
+        //     BigInteger bigInt = new BigInteger(
+        //      "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B412B1DA197FB71123ACD3A729901D1A71874700133107EC5",
+        //      16
+        //  );
 
         // byte[] actualCmac = AesHelper.ComputeCmac(key, encrypted_nounce);
 

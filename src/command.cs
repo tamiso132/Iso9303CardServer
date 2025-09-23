@@ -9,6 +9,7 @@ using Helper;
 using System.ComponentModel;
 using ErrorHandling;
 using Microsoft.AspNetCore.Authentication;
+using System.Formats.Asn1;
 
 namespace Command;
 
@@ -104,14 +105,31 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return await SendPackageDecodeResponse(cmd);
     }
 
-    public async Task<TResult> GeneralAuthenticate(byte cla = 0x10)
+    public async Task<TResult> GeneralAuthenticate(GenAuthType type, byte cla = 0x10)
     {
         Log.Info("Sending General Authenticate Command");
         // byte[] data = new AsnBuilder().AddCustomTag(0x7C, []).Build();
         // According to example should give encrypted nounce
-        byte[] raw = [0x10, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        var ctxSeq = new Asn1Tag(TagClass.ContextSpecific, 0x7C, true);
 
-        var result = await SendPackageDecodeResponse(raw);
+        using (writer.PushSequence(ctxSeq))
+        {
+            var data = type.Data();
+            if (data.Length != 0)
+                writer.WriteEncodedValue(data);
+        }
+
+        byte[] encoded_raw = writer.Encode()[1..];
+
+        //  byte[] raw = [0x10, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
+
+        var cmdFormat = FormatCommand(cla, 0x86, 0x00, 0x00, data: encoded_raw, le: 0x00);
+
+
+        Log.Info("Write: " + BitConverter.ToString(cmdFormat));
+
+        var result = await SendPackageDecodeResponse(cmdFormat);
 
         if (result.IsSuccess)
             if (result.Value.data.Length == 0)
@@ -171,6 +189,41 @@ enum MSEType // p1 p2
 }
 
 
+public abstract record GenAuthType
+{
+    public abstract byte[] Data();
 
+    public record EncryptedNounce() : GenAuthType
+    {
+        public override byte[] Data()
+        {
+            return [];
+        }
+
+    }
+    public record MappingData(byte[] mappingData) : GenAuthType
+    {
+        public override byte[] Data()
+        {
+            return new AsnBuilder().AddCustomTag(0x81, _mappingData).Build();
+        }
+
+        private byte[] _mappingData = mappingData;
+
+    }
+
+    public record KeyAgreement(byte[] authToken) : GenAuthType
+    {
+        public override byte[] Data()
+        {
+
+            AsnWriter writer = new AsnWriter(AsnEncodingRules.DER);
+            writer.WriteOctetString(_authToken, tag: new Asn1Tag(TagClass.ContextSpecific, 0x86));
+            return writer.Encode();
+        }
+
+        private byte[] _authToken = authToken;
+    }
+}
 
 
