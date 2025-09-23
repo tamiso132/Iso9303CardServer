@@ -105,13 +105,11 @@ public class TestClass
             return RVoid.Fail(response.Error);
         }
 
-        Log.Info("Survived General?");
 
         var allNodes = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
 
         foreach (var n in allNodes.GetAllNodes())
         {
-            Log.Info("print bare?");
             n.PrintBare();
         }
 
