@@ -13,9 +13,6 @@ using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Math;
 
 
-
-
-
 namespace Encryption;
 
 public class TestClass
@@ -90,8 +87,14 @@ public class TestClass
         */
     }
 
+    public enum PasswordType : byte
+    {
+        Undefined = 0,
+        MRZ = 1,
+        CAN = 2,
+    }
 
-    public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info)
+    public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info,byte[] password, PasswordType passwordType)
     where T : IServerFormat
     {
         var response = await command.GeneralAuthenticate(new GenAuthType.EncryptedNounce());
@@ -101,43 +104,47 @@ public class TestClass
             return RVoid.Fail(response.Error);
         }
 
-        Log.Info("Does it come here?");
+        //Log.Info("Does it come here?");
 
-        // var tree = AsnNode.Parse(new ByteReader(response.Value.data));
+        var tree = AsnNode.Parse(new ByteReader(response.Value.data));
+        var nodes = tree.GetAllNodes();
+        var encrypted_nounce = nodes[0].Children[0].GetValueAsOID(); // GetValueAsOID -> GetValueAsBytes??
 
-        // var nodes = tree.GetAllNodes();
-        // nodes[0].PrintBare();
-        // // TODO, check length
+        byte[] concatenated = password;
+        if (passwordType == PasswordType.MRZ)
+            concatenated = SHA1.HashData(concatenated);
 
-        // // ERROR
-        // if (nodes[0].Id != 0x7C)
-        // { }
+        concatenated = [.. concatenated, .. new byte[] { 0, 0, 0, 3 }];
 
-        // if (nodes[0].Children[0].Id != 0x80)
-        // {
-        //     // error
-        // }
+        byte[] hash;
+        if (info.KeySize == 16) // AES 128
+            hash = SHA1.HashData(concatenated).Take(16).ToArray();
+        else if (info.KeySize == 24) // AES 192 
+            hash = SHA256.HashData(concatenated).Take(24).ToArray();
+        else if (info.KeySize == 32) // AES 256 
+            hash = SHA256.HashData(concatenated).Take(32).ToArray();
+        else
+            throw new NotImplementedException("Unsupported key size");
 
-        //     var encrypted_nounce = nodes[0].Children[0].GetValueAsOID();
 
-        //     var aes = Aes.Create();
-        //     aes.KeySize = info.KeySize * 8;
-        //     aes.BlockSize = 128; // TODO, support other
-        //     byte[] iv = [.. Enumerable.Repeat<byte>(0x00, 16)];
+        // -- Dectrypt -- 
 
-        //     BigInteger bigInt = new BigInteger(
-        //      "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B412B1DA197FB71123ACD3A729901D1A71874700133107EC5",
-        //      16
-        //  );
+        using var aes = Aes.Create();
+        aes.KeySize = info.KeySize * 8;
+        aes.BlockSize = 128;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.None;
+        aes.Key = hash;
+        aes.IV = new byte[16];
 
-        // byte[] actualCmac = AesHelper.ComputeCmac(key, encrypted_nounce);
+        using var dectryptor = aes.CreateDecryptor();
+        var dectryptedNonce = dectryptor.TransformFinalBlock(encrypted_nounce, 0, encrypted_nounce.Length);
 
-        // byte[] cipherTxt = AesHelper.Process(encrypted_nounce, key, iv, info.MacType, false);
-
+        Log.Info("Dectryprd Nonce: " + BitConverter.ToString(dectryptedNonce));
 
         return RVoid.Success();
 
-
+       
     }
 
     static void PerformKeyAgreement()
