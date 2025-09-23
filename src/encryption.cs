@@ -1,3 +1,4 @@
+using System.Formats.Asn1;
 using System.Security.Cryptography;
 using System.Text;
 using Asn1;
@@ -94,7 +95,7 @@ public class TestClass
         CAN = 2,
     }
 
-    public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info,byte[] password, PasswordType passwordType)
+    public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info, byte[] password, PasswordType passwordType)
     where T : IServerFormat
     {
         var response = await command.GeneralAuthenticate();
@@ -105,10 +106,18 @@ public class TestClass
         }
 
         //Log.Info("Does it come here?");
+        var allNodes = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
 
-        var tree = AsnNode.Parse(new ByteReader(response.Value.data));
+
+
+        foreach (var n in allNodes.GetAllNodes())
+        {
+            n.PrintBare();
+        }
+
+        var tree = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
         var nodes = tree.GetAllNodes();
-        var encrypted_nounce = nodes[0].Children[0].GetValueAsOID(); // GetValueAsOID -> GetValueAsBytes??
+        var encrypted_nounce = nodes[0].Children[0].GetValueAsBytes(); // GetValueAsOID -> GetValueAsBytes??
 
         byte[] concatenated = password;
         if (passwordType == PasswordType.MRZ)
@@ -140,11 +149,13 @@ public class TestClass
         using var dectryptor = aes.CreateDecryptor();
         var dectryptedNonce = dectryptor.TransformFinalBlock(encrypted_nounce, 0, encrypted_nounce.Length);
 
-        Log.Info("Dectryprd Nonce: " + BitConverter.ToString(dectryptedNonce));
+        Log.Info("Dectrypted Nonce: " + BitConverter.ToString(dectryptedNonce));
 
         return RVoid.Success();
 
-       
+
+
+
     }
 
     static void PerformKeyAgreement()
