@@ -363,11 +363,36 @@ public sealed record ECDH
 
     }
 
+    public void MapGenerator(byte[] nonce)
+    {
+        var iNonce = new BigInteger(1, nonce);
+        _generator = _generator.Multiply(iNonce).Add(_secret);
+    }
+
+    public void CalculateSharedSecret(byte[] encodedPoint)
+    {
+        var publicKeyIC = param.param.Curve.DecodePoint(encodedPoint);
+        _secret = publicKeyIC.Multiply(PrivateKey);
+    }
+
+    public void GenerateEphemeralKeys(RandomNumberProvider RandomNumberProvider)
+    {
+        PrivateKey = new BigInteger(1, RandomNumberProvider.GetNextBytes(32));
+    }
+
     public byte[] PublicKey
     {
         get
         {
             return _generator.Multiply(PrivateKey).Normalize().GetEncoded();
+        }
+    }
+
+    public byte[] SharedSecret
+    {
+        get
+        {
+            return _secret.Normalize().XCoord.GetEncoded();
         }
     }
 

@@ -154,6 +154,7 @@ public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
 
                 var info = new EncryptionInfo(oid, paramID);
                 ef.EncryptInfos.Add(info);
+                info.PrintInfo();
             }
         }
 
@@ -242,16 +243,16 @@ public class ImplEfSod : IEfParser<EFSodInfo>
             int dgNumber = (int)dgSeq.ReadInteger();
             byte[] hashValue = dgSeq.ReadOctetString();
             ef.DgHashes[dgNumber] = hashValue;
-            
+
         }
 
         if (sodSeq.HasData)
-{
-    // Läs sekvensen som innehåller LDSVersionInfo
-        var ldsVersionSeq = sodSeq.ReadSequence();
-        ef.LdsVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString);    // ldsVersion
-        ef.UnicodeVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString); // unicodeVersion
-}
+        {
+            // Läs sekvensen som innehåller LDSVersionInfo
+            var ldsVersionSeq = sodSeq.ReadSequence();
+            ef.LdsVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString);    // ldsVersion
+            ef.UnicodeVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString); // unicodeVersion
+        }
 
         ef.Signature = sodSeq.ReadOctetString();
 
@@ -273,21 +274,21 @@ public class ImplEfSod : IEfParser<EFSodInfo>
         // int signatureTag = reader.ReadInt(1);
         // int signatureLength = reader.ReadLength();
         // ef.Signature = reader.ReadBytes(signatureLength);
-        
+
         // Utskrift
         Console.WriteLine("LDS Version: " + ef.LdsVersion);
         Console.WriteLine("Digest Algorithm: " + ef.DigestAlgorithm);
 
         foreach (var kvp in ef.DgHashes)
         {
-        Console.WriteLine($"DG{kvp.Key} Hash: {BitConverter.ToString(kvp.Value)}");
+            Console.WriteLine($"DG{kvp.Key} Hash: {BitConverter.ToString(kvp.Value)}");
         }
 
         Console.WriteLine("Signature: " + BitConverter.ToString(ef.Signature));
 
         return ef;
         // throw new NotImplementedException();
-        
+
 
     }
 }
