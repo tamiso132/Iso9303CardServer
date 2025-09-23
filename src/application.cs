@@ -48,6 +48,8 @@ public class ClientSession(ICommunicator comm)
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
+             byte[] key = TestClass.DerivePaceKey(info);
+            
             byte[] key = TestClass.DerivePaceKey(info);
             Log.Info("orgID: " + BitConverter.ToString(info.OrgOid));
 
