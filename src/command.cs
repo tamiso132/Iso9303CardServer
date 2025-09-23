@@ -110,26 +110,26 @@ public class Command<T>(ICommunicator communicator, T encryption)
         Log.Info("Sending General Authenticate Command");
         // byte[] data = new AsnBuilder().AddCustomTag(0x7C, []).Build();
         // According to example should give encrypted nounce
-        var writer = new AsnWriter(AsnEncodingRules.DER);
-        var ctxSeq = new Asn1Tag(TagClass.ContextSpecific, 0x7C, true);
+        // var writer = new AsnWriter(AsnEncodingRules.DER);
+        // var ctxSeq = new Asn1Tag(TagClass.ContextSpecific, 0x7C, true);
 
-        using (writer.PushSequence(ctxSeq))
-        {
-            var data = type.Data();
-            if (data.Length != 0)
-                writer.WriteEncodedValue(data);
-        }
+        // using (writer.PushSequence(ctxSeq))
+        // {
+        //     var data = type.Data();
+        //     if (data.Length != 0)
+        //         writer.WriteEncodedValue(data);
+        // }
 
-        byte[] encoded_raw = writer.Encode()[1..];
+        // byte[] encoded_raw = writer.Encode()[1..];
 
-        //  byte[] raw = [0x10, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
+        byte[] raw = [0x10, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
 
-        var cmdFormat = FormatCommand(cla, 0x86, 0x00, 0x00, data: encoded_raw, le: 0x00);
+        //byte[] cmdFormat = FormatCommand(cla, 0x86, 0x00, 0x00, data: encoded_raw, le: 0x00);
 
 
-        Log.Info("Write: " + BitConverter.ToString(cmdFormat));
+        //Log.Info("Write: " + BitConverter.ToString(raw));
 
-        var result = await SendPackageDecodeResponse(cmdFormat);
+        var result = await SendPackageDecodeResponse(raw);
 
         if (result.IsSuccess)
             if (result.Value.data.Length == 0)
