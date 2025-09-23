@@ -4,31 +4,29 @@ using App;
 using Server;
 using System.Collections.Concurrent;
 using EpassValidation;
+using System.Collections;
+using System.Security.Cryptography.X509Certificates;
 using Org.BouncyCastle.Cms;
-using Org.BouncyCastle.Utilities.Collections;
-using Org.BouncyCastle.X509;
-using Org.BouncyCastle.Asn1;
-using Org.BouncyCastle.Asn1.Cms;
-using Helper;
 
 // Load the ML file (DER encoded)
 byte[] mlBytes = File.ReadAllBytes("C://Users/tom/Downloads/ICAO_ml_July2025.ml");
 
-var d = Asn1.AsnNode.Parse(new ByteReader(mlBytes));
 
-foreach (var e in d.GetAllNodes())
+// Step 1: unwrap CMS chain
+var cmsChain = new System.Collections.Generic.List<byte[]>();
+byte[] currentBytes = mlBytes;
+
+CmsSignedData cms = new CmsSignedData(currentBytes);
+X509Store certs = cms.GetCertificates();
+
+SignerInformationStore signers = s.GetSignerInfos();
+
+foreach (SignerInformation signer in signers.GetSigners())
 {
-    e.PrintBare();
+    ArrayList certList = new ArrayList(certs.GetMatches(signer.SignerID));
+    X509Certificate cert = (X509Certificate)certList[0];
 }
 
-
-// // Parse CMS SignedData
-// CmsSignedData cms = new CmsSignedData(mlBytes);
-
-// cms.GetAttributeCertificates();
-
-// // Extract certificates
-// var certStore = cms.GetCertificates();
 // foreach (var cert in certStore.EnumerateMatches(selector: (ISelector<X509Certificate>)new Select()))
 // {
 //     Console.WriteLine("Issuer: " + cert.IssuerDN);
@@ -179,7 +177,7 @@ try
      Console.WriteLine($"{certs.Count}");
      Console.WriteLine($"Hittade {certs.Count} certifikat i Master List.\n");
  */
-    CertInfo.ShowCertificateInfo(mlPath);
+    //CertInfo.ShowCertificateInfo(mlPath);
 
 
     // Skriv ut lite info om de första certifikaten
