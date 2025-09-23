@@ -103,32 +103,32 @@ public class TestClass
 
         Log.Info("Does it come here?");
 
-        var tree = AsnNode.Parse(new ByteReader(response.Value.data));
+        // var tree = AsnNode.Parse(new ByteReader(response.Value.data));
 
-        var nodes = tree.GetAllNodes();
-        nodes[0].PrintBare();
-        // TODO, check length
+        // var nodes = tree.GetAllNodes();
+        // nodes[0].PrintBare();
+        // // TODO, check length
 
-        // ERROR
-        if (nodes[0].Id != 0x7C)
-        { }
+        // // ERROR
+        // if (nodes[0].Id != 0x7C)
+        // { }
 
-        if (nodes[0].Children[0].Id != 0x80)
-        {
-            // error
-        }
+        // if (nodes[0].Children[0].Id != 0x80)
+        // {
+        //     // error
+        // }
 
-        var encrypted_nounce = nodes[0].Children[0].GetValueAsOID();
+    //     var encrypted_nounce = nodes[0].Children[0].GetValueAsOID();
 
-        var aes = Aes.Create();
-        aes.KeySize = info.KeySize * 8;
-        aes.BlockSize = 128; // TODO, support other
-        byte[] iv = [.. Enumerable.Repeat<byte>(0x00, 16)];
+    //     var aes = Aes.Create();
+    //     aes.KeySize = info.KeySize * 8;
+    //     aes.BlockSize = 128; // TODO, support other
+    //     byte[] iv = [.. Enumerable.Repeat<byte>(0x00, 16)];
 
-        BigInteger bigInt = new BigInteger(
-         "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B412B1DA197FB71123ACD3A729901D1A71874700133107EC5",
-         16
-     );
+    //     BigInteger bigInt = new BigInteger(
+    //      "8CB91E82A3386D280F5D6F7E50E641DF152F7109ED5456B412B1DA197FB71123ACD3A729901D1A71874700133107EC5",
+    //      16
+    //  );
 
         // byte[] actualCmac = AesHelper.ComputeCmac(key, encrypted_nounce);
 

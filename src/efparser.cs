@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Formats.Asn1;
 using System.Text;
 using Asn1;
 using Encryption;
@@ -113,10 +114,10 @@ public struct ImplDG14 : IEfParser<ImplDG14.Info>
     public readonly Info ParseFromBytes(byte[] bytes)
     {
         var ef = new Info();
-        var allNodes = AsnNode.Parse(new ByteReader(bytes));
+        var allNodes = AsnNode.Parse(new AsnReader(bytes, AsnEncodingRules.DER));
         foreach (var node in allNodes.GetAllNodes())
         {
-            node.PrintTree();
+            // node.PrintTree();
         }
         return ef;
     }
@@ -134,11 +135,19 @@ public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
     public Info ParseFromBytes(byte[] bytes)
     {
         var ef = new Info();
-        var allNodes = AsnNode.Parse(new ByteReader(bytes));
+        var allNodes = AsnNode.Parse(new AsnReader(bytes, AsnEncodingRules.DER));
 
-        foreach (var set in allNodes.Filter(TagID.Set))
+
+
+        foreach (var n in allNodes.GetAllNodes())
         {
-            foreach (var paceInfo in set.Filter(TagID.Sequence))
+            Log.Info("??");
+            n.PrintBare();
+        }
+
+        foreach (var set in allNodes.Filter(Asn1Tag.SetOf))
+        {
+            foreach (var paceInfo in set.Filter(Asn1Tag.Sequence))
             {
                 byte[] oid = paceInfo.GetChildNode(0).GetValueAsOID();
                 var ver = paceInfo.GetChildNode(1).GetValueAsInt();
@@ -167,10 +176,9 @@ public struct ImplEFDir : IEfParser<ImplEFDir.Info>
     public readonly Info ParseFromBytes(byte[] bytes)
     {
         var ef = new Info();
-        var allNodes = AsnNode.Parse(new ByteReader(bytes));
+        var allNodes = AsnNode.Parse(new AsnReader(bytes, AsnEncodingRules.DER));
         foreach (var node in allNodes.GetAllNodes())
         {
-            node.PrintTree();
         }
         return ef;
     }
