@@ -101,14 +101,10 @@ public class TestClass
         var response = await command.GeneralAuthenticate(new GenAuthType.EncryptedNounce());
         if (!response.IsSuccess)
         {
-            Log.Error(response.Error.ErrorMessage());
             return RVoid.Fail(response.Error);
         }
 
-        //Log.Info("Does it come here?");
         var allNodes = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
-
-
 
         foreach (var n in allNodes.GetAllNodes())
         {
