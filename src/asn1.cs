@@ -1,6 +1,7 @@
 namespace Asn1;
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Formats.Asn1;
 using System.Linq;
@@ -73,7 +74,7 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
     }
 
     // Example parser skeleton, replace ByteReader/AsnInfo with your parser implementation
-    public static AsnFind Parse(AsnReader asnReader, bool is_top_level = true)
+    public static AsnFind Parse(AsnReader asnReader, Asn1Tag[]? customSeq = null, Asn1Tag[]? customSet = null, bool is_top_level = true)
     {
         // var asnReader = new AsnReader(reader, AsnEncodingRules.DER);
 
@@ -89,7 +90,7 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
                 Log.Info("Sequence");
                 var seqReader = asnReader.ReadSequence();
                 var children = new List<AsnNode>();
-                children.AddRange(Parse(seqReader, false).GetAllNodes());
+                children.AddRange(Parse(seqReader, is_top_level: false).GetAllNodes());
                 nodes.Add(new AsnNode(tag, children: children));
             }
             else if (tag == Asn1Tag.SetOf)
@@ -97,7 +98,7 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
                 Log.Info("Set");
                 var setOfReader = asnReader.ReadSetOf();
                 var children = new List<AsnNode>();
-                children.AddRange(Parse(setOfReader, false).GetAllNodes());
+                children.AddRange(Parse(setOfReader, is_top_level: false).GetAllNodes());
                 nodes.Add(new AsnNode(tag, children: children));
             }
             else if (is_top_level)
@@ -105,12 +106,13 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
 
                 var seqReader = asnReader.ReadSequence(tag);
                 var children = new List<AsnNode>();
-                children.AddRange(Parse(seqReader, false).GetAllNodes());
+                children.AddRange(Parse(seqReader, is_top_level: false).GetAllNodes());
                 nodes.Add(new AsnNode(tag, children: children));
             }
             else
             {
-                Log.Info("other");
+                foreach ()
+                    Log.Info("other");
                 var encodedData = asnReader.ReadEncodedValue().ToArray();
 
                 var sliceStart = 2;
