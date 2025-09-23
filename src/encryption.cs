@@ -117,7 +117,7 @@ public class TestClass
 
         var tree = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
         var nodes = tree.GetAllNodes();
-        var encrypted_nounce = nodes[0].Children[0].GetValueAsBytes(); // GetValueAsOID -> GetValueAsBytes??
+        var encrypted_nounce = nodes[0].Children[0].GetValueAsBytes(); 
 
         byte[] concatenated = password;
         if (passwordType == PasswordType.MRZ)
@@ -136,7 +136,7 @@ public class TestClass
             throw new NotImplementedException("Unsupported key size");
 
 
-        // -- Dectrypt -- 
+        // -- Decrypt-- 
 
         using var aes = Aes.Create();
         aes.KeySize = info.KeySize * 8;

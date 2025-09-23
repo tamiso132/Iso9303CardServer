@@ -108,5 +108,5 @@ using Helper;
 
 
 
-testNonceDecrypt.testings();
+//testNonceDecrypt.testings();
 
