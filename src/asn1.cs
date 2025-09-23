@@ -93,7 +93,6 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
 
             if (tag == Asn1Tag.Sequence)
             {
-                Log.Info("Sequence");
                 var seqReader = asnReader.ReadSequence();
                 var children = new List<AsnNode>();
                 children.AddRange(Parse(seqReader, is_top_level: false).GetAllNodes());
@@ -101,7 +100,6 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
             }
             else if (tag == Asn1Tag.SetOf)
             {
-                Log.Info("Set");
                 var setOfReader = asnReader.ReadSetOf();
                 var children = new List<AsnNode>();
                 children.AddRange(Parse(setOfReader, is_top_level: false).GetAllNodes());

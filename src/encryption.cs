@@ -6,6 +6,7 @@ using Command;
 using ErrorHandling;
 using Helper;
 using Interfaces;
+using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Modes;
@@ -104,16 +105,24 @@ public class TestClass
             return RVoid.Fail(response.Error);
         }
 
+        Log.Info("Survived General?");
+
         var allNodes = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
 
         foreach (var n in allNodes.GetAllNodes())
         {
+            Log.Info("print bare?");
             n.PrintBare();
         }
 
+        var nounce = allNodes.GetAllNodes()[0].Children[0].GetValueAsBytes();
+
+        Log.Info(BitConverter.ToString(nounce));
+
+
         var tree = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
         var nodes = tree.GetAllNodes();
-        var encrypted_nounce = nodes[0].Children[0].GetValueAsBytes(); 
+        var encrypted_nounce = nodes[0].Children[0].GetValueAsBytes();
 
         byte[] concatenated = password;
         if (passwordType == PasswordType.MRZ)
@@ -150,6 +159,13 @@ public class TestClass
         return RVoid.Success();
 
 
+
+        //Test
+        RandomNumberProvider rngProvider = new RandomNumberProvider();
+
+        BigInteger privateKey = new BigInteger(1, rngProvider.GetNextBytes(32));
+        DomainParameter param = ParameterUtil.getParameterById(info.OrgParameterID);
+        // param.param;
 
 
     }
@@ -325,14 +341,41 @@ public static class AesHelper
     }
 }
 
-sealed record DomainParameter(BigInteger p, BigInteger a, BigInteger b, BigInteger g, BigInteger n, BigInteger h)
-{
-    BigInteger P;
-    BigInteger A;
-    BigInteger B;
-    BigInteger G;
-    BigInteger n;
-    BigInteger h;
 
-    static readonly DomainParameter BrainpoolP384r1 = new DomainParameter(BigInteger.Five, BigInteger.Four, BigInteger.Four, BigInteger.Four, BigInteger.Four, BigInteger.Four);
+
+public sealed record DomainParameter(X9ECParameters param)
+{
+    public readonly X9ECParameters param = param;
+
+    internal static DomainParameter BrainpoolP384r1 = new(ECNamedCurveTable.GetByName("BRAINPOOLP384R1"));
+}
+
+public sealed record ECDH
+{
+
+    public ECDH(DomainParameter param, byte[] privateKey, byte[]? generator)
+    {
+        PrivateKey = new BigInteger(1, privateKey);
+        this.param = param;
+        _secret = this.param.param.G;
+        if (generator == null)
+            _generator = this.param.param.G;
+        else
+            _generator = this.param.param.Curve.DecodePoint(generator).Normalize();
+
+    }
+
+    public byte[] PublicKey
+    {
+        get
+        {
+            return _generator.Multiply(PrivateKey).Normalize().GetEncoded();
+        }
+    }
+
+    DomainParameter param;
+    Org.BouncyCastle.Math.EC.ECPoint _generator;
+    Org.BouncyCastle.Math.EC.ECPoint _secret;
+
+    BigInteger PrivateKey;
 }

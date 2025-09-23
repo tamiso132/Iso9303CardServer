@@ -1,3 +1,4 @@
+using Encryption;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
@@ -232,4 +233,15 @@ public class RandomNumberProvider
     }
 }
 
+public class ParameterUtil
+{
+    public static DomainParameter getParameterById(int id)
+    {
+        return id switch
+        {
+            16 => DomainParameter.BrainpoolP384r1,
+            _ => throw new NotImplementedException("Parameter ID not implemented"),
+        };
 
+    }
+}

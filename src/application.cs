@@ -23,6 +23,8 @@ public class ClientSession(ICommunicator comm)
         {
             var result = await _cmd.SelectDefaultMF();
 
+
+
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
@@ -40,7 +42,6 @@ public class ClientSession(ICommunicator comm)
 
             var response = result.Value;
             var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
-            Log.Info("Parameter ID: " + info.OrgParameterID);
 
             if (!result.IsSuccess)
             {
@@ -50,10 +51,10 @@ public class ClientSession(ICommunicator comm)
             //  byte[] key = TestClass.DerivePaceKey(info);
             byte[] key = [];
             Log.Info("orgID: " + BitConverter.ToString(info.OrgOid));
+
             result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
 
 
-
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
@@ -67,8 +68,10 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-
+            //  await _cmd.GeneralAuthenticate(new GenAuthType.MappingData([]));
+            //  return;
             var r = await TestClass.ComputeDecryptedNounce(_cmd, info, key, TestClass.PasswordType.MRZ);
+
 
             if (!r.IsSuccess)
             {

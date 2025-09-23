@@ -222,7 +222,6 @@ public sealed class SwStatus
         if (this == Success)
             return true;
 
-        Log.Error("SW ErrorCode: " + this.Message);
         return false;
     }
 

@@ -1,14 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Interfaces;
 using Type;
 using Asn1;
 using Helper;
-using System.ComponentModel;
 using ErrorHandling;
-using Microsoft.AspNetCore.Authentication;
 using System.Formats.Asn1;
 
 namespace Command;
@@ -108,32 +102,31 @@ public class Command<T>(ICommunicator communicator, T encryption)
     public async Task<TResult> GeneralAuthenticate(GenAuthType type, byte cla = 0x10)
     {
         Log.Info("Sending General Authenticate Command");
-        // byte[] data = new AsnBuilder().AddCustomTag(0x7C, []).Build();
-        // According to example should give encrypted nounce
-        // var writer = new AsnWriter(AsnEncodingRules.DER);
-        // var ctxSeq = new Asn1Tag(TagClass.ContextSpecific, 0x7C, true);
 
-        // using (writer.PushSequence(ctxSeq))
-        // {
-        //     var data = type.Data();
-        //     if (data.Length != 0)
-        //         writer.WriteEncodedValue(data);
-        // }
+        var writer = new AsnWriter(AsnEncodingRules.DER);
+        var ctxSeq = new Asn1Tag(TagClass.ContextSpecific, 0x7C, true);
+
+        using (writer.PushSequence(ctxSeq))
+        {
+            var data = type.Data();
+            if (data.Length != 0)
+                writer.WriteEncodedValue(data);
+        }
 
         // byte[] encoded_raw = writer.Encode()[1..];
 
-        byte[] raw = [0x10, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
+        //        byte[] raw = [0x10, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
 
-        //byte[] cmdFormat = FormatCommand(cla, 0x86, 0x00, 0x00, data: encoded_raw, le: 0x00);
+        byte[] cmdFormat = FormatCommand(cla, 0x86, 0x00, 0x00, data: writer.Encode()[1..], le: 0x00);
 
 
         //Log.Info("Write: " + BitConverter.ToString(raw));
 
-        var result = await SendPackageDecodeResponse(raw);
+        var result = await SendPackageDecodeResponse(cmdFormat);
 
         if (result.IsSuccess)
             if (result.Value.data.Length == 0)
-                return TResult.Fail(new Error.Other("Genral Authentication not sending the encrypted nounce!"));
+                return TResult.Fail(new Error.Other("General Authentication not sending the encrypted nounce!"));
 
 
         return result;
@@ -205,7 +198,11 @@ public abstract record GenAuthType
     {
         public override byte[] Data()
         {
-            return new AsnBuilder().AddCustomTag(0x81, _mappingData).Build();
+            // return new AsnBuilder().AddCustomTag(0x81, _mappingData).Build();
+            AsnWriter writer = new AsnWriter(AsnEncodingRules.DER);
+            var n = new Asn1Tag(TagClass.ContextSpecific, 0x81);
+            writer.WriteOctetString(mappingData, n);
+            return writer.Encode()[1..];
         }
 
         private byte[] _mappingData = mappingData;
