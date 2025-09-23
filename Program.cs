@@ -27,6 +27,15 @@ foreach (SignerInformation signer in signers.GetSigners())
     X509Certificate cert = (X509Certificate)certList[0];
 }
 
+
+
+// // Parse CMS SignedData
+// CmsSignedData cms = new CmsSignedData(mlBytes);
+
+// cms.GetAttributeCertificates();
+
+// // Extract certificates
+// var certStore = cms.GetCertificates();
 // foreach (var cert in certStore.EnumerateMatches(selector: (ISelector<X509Certificate>)new Select()))
 // {
 //     Console.WriteLine("Issuer: " + cert.IssuerDN);
@@ -163,12 +172,23 @@ public class WsSession : WebSocketBehavior
 }
 */
 // Reading lists 
+// Maybe baby:
 
 
+// string mlPath = "C:/Users/foffe/ICAO_ml_July2025.ml";
 
-string mlPath = "C:/Users/foffe/ICAO_ml_July2025.ml";
+// try
+// {
+//     var allCerts = MasterListHelper.ReadAllCerificates(mlPath);
+//     Console.WriteLine($"Totalt antal certifikat i Master List: {allCerts.Count}\n");
 
-//Console.WriteLine("=== ICAO Master List validering ===");
+//     MasterListHelper.PrintCertificates(allCerts);
+// }
+// catch (Exception ex)
+// {
+//     Console.WriteLine("Fel vid läsning av Master List:");
+//     Console.WriteLine(ex.Message);
+// }
 
 try
 {
@@ -178,24 +198,12 @@ try
      Console.WriteLine($"Hittade {certs.Count} certifikat i Master List.\n");
  */
     //CertInfo.ShowCertificateInfo(mlPath);
+// Console.WriteLine("\nKlar!");
+// Console.ReadLine();
 
-
-    // Skriv ut lite info om de första certifikaten
-    // for (int i = 0; i < Math.Min(5, certs.Count); i++)
-    // {
-    //     MasterListHelper.PrintCertInfo(certs[i]);
-    // }
-    //     Console.WriteLine($"{certs.Count}");
-
-}
-catch (Exception ex)
-{
-    Console.WriteLine("Fel vid läsning av Master List:");
-    Console.WriteLine(ex.Message);
-}
-
-Console.WriteLine("\nKlar!");
-Console.ReadLine();
+var certs = MasterListHelper.ReadAllCertificatesFromMl("C:/Users/foffe/ICAO_ml_July2025.ml");
+Console.WriteLine($"Hittade {certs.Count} certifikat i ML.");
+MasterListHelper.PrintBcCerts(certs);
 
 
 
@@ -212,4 +220,7 @@ class Select : ISelector<X509Certificate>
         return true;
     }
 }
+
+
+
 

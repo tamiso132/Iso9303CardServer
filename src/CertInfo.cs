@@ -34,17 +34,17 @@ public class CertInfo
             try
             {
                 byte[] rawdata = x509.RawData;
-                Console.WriteLine("Content Type: {0}{1}",X509Certificate2.GetCertContentType(rawdata),Environment.NewLine);
-                Console.WriteLine("Friendly Name: {0}{1}",x509.FriendlyName,Environment.NewLine);
-                Console.WriteLine("Certificate Verified?: {0}{1}",x509.Verify(),Environment.NewLine);
-                Console.WriteLine("Simple Name: {0}{1}",x509.GetNameInfo(X509NameType.SimpleName,true),Environment.NewLine);
-                Console.WriteLine("Signature Algorithm: {0}{1}",x509.SignatureAlgorithm.FriendlyName,Environment.NewLine);
-                Console.WriteLine("Public Key: {0}{1}",x509.PublicKey.Key.ToXmlString(false),Environment.NewLine);
-                Console.WriteLine("Certificate Archived?: {0}{1}",x509.Archived,Environment.NewLine);
-                Console.WriteLine("Length of Raw Data: {0}{1}",x509.RawData.Length,Environment.NewLine);
-              //  X509Certificate2UI.DisplayCertificate(x509);
-                x509.Reset();
-            }
+            //     Console.WriteLine("Content Type: {0}{1}",X509Certificate2.GetCertContentType(rawdata),Environment.NewLine);
+            //     Console.WriteLine("Friendly Name: {0}{1}",x509.FriendlyName,Environment.NewLine);
+            //     Console.WriteLine("Certificate Verified?: {0}{1}",x509.Verify(),Environment.NewLine);
+            //     Console.WriteLine("Simple Name: {0}{1}",x509.GetNameInfo(X509NameType.SimpleName,true),Environment.NewLine);
+            //     Console.WriteLine("Signature Algorithm: {0}{1}",x509.SignatureAlgorithm.FriendlyName,Environment.NewLine);
+            //     Console.WriteLine("Public Key: {0}{1}",x509.PublicKey.Key.ToXmlString(false),Environment.NewLine);
+            //     Console.WriteLine("Certificate Archived?: {0}{1}",x509.Archived,Environment.NewLine);
+            //     Console.WriteLine("Length of Raw Data: {0}{1}",x509.RawData.Length,Environment.NewLine);
+            //     X509Certificate2UI.DisplayCertificate(x509);
+            //     x509.Reset();
+             }
             catch (CryptographicException)
             {
                 Console.WriteLine("Information could not be written out for this certificate.");
