@@ -198,6 +198,7 @@ public struct ImplEFDir : IEfParser<ImplEFDir.Info>
 public class EFSodInfo
 {
     public string LdsVersion { get; set; } = "";
+    public string UnicodeVersion { get; set; } = "";
     public string DigestAlgorithm { get; set; } = "";
     public Dictionary<int, byte[]> DgHashes { get; } = new();
     public byte[] Signature { get; set; } = Array.Empty<byte>();
@@ -243,6 +244,14 @@ public class ImplEfSod : IEfParser<EFSodInfo>
             ef.DgHashes[dgNumber] = hashValue;
             
         }
+
+        if (sodSeq.HasData)
+{
+    // Läs sekvensen som innehåller LDSVersionInfo
+        var ldsVersionSeq = sodSeq.ReadSequence();
+        ef.LdsVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString);    // ldsVersion
+        ef.UnicodeVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString); // unicodeVersion
+}
 
         ef.Signature = sodSeq.ReadOctetString();
 
