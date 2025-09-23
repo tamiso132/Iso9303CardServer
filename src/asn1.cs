@@ -62,6 +62,12 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
 
     public byte[] GetValueAsOID() => Value ?? Array.Empty<byte>();
 
+    public byte[] GetValueAsBytes()
+{
+    return Value ?? Array.Empty<byte>();
+}
+
+
     public int GetValueAsInt()
     {
         if (Value == null) throw new Exception("Value is null");

@@ -47,7 +47,7 @@ public class ClientSession(ICommunicator comm)
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
-            //  byte[] key = TestClass.DerivePaceKey(info);
+            byte[] key = TestClass.DerivePaceKey(info);
             Log.Info("orgID: " + BitConverter.ToString(info.OrgOid));
             result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
 
@@ -72,7 +72,7 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-            await TestClass.ComputeDecryptedNounce(_cmd, info);
+            await TestClass.ComputeDecryptedNounce(_cmd, info, key, TestClass.PasswordType.MRZ);
 
             Log.Info("All commands completed without a problem");
 
