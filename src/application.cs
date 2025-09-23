@@ -50,6 +50,7 @@ public class ClientSession(ICommunicator comm)
             }
              byte[] key = TestClass.DerivePaceKey(info);
             
+            byte[] key = TestClass.DerivePaceKey(info);
             Log.Info("orgID: " + BitConverter.ToString(info.OrgOid));
 
             result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
