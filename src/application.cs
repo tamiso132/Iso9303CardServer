@@ -48,8 +48,7 @@ public class ClientSession(ICommunicator comm)
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
-            //  byte[] key = TestClass.DerivePaceKey(info);
-            byte[] key = [];
+            byte[] key = TestClass.DerivePaceKey(info);
             Log.Info("orgID: " + BitConverter.ToString(info.OrgOid));
 
             result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
