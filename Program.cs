@@ -6,26 +6,19 @@ using System.Collections.Concurrent;
 using EpassValidation;
 using System.Collections;
 using System.Security.Cryptography.X509Certificates;
-using Org.BouncyCastle.Cms;
+using Helper;
 
 // Load the ML file (DER encoded)
-byte[] mlBytes = File.ReadAllBytes("C://Users/tom/Downloads/ICAO_ml_July2025.ml");
+byte[] mlBytes = File.ReadAllBytes("masterlist-cscas/C=AT,O=GV,OU=BMI,CN=CSCA-AUSTRIA56.pem");
 
 
 // Step 1: unwrap CMS chain
 var cmsChain = new System.Collections.Generic.List<byte[]>();
 byte[] currentBytes = mlBytes;
 
-CmsSignedData cms = new CmsSignedData(currentBytes);
-X509Store certs = cms.GetCertificates();
+var cert = X509CertificateLoader.LoadCertificate(currentBytes);
+Log.Info(cert.IssuerName.Name);
 
-SignerInformationStore signers = s.GetSignerInfos();
-
-foreach (SignerInformation signer in signers.GetSigners())
-{
-    ArrayList certList = new ArrayList(certs.GetMatches(signer.SignerID));
-    X509Certificate cert = (X509Certificate)certList[0];
-}
 
 
 
@@ -189,37 +182,6 @@ public class WsSession : WebSocketBehavior
 //     Console.WriteLine("Fel vid läsning av Master List:");
 //     Console.WriteLine(ex.Message);
 // }
-
-try
-{
-    // Läs certifikaten från Master List
-    /* List<X509Certificate2> certs = MasterListHelper.ReadMasterList(mlPath);
-     Console.WriteLine($"{certs.Count}");
-     Console.WriteLine($"Hittade {certs.Count} certifikat i Master List.\n");
- */
-    //CertInfo.ShowCertificateInfo(mlPath);
-// Console.WriteLine("\nKlar!");
-// Console.ReadLine();
-
-var certs = MasterListHelper.ReadAllCertificatesFromMl("C:/Users/foffe/ICAO_ml_July2025.ml");
-Console.WriteLine($"Hittade {certs.Count} certifikat i ML.");
-MasterListHelper.PrintBcCerts(certs);
-
-
-
-class Select : ISelector<X509Certificate>
-{
-    public object Clone()
-    {
-        throw new NotImplementedException();
-    }
-
-    public bool Match(X509Certificate candidate)
-    {
-        Console.WriteLine("hellO?");
-        return true;
-    }
-}
 
 
 
