@@ -38,3 +38,23 @@ the file has info about active authentication
 ## Conditionals
 
 If CardSecurity is missing, it should fallback to using BAC instead of PACE
+
+
+# ECDH
+
+## Variables
+- Curve Domain Parameters, (a, b, G, n, h) can be found in different standarized curves.
+- The private key is random integer in range of [1, n-1]
+- Compute Public Key by multiplying the private key with generator G
+- Shared Secret is computed by multiplying the other parts public key with their private,
+
+## Specific to PACEv2
+- First takes a nounce and uses that nounce to map to a new G by taking a point in the curve
+- After that both parties chooses their own ephemeral private keys, multiply with new generator to produce ephemeral public key
+- then shared secret is computed the standard way   
+
+# How to get Nounce
+-The nonce s SHALL be encrypted in CBC mode according to [ISO/IEC 10116] using the key Kπ =
+KDFπ(π) derived from the password π and IV set to the all-0 string
+
+- 

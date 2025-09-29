@@ -19,11 +19,7 @@ namespace Encryption;
 
 public class TestClass
 {
-    static public byte[] MappingGm(EncryptionInfo info)
-    {
-        var bytes = Encoding.ASCII.GetBytes(MrzUtils.GetMrz("35172541", "010813", "250820"));
-        return SHA1.Create().ComputeHash(bytes);
-    }
+
     // TODO, read more. so I can support stuff
     public static byte[] DerivePaceKey(EncryptionInfo info)
     {
@@ -363,6 +359,7 @@ public sealed record ECDH
 
     }
 
+    // Using nounce, create new generator
     public void MapGenerator(byte[] nonce)
     {
         var iNonce = new BigInteger(1, nonce);
