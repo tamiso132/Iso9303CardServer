@@ -286,3 +286,145 @@ public class ImplEfSod : IEfParser<EFSodInfo>
 
     }
 }
+
+
+// Generic Parser for DG1-16 ?? 
+// public class ImplGenericDG : IEfParser<byte[]>
+// {
+//     private readonly int _dgNumber;
+
+//     public ImplGenericDG(int dgNumber)
+//     {
+//         _dgNumber = dgNumber;
+//     }
+
+//     public string Name()
+//     {
+//         return $"DG{_dgNumber}";
+//     }
+
+//     public byte[] ParseFromBytes(byte[] bytes)
+//     {
+//         return bytes;
+//     }
+
+// }
+
+// Generic TLV parser for DG 11, 14, 16
+
+public class TLV
+{
+    public int Tag { get; set; }
+    public int Length { get; set; }
+    public byte[] Value { get; set; }
+
+}
+
+public static class TLVParser
+{
+    public static List<TLV> Parse(byte[] data)
+    {
+        var result = new List<TLV>();
+        int index = 0;
+
+        while (index < data.Length)
+        {
+            int tag = data[index++];
+            int length = data[index++];
+
+            if (length > 0x80)
+            {
+                int lengthBytes = length & 0x77;
+                length = 0;
+                for (int i = 0; i < lengthBytes; i++)
+                {
+                    length = (length << 8) | data[index++];
+                }
+            }
+
+            byte[] value = new byte[length];
+            Array.Copy(data, index, value, 0, length);
+            index += length;
+
+            result.Add(new TLV { Tag = tag, Length = length, Value = value });
+        }
+        return result;
+    }
+
+
+
+    // DG11
+
+    public static void ParseDG11(byte[] dg11)
+    {
+        var tlvs = TLVParser.Parse(dg11);
+
+        foreach (var tlv in tlvs)
+        {
+            switch (tlv.Tag)
+            {
+                case 0x5F0E: // Optional Details
+                    Console.WriteLine("Place of Birth: " + System.Text.Encoding.UTF8.GetString(tlv.Value));
+                    break;
+                case 0x5F10: // Gender
+                    Console.WriteLine("Gender: " + System.Text.Encoding.UTF8.GetString(tlv.Value));
+                    break;
+                case 0x5F11: // Date of Birth
+                    Console.WriteLine("Date of Birth: " + System.Text.Encoding.UTF8.GetString(tlv.Value));
+                    break;
+                default:
+                    Console.WriteLine($"Unknown DG11 Tag {tlv.Tag:X2}");
+                    break;
+            }
+        }
+    }
+
+
+    // Dg14
+    public static void ParseDG14(byte[] dg14)
+    {
+        var tlvs = TLVParser.Parse(dg14);
+
+        foreach (var tlv in tlvs)
+        {
+            if (tlv.Tag == 0x6E) // SecurityInfos
+            {
+                var innerTlvs = TLVParser.Parse(tlv.Value);
+                foreach (var inner in innerTlvs)
+                {
+                    if (inner.Tag == 0x06) // OID
+                    {
+                        string oid = string.Join(".", inner.Value.Select(b => b.ToString()));
+                        Console.WriteLine("Security Feature OID: " + oid);
+                    }
+                }
+            }
+        }
+    }
+
+
+
+    public static void ParseDG16(byte[] dg16)
+    {
+        var tlvs = TLVParser.Parse(dg16);
+
+        foreach (var tlv in tlvs)
+        {
+            switch (tlv.Tag)
+            {
+                case 0x5F20: // Contact Person Name
+                    Console.WriteLine("Contact Name: " + System.Text.Encoding.UTF8.GetString(tlv.Value));
+                    break;
+                case 0x5F21: // Contact Address
+                    Console.WriteLine("Contact Address: " + System.Text.Encoding.UTF8.GetString(tlv.Value));
+                    break;
+                case 0x5F22: // Contact Phone
+                    Console.WriteLine("Contact Phone: " + System.Text.Encoding.UTF8.GetString(tlv.Value));
+                    break;
+                default:
+                    Console.WriteLine($"Unknown DG16 Tag {tlv.Tag:X2}");
+                    break;
+            }
+        }
+    }
+}
