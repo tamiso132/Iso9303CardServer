@@ -24,6 +24,8 @@ public struct AsnBuilder()
         return this;
     }
 
+
+
     public AsnBuilder AddTag(int tag, byte[] packetData)
     {
         return AddCustomTag((byte)tag, packetData);
@@ -63,9 +65,9 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
     public byte[] GetValueAsOID() => Value ?? Array.Empty<byte>();
 
     public byte[] GetValueAsBytes()
-{
-    return Value ?? Array.Empty<byte>();
-}
+    {
+        return Value ?? Array.Empty<byte>();
+    }
 
 
     public int GetValueAsInt()
@@ -115,14 +117,27 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
             }
             else
             {
+                bool tagFound = false;
                 if (customSeq != null)
                 {
                     foreach (var s in customSeq)
                     {
-                        
+                        if (s == tag)
+                        {
+                            var setOfReader = asnReader.ReadSequence(tag);
+                            var children = new List<AsnNode>();
+                            children.AddRange(Parse(setOfReader, is_top_level: false).GetAllNodes());
+                            nodes.Add(new AsnNode(tag, children: children));
+                            tagFound = true;
+                            break;
+                        }
+                    }
+                    if (tagFound)
+                    {
+                        continue;
                     }
                 }
-                Log.Info("other");
+
                 var encodedData = asnReader.ReadEncodedValue().ToArray();
 
                 var sliceStart = 2;

@@ -3,7 +3,6 @@ using WebSocketSharp.Server;
 using App;
 using Server;
 using System.Collections.Concurrent;
-using EpassValidation;
 using System.Collections;
 using System.Security.Cryptography.X509Certificates;
 using Helper;

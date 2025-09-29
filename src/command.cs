@@ -131,6 +131,29 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         return result;
     }
+    public async Task<TResult> GeneralAuthenticateMapping(byte innerTag, byte[] publicKey)
+    {
+        Log.Info("General Authentication Mapping");
+        // TODO, check if length is bigger then 128
+        byte[] innerSequence = [innerTag, (byte)publicKey.Length, .. publicKey];
+        byte[] data = [0x7C, (byte)innerSequence.Length, .. innerSequence];
+
+
+
+        byte[] cmdFormat = FormatCommand(0x10, 0x86, 0x00, 0x00, data: data, le: 0x00);
+
+
+        //Log.Info("Write: " + BitConverter.ToString(raw));
+
+        var result = await SendPackageDecodeResponse(cmdFormat);
+
+        if (result.IsSuccess)
+            if (result.Value.data.Length == 0)
+                return TResult.Fail(new Error.Other("General Authentication not sending the encrypted nounce!"));
+
+
+        return result;
+    }
 
     private static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, byte? le = null)
     {

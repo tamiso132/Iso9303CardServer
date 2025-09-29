@@ -25,7 +25,7 @@ public class TestClass
     {
         // get mrz
         // SHA1 the mrz
-        var mrz = MrzUtils.GetMrz("35172541", "010813", "250820");
+        var mrz = MrzUtils.GetMrz("XA0000002", "820821", "270101");
         byte[] shaMrz = SHA1.HashData(Encoding.UTF8.GetBytes(mrz));
 
         byte[] PACEMODE = [0x00, 0x00, 0x00, 0x03];
@@ -85,6 +85,16 @@ public class TestClass
         */
     }
 
+    public static Tuple<byte[], byte[]> DeriveSessionKeys(EncryptionInfo info, byte[] sharedSecretX)
+    {
+        byte[] concatenatedMac = [.. sharedSecretX, .. new byte[3], 2];
+        byte[] concatenatedEnc = [.. sharedSecretX, .. new byte[3], 1];
+
+        var macKey = SHA256.HashData(concatenatedMac);
+        var encKey = SHA256.HashData(concatenatedEnc);
+
+    }
+
     public enum PasswordType : byte
     {
         Undefined = 0,
@@ -92,47 +102,27 @@ public class TestClass
         CAN = 2,
     }
 
-    public static async Task<Result<RVoid>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info, byte[] password, PasswordType passwordType)
+    public static async Task<Result<byte[]>> ComputeDecryptedNounce<T>(Command<T> command, EncryptionInfo info, byte[] password, PasswordType passwordType)
     where T : IServerFormat
     {
         var response = await command.GeneralAuthenticate(new GenAuthType.EncryptedNounce());
         if (!response.IsSuccess)
         {
-            return RVoid.Fail(response.Error);
+            Log.Error("Encrypted nounce command fails");
+            return Result<byte[]>.Fail(response.Error);
         }
+
+
 
 
         var allNodes = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
 
-        foreach (var n in allNodes.GetAllNodes())
-        {
-            n.PrintBare();
-        }
+
 
         var encrypted_nounce = allNodes.GetAllNodes()[0].Children[0].GetValueAsBytes();
 
-        Log.Info(BitConverter.ToString(encrypted_nounce));
 
 
-        // var tree = AsnNode.Parse(new AsnReader(response.Value.data, AsnEncodingRules.DER));
-        // var nodes = tree.GetAllNodes();
-        // var encrypted_nounce = nodes[0].Children[0].GetValueAsBytes();
-
-        byte[] concatenated = password;
-        if (passwordType == PasswordType.MRZ)
-            concatenated = SHA1.HashData(concatenated);
-
-        concatenated = [.. concatenated, .. new byte[] { 0, 0, 0, 3 }];
-
-        // byte[] hash;
-        // if (info.KeySize == 16) // AES 128
-        //     hash = SHA1.HashData(concatenated).Take(16).ToArray();
-        // else if (info.KeySize == 24) // AES 192 
-        //     hash = SHA256.HashData(concatenated).Take(24).ToArray();
-        // else if (info.KeySize == 32) // AES 256 
-        //     hash = SHA256.HashData(concatenated).Take(32).ToArray();
-        // else
-        //     throw new NotImplementedException("Unsupported key size");
 
 
         // -- Decrypt-- 
@@ -145,21 +135,17 @@ public class TestClass
         aes.Key = password;
         aes.IV = new byte[16];
 
+
         using var dectryptor = aes.CreateDecryptor();
         var dectryptedNonce = dectryptor.TransformFinalBlock(encrypted_nounce, 0, encrypted_nounce.Length);
 
         Log.Info("Dectrypted Nonce: " + BitConverter.ToString(dectryptedNonce));
 
-        return RVoid.Success();
+        return Result<byte[]>.Success(dectryptedNonce);
 
 
 
-        //Test
-        RandomNumberProvider rngProvider = new RandomNumberProvider();
 
-        BigInteger privateKey = new BigInteger(1, rngProvider.GetNextBytes(32));
-        DomainParameter param = ParameterUtil.getParameterById(info.OrgParameterID);
-        // param.param;
 
 
     }
@@ -233,7 +219,7 @@ public class EncryptionInfo
 
     public void PrintInfo()
     {
-        Log.Info($"{AgreementType} {EncryptType}{_keybits} {MappingType} {MacType}");
+        Log.Info($"{AgreementType} {EncryptType}{_keybits} {MappingType} {MacType}, {OrgParameterID}");
     }
 
     public KeyAgreement AgreementType { get; set; } = KeyAgreement.Unknown;
@@ -347,7 +333,7 @@ public sealed record DomainParameter(X9ECParameters param)
 public sealed record ECDH
 {
 
-    public ECDH(DomainParameter param, byte[] privateKey, byte[]? generator)
+    public ECDH(DomainParameter param, byte[] privateKey, byte[]? generator = null)
     {
         PrivateKey = new BigInteger(1, privateKey);
         this.param = param;
@@ -362,16 +348,20 @@ public sealed record ECDH
     // Using nounce, create new generator
     public void MapGenerator(byte[] nonce)
     {
+        Log.Info("Calculate new generator, using the nounce, current generator and secret");
         var iNonce = new BigInteger(1, nonce);
-        _generator = _generator.Multiply(iNonce).Add(_secret);
+        _generator = _generator.Multiply(iNonce).Add(_secret).Normalize();
+
     }
 
-    public void CalculateSharedSecret(byte[] encodedPoint)
+    public void CalculateSharedSecret(byte[] encodedChipPublic)
     {
-        var publicKeyIC = param.param.Curve.DecodePoint(encodedPoint);
-        _secret = publicKeyIC.Multiply(PrivateKey);
+        Log.Info("Calculate Shared Secret");
+        var publicKeyIC = param.param.Curve.DecodePoint(encodedChipPublic).Normalize();
+        _secret = publicKeyIC.Multiply(PrivateKey).Normalize();
     }
 
+    // Update Private key
     public void GenerateEphemeralKeys(RandomNumberProvider RandomNumberProvider)
     {
         PrivateKey = new BigInteger(1, RandomNumberProvider.GetNextBytes(32));
@@ -399,3 +389,17 @@ public sealed record ECDH
 
     BigInteger PrivateKey;
 }
+
+
+/*
+Data Object Notation      Tag   Type
+Object Identifier         0x06  Object Identifier
+Prime modulus p           0x81  Unsigned Integer
+First coefficient a       0x82  Unsigned Integer
+Second coefficient b      0x83  Unsigned Integer
+Base point G              0x84  Elliptic Curve Point
+Order of the base point r 0x85  Unsigned Integer
+Public point Y            0x86  Elliptic Curve Point
+Cofactor f                0x87  Unsigned Integer
+
+*/

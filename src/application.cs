@@ -8,6 +8,12 @@ using Helper;
 using Encryption;
 using Command;
 using ErrorHandling;
+using Org.BouncyCastle.Bcpg;
+using Asn1;
+using System.Formats.Asn1;
+using Org.BouncyCastle.Asn1;
+using System.Runtime.Intrinsics.Arm;
+using System.Security.Cryptography;
 namespace App;
 
 
@@ -42,16 +48,17 @@ public class ClientSession(ICommunicator comm)
 
             var response = result.Value;
             var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
+            info.PrintInfo();
 
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
+
             byte[] key = TestClass.DerivePaceKey(info);
 
 
-            Log.Info("orgID: " + BitConverter.ToString(info.OrgOid));
 
             result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
 
@@ -63,14 +70,6 @@ public class ClientSession(ICommunicator comm)
             }
 
 
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
-
-            //  await _cmd.GeneralAuthenticate(new GenAuthType.MappingData([]));
-            //  return;
             var r = await TestClass.ComputeDecryptedNounce(_cmd, info, key, TestClass.PasswordType.MRZ);
 
 
@@ -79,6 +78,61 @@ public class ClientSession(ICommunicator comm)
                 Log.Error(r.Error.ErrorMessage());
                 return;
             }
+
+            var decryptedNounce = r.Value;
+            var rnd = new RandomNumberProvider();
+            var ecdh = new ECDH(DomainParameter.BrainpoolP384r1, rnd.GetNextBytes(32));
+
+            result = await _cmd.GeneralAuthenticateMapping(0x81, ecdh.PublicKey);
+
+            if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
+                return;
+            }
+
+            // var asn1Result = AsnNode.Parse(new AsnReader(result.Value.data, AsnEncodingRules.BER, new AsnReaderOptions()), [new Asn1Tag(TagClass.ContextSpecific, 0x7C, true), new Asn1Tag(TagClass.ContextSpecific, 0x84, true)]);
+
+            //   Log.Info(asn1Result.GetAllNodes()[0].Id.TagValue.ToString());
+
+            using (var stream = new Asn1InputStream(result.Value.data))
+            {
+                Asn1Object obj = stream.ReadObject();  // top-level object
+                byte[] data = obj.GetDerEncoded()[4..];
+
+                ecdh.CalculateSharedSecret(data);
+
+            }
+
+
+            // update generator with new shared secret
+            ecdh.MapGenerator(decryptedNounce);
+
+
+
+            // send new public key and do same
+            result = await _cmd.GeneralAuthenticateMapping(0x83, ecdh.PublicKey);
+
+            if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
+                return;
+            }
+
+            using (var stream = new Asn1InputStream(result.Value.data))
+            {
+                Asn1Object obj = stream.ReadObject();  // top-level object
+                byte[] data = obj.GetDerEncoded()[4..];
+
+                ecdh.CalculateSharedSecret(data);
+            }
+
+
+            byte[] concatenatedMac = [.. ecdh.SharedSecret, .. new byte[3], 2]; // key
+            byte[] concatenatedEnc = [.. ecdh.SharedSecret, .. new byte[3], 1];
+
+
+
 
 
 
