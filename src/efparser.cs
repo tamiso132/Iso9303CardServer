@@ -10,58 +10,6 @@ using Type;
 
 namespace Parser;
 
-public class Dg1Info
-{
-    public int DocumentCode { get; set; }
-    public int State { get; set; }
-    public List<byte> DocumentNumber { get; } = new();
-    public byte[] DateOfBirth { get; set; } = Array.Empty<byte>();
-    public int Gender { get; set; }
-    public byte[] DateExpire { get; set; } = Array.Empty<byte>();
-    public byte[] Nationality { get; set; } = Array.Empty<byte>();
-    public string Name { get; set; } = "";
-    internal Dg1Info() { }
-}
-
-public class ImplEfDg1TD1 : IEfParser<Dg1Info>
-{
-    public string Name()
-    {
-        return "DG1";
-    }
-
-    public Dg1Info ParseFromBytes(byte[] bytes)
-    {
-        var ef = new Dg1Info();
-        var reader = new ByteReader(bytes);
-        int tag = reader.ReadInt(1);
-        if (tag != 0x61) throw new Exception($"Unexpected tag: 0x{tag:X2}");
-
-        int length = reader.ReadLength();
-        int innerTag = reader.ReadInt(2);
-        if (innerTag != 0x5F1F) throw new Exception($"Wrong inner tag: 0x{innerTag:X2}");
-
-        ef.DocumentCode = reader.ReadInt(2);
-        ef.State = reader.ReadInt(3);
-        ef.DocumentNumber.AddRange(reader.ReadBytes(14));
-
-        int isExtended = reader.ReadInt(1);
-        if (isExtended == 1) ef.DocumentNumber.AddRange(reader.ReadBytes(15));
-        else reader.PaddingNext(15);
-
-        ef.DateOfBirth = reader.ReadBytes(6);
-        int checkBirth = reader.ReadInt(1);
-        ef.Gender = reader.ReadInt(1);
-        ef.DateExpire = reader.ReadBytes(6);
-        int checkExpire = reader.ReadInt(1);
-        ef.Nationality = reader.ReadBytes(3);
-
-        reader.PaddingNext(12);
-        ef.Name = reader.ReadString(30);
-
-        return ef;
-    }
-}
 
 public class EfComInfo
 {
@@ -70,6 +18,7 @@ public class EfComInfo
     public List<int> DgTags { get; set; } = new();
 }
 
+//EFCOM
 public class ImplEfCom : IEfParser<EfComInfo>
 {
     public string Name()
@@ -104,6 +53,7 @@ public class ImplEfCom : IEfParser<EfComInfo>
     }
 }
 
+//DG14
 public struct ImplDG14 : IEfParser<ImplDG14.Info>
 {
     public string Name()
@@ -287,31 +237,6 @@ public class ImplEfSod : IEfParser<EFSodInfo>
     }
 }
 
-
-// Generic Parser for DG1-16 ?? 
-// public class ImplGenericDG : IEfParser<byte[]>
-// {
-//     private readonly int _dgNumber;
-
-//     public ImplGenericDG(int dgNumber)
-//     {
-//         _dgNumber = dgNumber;
-//     }
-
-//     public string Name()
-//     {
-//         return $"DG{_dgNumber}";
-//     }
-
-//     public byte[] ParseFromBytes(byte[] bytes)
-//     {
-//         return bytes;
-//     }
-
-// }
-
-// Generic TLV parser for DG 11, 14, 16
-
 public class TLV
 {
     public int Tag { get; set; }
@@ -319,6 +244,8 @@ public class TLV
     public byte[] Value { get; set; }
 
 }
+
+
 
 public static class TLVParser
 {
@@ -350,10 +277,66 @@ public static class TLVParser
         }
         return result;
     }
+    
+    public class Dg1Info
+{
+    public int DocumentCode { get; set; }
+    public int State { get; set; }
+    public List<byte> DocumentNumber { get; } = new();
+    public byte[] DateOfBirth { get; set; } = Array.Empty<byte>();
+    public int Gender { get; set; }
+    public byte[] DateExpire { get; set; } = Array.Empty<byte>();
+    public byte[] Nationality { get; set; } = Array.Empty<byte>();
+    public string Name { get; set; } = "";
+    internal Dg1Info() { }
+}
+
+// DG1
+public class ImplEfDg1TD1 : IEfParser<Dg1Info>
+{
+    public string Name()
+    {
+        return "DG1";
+    }
+
+    public Dg1Info ParseFromBytes(byte[] bytes)
+    {
+        var ef = new Dg1Info();
+        var reader = new ByteReader(bytes);
+        int tag = reader.ReadInt(1);
+        if (tag != 0x61) throw new Exception($"Unexpected tag: 0x{tag:X2}");
+
+        int length = reader.ReadLength();
+        int innerTag = reader.ReadInt(2);
+        if (innerTag != 0x5F1F) throw new Exception($"Wrong inner tag: 0x{innerTag:X2}");
+
+        ef.DocumentCode = reader.ReadInt(2);
+        ef.State = reader.ReadInt(3);
+        ef.DocumentNumber.AddRange(reader.ReadBytes(14));
+
+        int isExtended = reader.ReadInt(1);
+        if (isExtended == 1) ef.DocumentNumber.AddRange(reader.ReadBytes(15));
+        else reader.PaddingNext(15);
+
+        ef.DateOfBirth = reader.ReadBytes(6);
+        int checkBirth = reader.ReadInt(1);
+        ef.Gender = reader.ReadInt(1);
+        ef.DateExpire = reader.ReadBytes(6);
+        int checkExpire = reader.ReadInt(1);
+        ef.Nationality = reader.ReadBytes(3);
+
+        reader.PaddingNext(12);
+        ef.Name = reader.ReadString(30);
+
+        return ef;
+    }
+}
 
 
 
-    // DG11
+
+
+// DG11
 
     public static void ParseDG11(byte[] dg11)
     {
@@ -403,7 +386,7 @@ public static class TLVParser
     }
 
 
-
+    // DG16
     public static void ParseDG16(byte[] dg16)
     {
         var tlvs = TLVParser.Parse(dg16);
@@ -427,4 +410,44 @@ public static class TLVParser
             }
         }
     }
-}
+
+    // DG12 Utfärdande myndighet
+
+    public static void ParseDG12(byte[] dg12)
+    {
+        var tlvs = TLVParser.Parse(dg12);
+
+        foreach (var tlv in tlvs)
+        {
+            switch (tlv.Tag)
+            {
+                case 0x5F0B: // Issuing Authority
+                    Console.WriteLine("Issuing Authority: " + Encoding.UTF8.GetString(tlv.Value));
+                    break;
+
+                case 0x5F0C: // Issuing State or Organisation
+                    Console.WriteLine("Issuing State/Org: " + Encoding.UTF8.GetString(tlv.Value));
+                    break;
+
+                case 0x5F0D: // Endorsements / Observations
+                    Console.WriteLine("Endorsements: " + Encoding.UTF8.GetString(tlv.Value));
+                    break;
+
+                case 0x5F0E: // Other details
+                    Console.WriteLine("Other Details: " + Encoding.UTF8.GetString(tlv.Value));
+                    break;
+
+                default:
+                    Console.WriteLine($"Unknown DG12 Tag {tlv.Tag:X2}");
+                    break;
+
+            }
+        }
+    }
+} 
+
+
+
+
+// DG13 Ytterligare dokumentdetaljer ex dokumentnummer, typ av dokument, utfärdande plats
+// Kan vara onödig 
