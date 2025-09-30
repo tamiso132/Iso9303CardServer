@@ -53,27 +53,7 @@ public class ImplEfCom : IEfParser<EfComInfo>
     }
 }
 
-//DG14
-public struct ImplDG14 : IEfParser<ImplDG14.Info>
-{
-    public string Name()
-    {
-        return "DG14";
-    }
 
-    public readonly Info ParseFromBytes(byte[] bytes)
-    {
-        var ef = new Info();
-        var allNodes = AsnNode.Parse(new AsnReader(bytes, AsnEncodingRules.DER));
-        foreach (var node in allNodes.GetAllNodes())
-        {
-            // node.PrintTree();
-        }
-        return ef;
-    }
-
-    public struct Info { }
-}
 
 public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
 {
@@ -246,7 +226,8 @@ public class TLV
 }
 
 
-
+// Data Groups parsing 
+// Data Groups: DG1, DG11, DG12, DG14, DG16
 public static class TLVParser
 {
     public static List<TLV> Parse(byte[] data)
@@ -277,66 +258,66 @@ public static class TLVParser
         }
         return result;
     }
-    
+
     public class Dg1Info
-{
-    public int DocumentCode { get; set; }
-    public int State { get; set; }
-    public List<byte> DocumentNumber { get; } = new();
-    public byte[] DateOfBirth { get; set; } = Array.Empty<byte>();
-    public int Gender { get; set; }
-    public byte[] DateExpire { get; set; } = Array.Empty<byte>();
-    public byte[] Nationality { get; set; } = Array.Empty<byte>();
-    public string Name { get; set; } = "";
-    internal Dg1Info() { }
-}
-
-// DG1
-public class ImplEfDg1TD1 : IEfParser<Dg1Info>
-{
-    public string Name()
     {
-        return "DG1";
+        public int DocumentCode { get; set; }
+        public int State { get; set; }
+        public List<byte> DocumentNumber { get; } = new();
+        public byte[] DateOfBirth { get; set; } = Array.Empty<byte>();
+        public int Gender { get; set; }
+        public byte[] DateExpire { get; set; } = Array.Empty<byte>();
+        public byte[] Nationality { get; set; } = Array.Empty<byte>();
+        public string Name { get; set; } = "";
+        internal Dg1Info() { }
     }
 
-    public Dg1Info ParseFromBytes(byte[] bytes)
+    // DG1
+    public class ImplEfDg1TD1 : IEfParser<Dg1Info>
     {
-        var ef = new Dg1Info();
-        var reader = new ByteReader(bytes);
-        int tag = reader.ReadInt(1);
-        if (tag != 0x61) throw new Exception($"Unexpected tag: 0x{tag:X2}");
+        public string Name()
+        {
+            return "DG1";
+        }
 
-        int length = reader.ReadLength();
-        int innerTag = reader.ReadInt(2);
-        if (innerTag != 0x5F1F) throw new Exception($"Wrong inner tag: 0x{innerTag:X2}");
+        public Dg1Info ParseFromBytes(byte[] bytes)
+        {
+            var ef = new Dg1Info();
+            var reader = new ByteReader(bytes);
+            int tag = reader.ReadInt(1);
+            if (tag != 0x61) throw new Exception($"Unexpected tag: 0x{tag:X2}");
 
-        ef.DocumentCode = reader.ReadInt(2);
-        ef.State = reader.ReadInt(3);
-        ef.DocumentNumber.AddRange(reader.ReadBytes(14));
+            int length = reader.ReadLength();
+            int innerTag = reader.ReadInt(2);
+            if (innerTag != 0x5F1F) throw new Exception($"Wrong inner tag: 0x{innerTag:X2}");
 
-        int isExtended = reader.ReadInt(1);
-        if (isExtended == 1) ef.DocumentNumber.AddRange(reader.ReadBytes(15));
-        else reader.PaddingNext(15);
+            ef.DocumentCode = reader.ReadInt(2);
+            ef.State = reader.ReadInt(3);
+            ef.DocumentNumber.AddRange(reader.ReadBytes(14));
 
-        ef.DateOfBirth = reader.ReadBytes(6);
-        int checkBirth = reader.ReadInt(1);
-        ef.Gender = reader.ReadInt(1);
-        ef.DateExpire = reader.ReadBytes(6);
-        int checkExpire = reader.ReadInt(1);
-        ef.Nationality = reader.ReadBytes(3);
+            int isExtended = reader.ReadInt(1);
+            if (isExtended == 1) ef.DocumentNumber.AddRange(reader.ReadBytes(15));
+            else reader.PaddingNext(15);
 
-        reader.PaddingNext(12);
-        ef.Name = reader.ReadString(30);
+            ef.DateOfBirth = reader.ReadBytes(6);
+            int checkBirth = reader.ReadInt(1);
+            ef.Gender = reader.ReadInt(1);
+            ef.DateExpire = reader.ReadBytes(6);
+            int checkExpire = reader.ReadInt(1);
+            ef.Nationality = reader.ReadBytes(3);
 
-        return ef;
+            reader.PaddingNext(12);
+            ef.Name = reader.ReadString(30);
+
+            return ef;
+        }
     }
-}
 
 
 
 
 
-// DG11
+    // DG11
 
     public static void ParseDG11(byte[] dg11)
     {
@@ -413,9 +394,19 @@ public class ImplEfDg1TD1 : IEfParser<Dg1Info>
 
     // DG12 Utfärdande myndighet
 
-    public static void ParseDG12(byte[] dg12)
+    public class Dg12Info
+    {
+        public string issuingAuthority { get; set; } = "";
+        public string IssuingState { get; set; } = "";
+        public string Endorsements { get; set; } = "";
+        public string OtherDetails{ get; set; } = "";
+
+
+}
+    public static Dg12Info ParseDG12(byte[] dg12)
     {
         var tlvs = TLVParser.Parse(dg12);
+        var info = new Dg12Info();
 
         foreach (var tlv in tlvs)
         {
@@ -443,8 +434,9 @@ public class ImplEfDg1TD1 : IEfParser<Dg1Info>
 
             }
         }
+        return info;
     }
-} 
+}
 
 
 
