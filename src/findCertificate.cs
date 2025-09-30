@@ -11,6 +11,12 @@ using Microsoft.VisualBasic;
 
 namespace CertificateTools;
 
+// 1. Verify Issuer
+// 2. Verify Issuing date
+// 3. Check keyUsage, BasicConstrains, policydemands
+// 4. Check Revocation List 
+// 5. Demand that root(or somewhere in the chain) matches a CSCA from ML
+
 public static class CertificateFinder
 {
 
