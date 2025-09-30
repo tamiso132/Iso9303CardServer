@@ -135,7 +135,7 @@ public class ClientSession(ICommunicator comm)
 
             byte[] macKey = tuple.Item1;
             byte[] encKey = tuple.Item2;
-            
+
             result = await _cmd.GeneralAuthenticateMutual(icPublicKey, info.OrgOid, macKey);
 
 
