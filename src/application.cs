@@ -136,6 +136,8 @@ public class ClientSession(ICommunicator comm)
             byte[] macKey = tuple.Item1;
             byte[] encKey = tuple.Item2;
             
+
+            // Start Last step General Authentication
             result = await _cmd.GeneralAuthenticateMutual(icPublicKey, info.OrgOid, macKey);
 
 
