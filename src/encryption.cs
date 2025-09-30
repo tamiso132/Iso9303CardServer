@@ -134,9 +134,6 @@ public class TestClass
         using var sha1 = SHA1.Create();
         byte[] kMrz = sha1.ComputeHash(mrzBytes);
 
-
-
-
         byte[] PACEMODE = [0x00, 0x00, 0x00, 0x03];
 
         byte[] data = [.. kMrz, .. PACEMODE];
