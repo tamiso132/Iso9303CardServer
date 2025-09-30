@@ -14,6 +14,9 @@ using System.Formats.Asn1;
 using Org.BouncyCastle.Asn1;
 using System.Runtime.Intrinsics.Arm;
 using System.Security.Cryptography;
+using Org.BouncyCastle.Crypto.Macs;
+using Org.BouncyCastle.Crypto.Engines;
+using Org.BouncyCastle.Crypto.Parameters;
 namespace App;
 
 
@@ -98,9 +101,9 @@ public class ClientSession(ICommunicator comm)
             using (var stream = new Asn1InputStream(result.Value.data))
             {
                 Asn1Object obj = stream.ReadObject();  // top-level object
-                byte[] data = obj.GetDerEncoded()[4..];
+                byte[] data2 = obj.GetDerEncoded()[4..];
 
-                ecdh.CalculateSharedSecret(data);
+                ecdh.CalculateSharedSecret(data2);
 
             }
 
@@ -113,31 +116,38 @@ public class ClientSession(ICommunicator comm)
             // send new public key and do same
             result = await _cmd.GeneralAuthenticateMapping(0x83, ecdh.PublicKey);
 
+
+            if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
+                return;
+            }
+            byte[] icPublicKey = [];
+            using (var stream = new Asn1InputStream(result.Value.data))
+            {
+                Asn1Object obj = stream.ReadObject();  // top-level object
+                icPublicKey = obj.GetDerEncoded()[4..]; // ic publickey
+
+                ecdh.CalculateSharedSecret(icPublicKey);
+            }
+
+            var tuple = TestClass.DeriveSessionKeys(info, ecdh.SharedSecret);
+
+            byte[] macKey = tuple.Item1;
+            byte[] encKey = tuple.Item2;
+            
+            result = await _cmd.GeneralAuthenticateMutual(icPublicKey, info.OrgOid, macKey);
+
+
+
+
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
 
-            using (var stream = new Asn1InputStream(result.Value.data))
-            {
-                Asn1Object obj = stream.ReadObject();  // top-level object
-                byte[] data = obj.GetDerEncoded()[4..];
-
-                ecdh.CalculateSharedSecret(data);
-            }
-
-
-            byte[] concatenatedMac = [.. ecdh.SharedSecret, .. new byte[3], 2]; // key
-            byte[] concatenatedEnc = [.. ecdh.SharedSecret, .. new byte[3], 1];
-
-
-
-
-
-
             Log.Info("All commands completed without a problem");
-
         }
     }
 

@@ -15,18 +15,17 @@ namespace Helper;
 
 public static class MrzUtils
 {
-    public static string GetMrz(string docNr, string birth, string dateExpire)
+    public static byte[] GetMrz(string docNr, string birth, string dateExpire)
     {
         while (docNr.Length < 9)
             docNr += "<";
 
         string fullStr = "";
         fullStr += docNr + GetCheckDigit(docNr);
-        fullStr += GetCheckDigit(docNr);
         fullStr += birth + GetCheckDigit(birth);
         fullStr += dateExpire + GetCheckDigit(dateExpire);
 
-        return fullStr;
+        return Encoding.ASCII.GetBytes(fullStr);
     }
 
     internal static string GetCheckDigit(string s)
