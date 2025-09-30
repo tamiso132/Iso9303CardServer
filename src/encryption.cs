@@ -116,7 +116,7 @@ public class TestClass
 
         byte[] chipPublicKey = new byte[]
         {
-            0x82, 0x4F, 0xBA, 0x91,
+            0x04, 0x82, 0x4F, 0xBA, 0x91,
             0xC9, 0xCB, 0xE2, 0x6B,
             0xEF, 0x53, 0xA0, 0xEB,
             0xE7, 0x34, 0x2A, 0x3B,
@@ -166,14 +166,15 @@ public class TestClass
         ECDH ecdh = new ECDH(DomainParameter.BrainpoolP256r1, privateKey);
         ecdh.CalculateSharedSecret(chipPublicKey);
         var secretCalculated = ecdh._secret.Normalize().GetEncoded();
-        if (!IsEqual(secretCalculated, sharedSecret))
+    
+        if (!IsEqual(sharedSecret, secretCalculated))
         {
+            Log.Info("Shared Secret wrong computation");
             PrintByteComparison(secretCalculated, mappedGenerator);
             return false;
         }
 
         ecdh.MapGenerator(nonceDecrypted);
-
         var generator = ecdh._generator.Normalize().GetEncoded();
 
         if (!IsEqual(generator, mappedGenerator))
