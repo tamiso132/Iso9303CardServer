@@ -110,3 +110,21 @@ public class WsSession : WebSocketBehavior
 
 //testNonceDecrypt.testings();
 
+// Användning av Data groups ex:
+// byte[] dg11Bytes = ReadFileFromChip(0x6B);
+// DG11 dg11 = DG11.Parse(dg11Bytes);
+
+// byte[] dg14Bytes = ReadFileFromChip(0x6E);
+// DG14 dg14 = DG14.Parse(dg14Bytes);
+
+// byte[] dg16Bytes = ReadFileFromChip(0x70);
+// DG16 dg16 = DG16.Parse(dg16Bytes);
+
+// Deciding Certificate from dg12:
+
+// byte[] dg12Bytes = ReadFileFromChip(0x??);
+// DG12 dg12 = DG12.Parse(dg12Bytes);
+
+//var masterlist = Load("masterlist-cscas");
+//var dg12Info = TLVParser.ParseDG12(dg12Bytes);
+//var relevantCerts = CertificateFinder.FindRelevantCertificates(dg12Info, masterList);
