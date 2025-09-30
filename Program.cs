@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections;
 using System.Security.Cryptography.X509Certificates;
 using Helper;
+using Encryption;
 
 // Load the ML file (DER encoded)
 // byte[] mlBytes = [File.ReadAllBytes("masterlist-cscas/C=AT,O=GV,OU=BMI,CN=CSCA-AUSTRIA56.pem")];
@@ -18,7 +19,7 @@ using Helper;
 // var cert = X509CertificateLoader.LoadCertificate(currentBytes);
 // Log.Info(cert.IssuerName.Name);
 
-
+Log.Info(TestClass.Testing().ToString());
 
 
 var config = File.ReadAllLines("config.txt");

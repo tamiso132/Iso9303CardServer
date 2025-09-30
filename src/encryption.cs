@@ -1,4 +1,5 @@
 using System.Formats.Asn1;
+using System.Runtime.Intrinsics.Arm;
 using System.Security.Cryptography;
 using System.Text;
 using Asn1;
@@ -19,21 +20,332 @@ namespace Encryption;
 
 public class TestClass
 {
+    static bool IsEqual(byte[] a, byte[] b)
+    {
+        if (a.Length != b.Length)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (a[i] != b[i])
+            {
+                return false;
+            }
+        }
+        return true;
+
+
+    }
+    static int? IsEqualByteNr(byte[] a, byte[] b)
+    {
+        if (a.Length != b.Length)
+        {
+            return a.Length + 10;
+        }
+
+        for (int i = 0; i < a.Length; i++)
+        {
+            if (a[i] != b[i])
+            {
+                return i;
+            }
+        }
+        return null;
+    }
+    static void PrintByteComparison(byte[] correct, byte[] b)
+    {
+        int length = Math.Max(b.Length, correct.Length);
+
+        // First line: compared array, red for mismatches
+        for (int i = 0; i < length; i++)
+        {
+            byte bVal = i < b.Length ? b[i] : (byte)0;
+            byte cVal = i < correct.Length ? correct[i] : (byte)0;
+
+            if (i >= correct.Length || bVal != cVal)
+                Console.ForegroundColor = ConsoleColor.Red;
+            Console.Write($"{bVal:X2} ");
+            Console.ResetColor();
+        }
+        Console.WriteLine();
+
+        // Second line: correct array
+        for (int i = 0; i < length; i++)
+        {
+            byte cVal = i < correct.Length ? correct[i] : (byte)0;
+            Console.Write($"{cVal:X2} ");
+        }
+        Console.WriteLine();
+    }
+    private static bool MrzTest()
+    {
+
+        //! CHECK DIGIT TESTING
+        byte[] mrzTest = MrzUtils.GetMrz("L898902C<", "690806", "940623");
+
+        byte[] val = SHA1.HashData(mrzTest);
+
+        byte[] testVal = new byte[]
+        {
+            0x23, 0x9A, 0xB9, 0xCB, 0x28, 0x2D, 0xAF, 0x66,
+            0x23, 0x1D, 0xC5, 0xA4, 0xDF, 0x6B, 0xFB, 0xAE,
+            0xDF, 0x47, 0x75, 0x65
+        };
+
+        if (!IsEqual(val, testVal))
+        {
+            Log.Error("Fail: 1");
+            return false;
+        }
+
+
+
+        byte[] RealK = new byte[]
+        {
+            0x7E, 0x2D, 0x2A, 0x41,
+            0xC7, 0x4E, 0xA0, 0xB3,
+            0x8C, 0xD3, 0x6F, 0x86,
+            0x39, 0x39, 0xBF, 0xA8,
+            0xE9, 0x03, 0x2A, 0xAD
+        };
+
+        // Derived AES-128 key Kπ
+        byte[] RealKpi = new byte[]
+        {
+            0x89, 0xDE, 0xD1, 0xB2,
+            0x66, 0x24, 0xEC, 0x1E,
+            0x63, 0x4C, 0x19, 0x89,
+            0x30, 0x28, 0x49, 0xDD
+        };
+
+        // MRZ fields
+        string documentNumber = "T22000129";
+        string dateOfBirth = "640812";
+        string dateOfExpiry = "101031";
+
+        byte[] mrzBytes = MrzUtils.GetMrz(documentNumber, dateOfBirth, dateOfExpiry);
+
+        // Concatenate MRZ info (as bytes, typically ASCII)
+        //    string mrzString = documentNumber + dateOfBirth + dateOfExpiry;
+
+        // Compute SHA-1 hash to derive Kπ
+        using var sha1 = SHA1.Create();
+        byte[] kMrz = sha1.ComputeHash(mrzBytes);
+
+
+
+
+        byte[] PACEMODE = [0x00, 0x00, 0x00, 0x03];
+
+        byte[] data = [.. kMrz, .. PACEMODE];
+        byte[] key = [];
+
+        // TODO, implement for DESEDE2, cause it works different when creating key.
+
+        key = SHA1.HashData(data);
+
+        if (!IsEqual(RealK, kMrz))
+            return false;
+
+        if (!IsEqual(RealKpi, key[0..16]))
+        {
+            PrintByteComparison(RealKpi, key[0..16]);
+            return false;
+        }
+
+        return true;
+
+    }
+    public static bool Testing()
+    {
+
+
+        // Print Kπ in hex
+        if (!MrzTest())
+            return false;
+
+        byte[] mrz = new byte[]
+        {
+            0x89, 0xDE, 0xD1, 0xB2,
+            0x66, 0x24, 0xEC, 0x1E,
+            0x63, 0x4C, 0x19, 0x89,
+            0x30, 0x28, 0x49, 0xDD
+        };
+
+        byte[] sharedSecret = [
+
+            0x28, 0x76, 0x8D, 0x20,
+                0x70, 0x12, 0x47, 0xDA,
+                0xE8, 0x18, 0x04, 0xC9,
+                0xE7, 0x80, 0xED, 0xE5,
+                0x82, 0xA9, 0x99, 0x6D,
+                0xB4, 0xA3, 0x15, 0x02,
+                0x0B, 0x27, 0x33, 0x19,
+                0x7D, 0xB8, 0x49, 0x25
+        ];
+
+
+
+        byte[] concatenatedMac = [.. sharedSecret, .. new byte[3], 2];
+        byte[] concatenatedEnc = [.. sharedSecret, .. new byte[3], 1];
+
+        byte[] KSEnc = new byte[]
+        {
+            0xF5, 0xF0, 0xE3, 0x5C,
+            0x0D, 0x71, 0x61, 0xEE,
+            0x67, 0x24, 0xEE, 0x51,
+            0x3A, 0x0D, 0x9A, 0x7F
+        };
+
+        byte[] KSMAC = new byte[]
+        {
+            0xFE, 0x25, 0x1C, 0x78,
+            0x58, 0xB3, 0x56, 0xB2,
+            0x45, 0x14, 0xB3, 0xBD,
+            0x5F, 0x42, 0x97, 0xD1
+        };
+        byte[] macKey = SHA1.HashData(concatenatedMac).Take(16).ToArray();
+        byte[] encKey = SHA1.HashData(concatenatedEnc).Take(16).ToArray();
+
+        if (!IsEqual(macKey, KSMAC))
+            return false;
+
+        if (!IsEqual(encKey, KSEnc))
+            return false;
+
+        byte[] terminalPublicKey = new byte[]
+        {
+            0x2D, 0xB7, 0xA6, 0x4C,
+            0x03, 0x55, 0x04, 0x4E,
+            0xC9, 0xDF, 0x19, 0x05,
+            0x14, 0xC6, 0x25, 0xCB,
+            0xA2, 0xCE, 0xA4, 0x87,
+            0x54, 0x88, 0x71, 0x22,
+            0xF3, 0xA5, 0xEF, 0x0D,
+            0x5E, 0xDD, 0x30, 0x1C,
+            0x35, 0x56, 0xF3, 0xB3,
+            0xB1, 0x86, 0xDF, 0x10,
+            0xB8, 0x57, 0xB5, 0x8F,
+            0x6A, 0x7E, 0xB8, 0x0F,
+            0x20, 0xBA, 0x5D, 0xC7,
+            0xBE, 0x1D, 0x43, 0xD9,
+            0xBF, 0x85, 0x01, 0x49,
+            0xFB, 0xB3, 0x64, 0x62
+        };
+
+        byte[] chipPublicKey = new byte[]
+        {
+            0x04, 0x9E, 0x88, 0x0F, 0x84,
+            0x29, 0x05, 0xB8, 0xB3,
+            0x18, 0x1F, 0x7A, 0xF7,
+            0xCA, 0xA9, 0xF0, 0xEF,
+            0xB7, 0x43, 0x84, 0x7F,
+            0x44, 0xA3, 0x06, 0xD2,
+            0xD2, 0x8C, 0x1D, 0x9E,
+            0xC6, 0x5D, 0xF6, 0xDB,
+            0x77, 0x64, 0xB2, 0x22,
+            0x77, 0xA2, 0xED, 0xDC,
+            0x3C, 0x26, 0x5A, 0x9F,
+            0x01, 0x8F, 0x9C, 0xB8,
+            0x52, 0xE1, 0x11, 0xB7,
+            0x68, 0xB3, 0x26, 0x90,
+            0x4B, 0x59, 0xA0, 0x19,
+            0x37, 0x76, 0xF0, 0x94
+        };
+
+        byte[] inputDataForTIFD = new byte[]
+        {
+            0x7F, 0x49, 0x4F, 0x06,
+            0x0A, 0x04, 0x00, 0x7F,
+            0x00, 0x07, 0x02, 0x02,
+            0x04, 0x02, 0x02, 0x86,
+            0x41, 0x04, 0x9E, 0x88,
+            0x0F, 0x84, 0x29, 0x05,
+            0xB8, 0xB3, 0x18, 0x1F,
+            0x7A, 0xF7, 0xCA, 0xA9,
+            0xF0, 0xEF, 0xB7, 0x43,
+            0x84, 0x7F, 0x44, 0xA3,
+            0x06, 0xD2, 0xD2, 0x8C,
+            0x1D, 0x9E, 0xC6, 0x5D,
+            0xF6, 0xDB, 0x77, 0x64,
+            0xB2, 0x22, 0x77, 0xA2,
+            0xED, 0xDC, 0x3C, 0x26,
+            0x5A, 0x9F, 0x01, 0x8F,
+            0x9C, 0xB8, 0x52, 0xE1,
+            0x11, 0xB7, 0x68, 0xB3,
+            0x26, 0x90, 0x4B, 0x59,
+            0xA0, 0x19, 0x37, 0x76,
+            0xF0, 0x94
+        };
+
+        byte[] oid = new byte[]
+        {
+            0x04, 0x00, 0x7F, 0x00,
+            0x07, 0x02, 0x02, 0x04,
+            0x02, 0x02
+        };
+
+        var token = Command.Command<IServerFormat>.TestGeneralToken(chipPublicKey, oid, macKey);
+
+        byte[] tokenCmd2 = new byte[]
+        {
+            0x00, 0x86, 0x00, 0x00,
+            0x0C, 0x7C, 0x0A, 0x85,
+            0x08, 0xC2, 0xB0, 0xBD,
+            0x78, 0xD9, 0x4B, 0xA8,
+            0x66, 0x00
+        };
+
+        var byteProblem = IsEqualByteNr(tokenCmd2, token);
+
+        if (byteProblem != null)
+        {
+            byte[] inputTIFD = Command.Command<IServerFormat>.TestGeneralInput(chipPublicKey, oid, macKey);
+            var r = IsEqualByteNr(inputTIFD, inputDataForTIFD);
+            if (r != null)
+            {
+                Log.Info("Problem with inputTIFD");
+                PrintByteComparison(inputDataForTIFD, inputTIFD);
+            }
+            return false;
+        }
+
+
+
+        // using var aes = Aes.Create();
+        // aes.KeySize = 128;
+        // aes.BlockSize = 128;
+        // aes.Mode = CipherMode.CBC;
+        // aes.Padding = PaddingMode.None;
+        // aes.Key = password;
+        // aes.IV = new byte[16];
+
+
+        // using var dectryptor = aes.CreateDecryptor();
+        // var dectryptedNonce = dectryptor.TransformFinalBlock(encrypted_nounce, 0, encrypted_nounce.Length);
+
+        // Log.Info("Dectrypted Nonce: " + BitConverter.ToString(dectryptedNonce));
+
+        // return Result<byte[]>.Success(dectryptedNonce);
+
+
+        return true;
+    }
 
     // TODO, read more. so I can support stuff
     public static byte[] DerivePaceKey(EncryptionInfo info)
     {
         // get mrz
         // SHA1 the mrz
-        var mrz = MrzUtils.GetMrz("XA0000002", "820821", "270101");
-        byte[] shaMrz = SHA1.HashData(Encoding.UTF8.GetBytes(mrz));
+        byte[] shaMrz = MrzUtils.GetMrz("XA0000002", "820821", "270101");
 
         byte[] PACEMODE = [0x00, 0x00, 0x00, 0x03];
 
         byte[] data = [.. shaMrz, .. PACEMODE];
         byte[] key = [];
 
-        // TODO, implement for DESEDE2, cause it works different when creating key.
 
         if (info.KeySize <= 128 / 8)
         {
@@ -90,8 +402,26 @@ public class TestClass
         byte[] concatenatedMac = [.. sharedSecretX, .. new byte[3], 2];
         byte[] concatenatedEnc = [.. sharedSecretX, .. new byte[3], 1];
 
-        var macKey = SHA256.HashData(concatenatedMac);
-        var encKey = SHA256.HashData(concatenatedEnc);
+        var hasher = SHA256.Create();
+
+
+
+
+        //         To derive 192-bit and 256-bit AES [FIPS 197] keys SHA-256 [FIPS 180-4] SHALL be used. For 192-bit AES keys the
+        // following additional step MUST be performed:
+        // • Use octets 1 to 24 of keydata; additional octets are not used.
+
+
+        byte[] macKey = hasher.ComputeHash(concatenatedMac);
+        byte[] encKey = hasher.ComputeHash(concatenatedEnc);
+
+        if (macKey.Length != 32 && encKey.Length != 32)
+        {
+            Log.Error("Incorrect length from hash");
+        }
+
+
+        return new Tuple<byte[], byte[]>(macKey, encKey);
 
     }
 
@@ -127,7 +457,7 @@ public class TestClass
 
         // -- Decrypt-- 
 
-        using var aes = Aes.Create();
+        using var aes = System.Security.Cryptography.Aes.Create();
         aes.KeySize = info.KeySize * 8;
         aes.BlockSize = 128;
         aes.Mode = CipherMode.CBC;
@@ -403,3 +733,4 @@ Public point Y            0x86  Elliptic Curve Point
 Cofactor f                0x87  Unsigned Integer
 
 */
+
