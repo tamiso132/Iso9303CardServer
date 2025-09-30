@@ -79,6 +79,56 @@ public class TestClass
         }
         Console.WriteLine();
     }
+
+    private static bool EncryptionTesting()
+    {
+
+        byte[] nonceDecrypted = new byte[]
+        {
+            0x3F, 0x00, 0xC4, 0xD3,
+            0x9D, 0x15, 0x3F, 0x2B,
+            0x2A, 0x21, 0x4A, 0x07,
+            0x8D, 0x89, 0x9B, 0x22
+        };
+
+        // Encrypted Nonce z
+        byte[] nonceEncrypted = new byte[]
+        {
+            0x95, 0xA3, 0xA0, 0x16,
+            0x52, 0x2E, 0xE9, 0x8D,
+            0x01, 0xE7, 0x6C, 0xB6,
+            0xB9, 0x8B, 0x42, 0xC3
+        };
+
+
+        byte[] password = new byte[]
+        {
+            0x89, 0xDE, 0xD1, 0xB2,
+            0x66, 0x24, 0xEC, 0x1E,
+            0x63, 0x4C, 0x19, 0x89,
+            0x30, 0x28, 0x49, 0xDD
+        };
+
+        using var aes = System.Security.Cryptography.Aes.Create();
+        aes.KeySize = 128;
+        aes.BlockSize = 128;
+        aes.Mode = CipherMode.CBC;
+        aes.Padding = PaddingMode.None;
+        aes.Key = password;
+        aes.IV = new byte[16];
+
+
+        using var dectryptor = aes.CreateDecryptor();
+        byte[] dectryptedNonce = dectryptor.TransformFinalBlock(nonceEncrypted, 0, nonceEncrypted.Length);
+
+        if (!IsEqual(dectryptedNonce, nonceDecrypted))
+        {
+            PrintByteComparison(dectryptedNonce, nonceDecrypted);
+            return false;
+        }
+        return true;
+
+    }
     private static bool MrzTest()
     {
 
@@ -161,6 +211,9 @@ public class TestClass
 
         // Print Kπ in hex
         if (!MrzTest())
+            return false;
+
+        if (!EncryptionTesting())
             return false;
 
         byte[] mrz = new byte[]
