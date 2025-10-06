@@ -312,8 +312,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     internal ResponseCommand ParseEncryptedReponse(byte[] packet, byte[] iv)
     {
-        Debug.Assert(packet[0] == 0x87);
-        Debug.Assert(packet[2] == 0x01);
+
         byte sw1 = 0;
         byte sw2 = 0;
         if (packet.Length == 4)
@@ -324,6 +323,18 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
             return new ResponseCommand(sw1, sw2, null);
         }
+
+        if (packet.Length == 2)
+        {
+            sw1 = packet[0];
+            sw2 = packet[1];
+            return new ResponseCommand(sw1, sw2, null);
+        }
+
+        Log.Info(BitConverter.ToString(packet));
+
+        Debug.Assert(packet[0] == 0x87);
+        Debug.Assert(packet[2] == 0x01);
 
         byte dataLen = packet[1];
 
@@ -347,7 +358,10 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         ResponseCommand response = messageType.ParseCommand(this, result.Value);
 
-        return TResult.Success(response);
+        if (response.status.IsSuccess())
+            return TResult.Success(response);
+
+        return TResult.Fail(new Error.SwError(response.status));
     }
 
     private byte[] CalculateCMAC(byte[] data)
