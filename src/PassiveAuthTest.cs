@@ -3,9 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.ConstrainedExecution;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Helper;
+using Org.BouncyCastle.Cms;
+using Org.BouncyCastle.Utilities;
+
 
 // Trivialt test, får antagligen modda lite/ ändra implementeringar
 
@@ -65,20 +69,24 @@ namespace EPassAuth
             return true;
         }
 
-        private static X509Certificate2? FindCscaCert(string issuingCountry, List<X509Certificate2> masterList)
+        public static X509Certificate2? FindCscaCert(string issuingCountry, List<X509Certificate2> masterList)
         {
             return masterList.FirstOrDefault(c =>
                 c.Subject.Contains(issuingCountry, StringComparison.OrdinalIgnoreCase));
         }
 
-        private static X509Certificate2? ExtractDscFromSod(byte[] efSodBytes)
+        public static X509Certificate2 ExtractDscFromSod(byte[] efSodBytes)
         {
-            
-            // Här ska du plocka ut "Signer Certificate" från SOD-strukturen
+            var cms = new CmsSignedData(efSodBytes);
+            var certs = 
+            foreach (X509Certificate cert in certs)
+            {
+                
+            }
             return null;
         }
 
-        private static bool VerifyCertChain(X509Certificate2 dsc, X509Certificate2 csca)
+        public static bool VerifyCertChain(X509Certificate2 dsc, X509Certificate2 csca)
         {
             var chain = new X509Chain();
             chain.ChainPolicy.ExtraStore.Add(csca);
@@ -88,14 +96,32 @@ namespace EPassAuth
             return chain.Build(dsc);
         }
 
-        private static bool VerifySodSignature(byte[] efSodBytes, X509Certificate2 dscCert)
+        public static bool VerifySodSignature(byte[] efSodBytes, X509Certificate2 dscCert)
         {
             // TODO: ASN.1 parsing för att få:
             //   - signedAttributes (hashar för DGs)
             //   - signaturen
             //   - algoritm
             // Använd sedan dscCert.GetRSAPublicKey().VerifyData(...)
-            return true;
+
+
+            var cms = new CmsSignedData(efSodBytes);
+            var signerInfos = cms.GetSignerInfos();
+            var signers = signerInfos.GetSigners();
+
+            foreach (SignerInformation signer in signers)
+            {
+                var verifier = new JcaSimpleSignerInfoVerifierBuilder().Build(dscCert);
+                if (signer.Verify(verifier))
+                {
+                    Log.Info("EF.SOD signature is valid");
+                    
+                    return true;
+                }
+
+            }
+            Log.Info("EF.SOD signature not valid :(");
+            return false;
         }
 
         private static bool VerifyDataGroupHashes(byte[] efSodBytes, Dictionary<int, byte[]> dataGroups)
@@ -119,7 +145,7 @@ namespace EPassAuth
             return certs;
         }
 
-        private static X509Certificate2? PemToX509(string pemString)
+        public static X509Certificate2? PemToX509(string pemString)
         {
             try
             {

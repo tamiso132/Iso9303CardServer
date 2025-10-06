@@ -172,7 +172,12 @@ public class ClientSession(ICommunicator comm)
 
     }
 
-    // Read EF.SOD file in terminal
+    // Read EF.SOD file in terminal, From this we need to: TODO
+    // Parse??
+    // Extract list of data group hashes and what algorithm is used
+    // Find the SignerInfo and/or DSC
+
+    
     // private async Task ReadFileWithSM(SecureMessaging sm, ushort fileID)
     // {
     //     byte[] fileBytes = [(byte)(fileID >> 8), (byte)(fileID & 0xFF)];
@@ -230,7 +235,7 @@ public class ClientSession(ICommunicator comm)
 
 // TODO Implement Secure messaging
 // Add SSC, Wrapper, unwrapper
-// Read EF.SOD with secure messaging
+// Read EF.SOD with -- Complete ?? --
 
 public class ServerEncryption : IServerFormat
 {
