@@ -17,6 +17,7 @@ using System.Security.Cryptography;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Parameters;
+using Microsoft.AspNetCore.Components.Forms;
 namespace App;
 
 
@@ -151,13 +152,72 @@ public class ClientSession(ICommunicator comm)
                 Log.Info("AuthenticationToken was not correctly calculated");
 
             Log.Info("All commands completed without a problem");
+            Log.Info("Secure Messaging Established using: PACE, Session started.");
         }
+
+       // await ReadFileWithSM(sm, EfIdGlobal.SOD);
+
     }
+
+    // Read EF.SOD file in terminal
+    // private async Task ReadFileWithSM(SecureMessaging sm, ushort fileID)
+    // {
+    //     byte[] fileBytes = [(byte)(fileID >> 8), (byte)(fileID & 0xFF)];
+    //     byte[] select = [0x00, 0xA4, 0x02, 0x0C, 0x02, .. fileBytes];
+
+    //     var wrappedSelect = sm.WrapCommand(select);
+    //     var result = _cmd.SendRaw(wrappedSelect);
+    //     if (!result.IsSuccess)
+    //     {
+    //         Log.Error("Failed selecting EF.SOD");
+    //         return;
+    //     }
+
+    //     List<byte> allData = new();
+    //     int offset = 0;
+    //     const int chunkSize = 0xFF;
+
+    //     while (true)
+    //     {
+    //         byte p1 = (byte)((offset >> 8) & 0xFF);
+    //         byte p2 = (byte)(offset & 0xFF);
+    //         byte[] read = [0x00, 0xB0, p1, p2, (byte)chunkSize];
+    //         var wrappedRead = sm.WrapCommand(read);
+
+    //         var readResult = await _cmd.SendRaw(wrappedRead);
+    //         if (!readResult.IsSuccess)
+    //         {
+    //             Log.Error("Failed Reading EF.SOD");
+    //             break;
+    //         }
+
+    //         var response = sm.UnwrapResponse(readResult.Value);
+
+    //         if (response.Length == 0)
+    //             break;
+
+    //         allData.AddRange(response);
+    //         offset += response.Length;
+
+    //         if (response.Length < chunkSize)
+    //             break;
+
+
+
+
+    //     }
+        
+    //         Log.Info("✅ EF.SOD successfully read");
+    //         Log.Info(Convert.ToBase64String(allData.ToArray()));
+    // }
 
     private readonly ICommunicator _comm = comm;
     private readonly Command<ServerEncryption> _cmd = new(comm, new ServerEncryption());
 }
 
+// TODO Implement Secure messaging
+// Add SSC, Wrapper, unwrapper
+// Read EF.SOD with secure messaging
 
 public class ServerEncryption : IServerFormat
 {
