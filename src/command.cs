@@ -177,7 +177,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         byte[] innerPacket = [0x7f, 0x49, (byte)(innerSequence.Length + innerSequence2.Length), .. innerSequence, .. innerSequence2];
 
-        var token = CalculateAuthToken(innerPacket);
+        var token = CalculateCMAC(innerPacket);
 
         byte[] tokenHeader = [0x85, (byte)token.Length, .. token];
 
@@ -276,11 +276,10 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return response;
     }
 
-    private byte[] CalculateAuthToken(byte[] data)
+    private byte[] CalculateCMAC(byte[] data)
     {
         var engine = new CMac(new AesEngine(), 64);
         var calculatedToken = new byte[8];
-        engine.Reset();
         engine.Init(new KeyParameter(mac));
         engine.BlockUpdate(data, 0, data.Length);
         engine.DoFinal(calculatedToken);
@@ -301,21 +300,37 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     }
 
-    private byte[] encryptDataENC(byte[] decryptedData, byte[] iv)
+    private byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte lc = 0x00)
     {
-        //         Append a single byte 0x80.
-        // Append zero bytes (0x00) until the total length is a multiple of the block size (16 bytes for AES).
+        if ((ins % 2) != 0)
+            throw new NotImplementedException("Ins for Odd, is not implemented");
+
+        byte[] iv = GetIV();
+
+        byte[] lePacket = AlignData16([0x97, 1, 0x00]);
+        byte[] encryptedData = encryptDataFormatENC(data, iv);
+
+        //* 0x00 0x00, for extended length type
+        byte lengthType = 0x00;
+
+        byte[] packet = [0x0C, ins, p1, p2, .. encryptedData, .. lePacket, lengthType];
+
+        byte[] cmacToken = CalculateCMAC(packet);
+
+        byte[] packetFormat = [.. packet, 0x8e, (byte)cmacToken.Length, .. cmacToken];
+
+        return packetFormat;
+
+    }
+
+    private byte[] encryptDataFormatENC(byte[] decryptedData, byte[] iv)
+    {
         using var aes = System.Security.Cryptography.Aes.Create();
 
 
-        var aligned = (decryptedData.Length + 1) % 16;
-        byte[] zeroes = [];
-        if (aligned != 0)
-        {
-            zeroes = new byte[16 - aligned];
-        }
+        var aligned = AlignData16(decryptedData);
 
-        byte[] dataFormat = [.. decryptedData, 0x80, .. zeroes];
+        byte[] dataFormat = [.. aligned];
 
         // Check so it is aligned by 16
         Debug.Assert(dataFormat.Length % 16 == 0);
@@ -329,7 +344,10 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
         var encryptor = aes.CreateEncryptor();
-        return encryptor.TransformFinalBlock(dataFormat, 0, dataFormat.Length);
+        byte[] encryptedData = encryptor.TransformFinalBlock(dataFormat, 0, dataFormat.Length);
+
+        // !0x01 says in documentation but wierd af, dunno if correct
+        return [0x87, (byte)encryptedData.Length, 0x01, .. encryptedData];
     }
 
     // sid 72, part 11 för secure messaging
@@ -365,8 +383,11 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     }
 
+    //! only allowed to call once per command
     private byte[] GetIV()
     {
+
+        sequenceCounter += 1;
         using var aes = System.Security.Cryptography.Aes.Create();
 
         aes.KeySize = 256;
@@ -376,11 +397,17 @@ public class Command<T>(ICommunicator communicator, T encryption)
         aes.Mode = CipherMode.ECB;
 
         byte[] msbCounter = [.. sequenceCounter.ToByteArray().Reverse()];
-        var diffLen = 16 - msbCounter.Length;
-        var padding = new byte[diffLen];
+        byte[] alignedData = AlignData16(msbCounter);
 
-        sequenceCounter += 1;
-        return aes.EncryptEcb([.. msbCounter, .. padding], PaddingMode.None);
+        return aes.EncryptEcb([.. alignedData], PaddingMode.None);
+    }
+
+    private byte[] AlignData16(byte[] input)
+    {
+        var diffLen = 16 - ((input.Length + 1) % 16);
+        byte padTag = 0x80;
+        byte[] padding = [padTag, .. new byte[diffLen]];
+        return [.. input, .. padding];
     }
 
 
