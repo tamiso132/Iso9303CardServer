@@ -256,6 +256,7 @@ public class TestClass
         if (!IsEqual(val, testVal))
         {
             Log.Error("Fail: 1");
+            
             return false;
         }
 
@@ -310,6 +311,8 @@ public class TestClass
             PrintByteComparison(RealKpi, key[0..16]);
             return false;
         }
+
+        
 
         return true;
 
