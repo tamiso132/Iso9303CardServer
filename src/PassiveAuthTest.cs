@@ -5,10 +5,13 @@ using System.IO;
 using System.Linq;
 using System.Runtime.ConstrainedExecution;
 using System.Security.Cryptography;
+using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
 using Helper;
 using Org.BouncyCastle.Cms;
-using Org.BouncyCastle.Utilities;
+using Org.BouncyCastle.Utilities.Collections;
+using Org.BouncyCastle.X509.Store;
+using Org.BouncyCastle.X509;
 
 
 // Trivialt test, får antagligen modda lite/ ändra implementeringar
@@ -78,10 +81,13 @@ namespace EPassAuth
         public static X509Certificate2 ExtractDscFromSod(byte[] efSodBytes)
         {
             var cms = new CmsSignedData(efSodBytes);
-            var certs = 
-            foreach (X509Certificate cert in certs)
+            var certStore = cms.GetCertificates();
+            var certs = certStore.Equals(null);
+            
+             
+            foreach (X509Certificate2 cert in certs)
             {
-                
+                return new X509Certificate2(certStore.Equals());
             }
             return null;
         }
