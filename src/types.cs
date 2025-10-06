@@ -41,10 +41,10 @@ public sealed class EfIdGlobal : IEfID
         return Name;
     }
 
-    public static readonly EfIdGlobal CardAccess = new(0x1C, new byte[] { 0x01, 0x1C }, "CardAccess");
-    public static readonly EfIdGlobal CardSecurity = new(0x1D, new byte[] { 0x01, 0x1D }, "CardSecurity");
-    public static readonly EfIdGlobal AtrInfo = new(0x01, new byte[] { 0x2F, 0x01 }, "AtrInfo");
-    public static readonly EfIdGlobal Dir = new(0x1E, new byte[] { 0x2F, 0x00 }, "Dir");
+    public static readonly EfIdGlobal CardAccess = new(0x1C, [0x01, 0x1C], "CardAccess");
+    public static readonly EfIdGlobal CardSecurity = new(0x1D, [0x01, 0x1D], "CardSecurity");
+    public static readonly EfIdGlobal AtrInfo = new(0x01, [0x2F, 0x01], "AtrInfo");
+    public static readonly EfIdGlobal Dir = new(0x1E, [0x2F, 0x00], "Dir");
 
 }
 

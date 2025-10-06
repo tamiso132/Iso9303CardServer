@@ -94,9 +94,9 @@ public class TestClass
             0x9C, 0x01, 0x0F, 0x99
         ];
 
-        byte[] sharedSecret = new byte[]
-        {
-            0x60, 0x33, 0x2E, 0xF2,
+        byte[] sharedSecret =
+        [
+            0x04, 0x60, 0x33, 0x2E, 0xF2,
             0x45, 0x0B, 0x5D, 0x24,
             0x7E, 0xF6, 0xD3, 0x86,
             0x83, 0x97, 0xD3, 0x98,
@@ -112,10 +112,10 @@ public class TestClass
             0xA4, 0xE3, 0xEA, 0x4E,
             0x82, 0xC9, 0xC1, 0x3D,
             0x03, 0xEB, 0x71, 0x81
-        };
+        ];
 
-        byte[] chipPublicKey = new byte[]
-        {
+        byte[] chipPublicKey =
+        [
             0x04, 0x82, 0x4F, 0xBA, 0x91,
             0xC9, 0xCB, 0xE2, 0x6B,
             0xEF, 0x53, 0xA0, 0xEB,
@@ -132,19 +132,19 @@ public class TestClass
             0x70, 0x9A, 0x49, 0xDC,
             0x63, 0x71, 0x93, 0x63,
             0xCC, 0xD1, 0x3C, 0x54
-        };
+        ];
 
-        byte[] nonceDecrypted = new byte[]
-       {
+        byte[] nonceDecrypted =
+       [
             0x3F, 0x00, 0xC4, 0xD3,
             0x9D, 0x15, 0x3F, 0x2B,
             0x2A, 0x21, 0x4A, 0x07,
             0x8D, 0x89, 0x9B, 0x22
-       };
+       ];
 
 
-        byte[] mappedGenerator = new byte[]
-        {
+        byte[] mappedGenerator =
+        [
             0x04, 0x8C, 0xED, 0x63, 0xC9,
             0x14, 0x26, 0xD4, 0xF0,
             0xEB, 0x14, 0x35, 0xE7,
@@ -161,16 +161,16 @@ public class TestClass
             0x83, 0x40, 0x7C, 0x1B,
             0x6A, 0x4D, 0x85, 0x7A,
             0xE7, 0x6F, 0xE5, 0x22
-        };
+        ];
 
         ECDH ecdh = new ECDH(DomainParameter.BrainpoolP256r1, privateKey);
         ecdh.CalculateSharedSecret(chipPublicKey);
         var secretCalculated = ecdh._secret.Normalize().GetEncoded();
-    
+
         if (!IsEqual(sharedSecret, secretCalculated))
         {
             Log.Info("Shared Secret wrong computation");
-            PrintByteComparison(secretCalculated, mappedGenerator);
+            PrintByteComparison(sharedSecret, secretCalculated);
             return false;
         }
 
@@ -183,37 +183,39 @@ public class TestClass
             return false;
         }
 
+
+
         return true;
     }
 
     private static bool EncryptionTesting()
     {
 
-        byte[] nonceDecrypted = new byte[]
-        {
+        byte[] nonceDecrypted =
+        [
             0x3F, 0x00, 0xC4, 0xD3,
             0x9D, 0x15, 0x3F, 0x2B,
             0x2A, 0x21, 0x4A, 0x07,
             0x8D, 0x89, 0x9B, 0x22
-        };
+        ];
 
         // Encrypted Nonce z
-        byte[] nonceEncrypted = new byte[]
-        {
+        byte[] nonceEncrypted =
+        [
             0x95, 0xA3, 0xA0, 0x16,
             0x52, 0x2E, 0xE9, 0x8D,
             0x01, 0xE7, 0x6C, 0xB6,
             0xB9, 0x8B, 0x42, 0xC3
-        };
+        ];
 
 
-        byte[] password = new byte[]
-        {
+        byte[] password =
+        [
             0x89, 0xDE, 0xD1, 0xB2,
             0x66, 0x24, 0xEC, 0x1E,
             0x63, 0x4C, 0x19, 0x89,
             0x30, 0x28, 0x49, 0xDD
-        };
+        ];
 
         using var aes = System.Security.Cryptography.Aes.Create();
         aes.KeySize = 128;
@@ -244,12 +246,12 @@ public class TestClass
 
         byte[] val = SHA1.HashData(mrzTest);
 
-        byte[] testVal = new byte[]
-        {
+        byte[] testVal =
+        [
             0x23, 0x9A, 0xB9, 0xCB, 0x28, 0x2D, 0xAF, 0x66,
             0x23, 0x1D, 0xC5, 0xA4, 0xDF, 0x6B, 0xFB, 0xAE,
             0xDF, 0x47, 0x75, 0x65
-        };
+        ];
 
         if (!IsEqual(val, testVal))
         {
@@ -259,23 +261,23 @@ public class TestClass
 
 
 
-        byte[] RealK = new byte[]
-        {
+        byte[] RealK =
+        [
             0x7E, 0x2D, 0x2A, 0x41,
             0xC7, 0x4E, 0xA0, 0xB3,
             0x8C, 0xD3, 0x6F, 0x86,
             0x39, 0x39, 0xBF, 0xA8,
             0xE9, 0x03, 0x2A, 0xAD
-        };
+        ];
 
         // Derived AES-128 key Kπ
-        byte[] RealKpi = new byte[]
-        {
+        byte[] RealKpi =
+        [
             0x89, 0xDE, 0xD1, 0xB2,
             0x66, 0x24, 0xEC, 0x1E,
             0x63, 0x4C, 0x19, 0x89,
             0x30, 0x28, 0x49, 0xDD
-        };
+        ];
 
         // MRZ fields
         string documentNumber = "T22000129";
@@ -326,13 +328,13 @@ public class TestClass
         if (!TestingECDH())
             return false;
 
-        byte[] mrz = new byte[]
-        {
+        byte[] mrz =
+        [
             0x89, 0xDE, 0xD1, 0xB2,
             0x66, 0x24, 0xEC, 0x1E,
             0x63, 0x4C, 0x19, 0x89,
             0x30, 0x28, 0x49, 0xDD
-        };
+        ];
 
         byte[] sharedSecret = [
 
@@ -353,21 +355,21 @@ public class TestClass
         byte[] concatenatedMac = [.. sharedSecret, .. new byte[3], 2];
         byte[] concatenatedEnc = [.. sharedSecret, .. new byte[3], 1];
 
-        byte[] KSEnc = new byte[]
-        {
+        byte[] KSEnc =
+        [
             0xF5, 0xF0, 0xE3, 0x5C,
             0x0D, 0x71, 0x61, 0xEE,
             0x67, 0x24, 0xEE, 0x51,
             0x3A, 0x0D, 0x9A, 0x7F
-        };
+        ];
 
-        byte[] KSMAC = new byte[]
-        {
+        byte[] KSMAC =
+        [
             0xFE, 0x25, 0x1C, 0x78,
             0x58, 0xB3, 0x56, 0xB2,
             0x45, 0x14, 0xB3, 0xBD,
             0x5F, 0x42, 0x97, 0xD1
-        };
+        ];
         byte[] macKey = SHA1.HashData(concatenatedMac).Take(16).ToArray();
         byte[] encKey = SHA1.HashData(concatenatedEnc).Take(16).ToArray();
 
@@ -377,8 +379,8 @@ public class TestClass
         if (!IsEqual(encKey, KSEnc))
             return false;
 
-        byte[] terminalPublicKey = new byte[]
-        {
+        byte[] terminalPublicKey =
+        [
             0x2D, 0xB7, 0xA6, 0x4C,
             0x03, 0x55, 0x04, 0x4E,
             0xC9, 0xDF, 0x19, 0x05,
@@ -395,10 +397,10 @@ public class TestClass
             0xBE, 0x1D, 0x43, 0xD9,
             0xBF, 0x85, 0x01, 0x49,
             0xFB, 0xB3, 0x64, 0x62
-        };
+        ];
 
-        byte[] chipPublicKey = new byte[]
-        {
+        byte[] chipPublicKey =
+        [
             0x04, 0x9E, 0x88, 0x0F, 0x84,
             0x29, 0x05, 0xB8, 0xB3,
             0x18, 0x1F, 0x7A, 0xF7,
@@ -415,10 +417,10 @@ public class TestClass
             0x68, 0xB3, 0x26, 0x90,
             0x4B, 0x59, 0xA0, 0x19,
             0x37, 0x76, 0xF0, 0x94
-        };
+        ];
 
-        byte[] inputDataForTIFD = new byte[]
-        {
+        byte[] inputDataForTIFD =
+        [
             0x7F, 0x49, 0x4F, 0x06,
             0x0A, 0x04, 0x00, 0x7F,
             0x00, 0x07, 0x02, 0x02,
@@ -440,25 +442,25 @@ public class TestClass
             0x26, 0x90, 0x4B, 0x59,
             0xA0, 0x19, 0x37, 0x76,
             0xF0, 0x94
-        };
+        ];
 
-        byte[] oid = new byte[]
-        {
+        byte[] oid =
+        [
             0x04, 0x00, 0x7F, 0x00,
             0x07, 0x02, 0x02, 0x04,
             0x02, 0x02
-        };
+        ];
 
         var token = Command.Command<IServerFormat>.TestGeneralToken(chipPublicKey, oid, macKey);
 
-        byte[] tokenCmd2 = new byte[]
-        {
+        byte[] tokenCmd2 =
+        [
             0x00, 0x86, 0x00, 0x00,
             0x0C, 0x7C, 0x0A, 0x85,
             0x08, 0xC2, 0xB0, 0xBD,
             0x78, 0xD9, 0x4B, 0xA8,
             0x66, 0x00
-        };
+        ];
 
         var byteProblem = IsEqualByteNr(tokenCmd2, token);
 

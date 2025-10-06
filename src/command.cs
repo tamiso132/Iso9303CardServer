@@ -207,12 +207,14 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] cmd = [0x7C, (byte)tokenHeader.Length, .. tokenHeader];
         byte[] cmdFormat = FormatCommand(0x00, 0x86, 0x00, 0x00, data: cmd, le: 0x00);
 
+        Log.Info("Send: " + BitConverter.ToString(cmdFormat));
+
         var result = await SendPackageDecodeResponse(cmdFormat);
 
 
         string Hex(byte[] data) => BitConverter.ToString(data).Replace("-", " ");
-        Log.Info("Oid: " + Hex(innerSequence));
-        Log.Info("IcPubKey: " + Hex(innerSequence2));
+        //  Log.Info("Oid: " + Hex(innerSequence));
+        // Log.Info("IcPubKey: " + Hex(innerSequence2));
 
         if (result.IsSuccess)
             if (result.Value.data.Length == 0)

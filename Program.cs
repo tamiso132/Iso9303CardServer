@@ -19,7 +19,7 @@ using Encryption;
 // var cert = X509CertificateLoader.LoadCertificate(currentBytes);
 // Log.Info(cert.IssuerName.Name);
 
-Log.Info(TestClass.Testing().ToString());
+//Log.Info(TestClass.Testing().ToString());
 
 
 var config = File.ReadAllLines("config.txt");
