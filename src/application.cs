@@ -153,6 +153,19 @@ public class ClientSession(ICommunicator comm)
 
             Log.Info("All commands completed without a problem");
             Log.Info("Secure Messaging Established using: PACE, Session started.");
+            await _cmd.SelectApplication(MessageType.NonSecureMessage, AppID.IdLDS1);
+
+            if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
+                return;
+            }
+            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
+            if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
+                return;
+            }
         }
 
         // await ReadFileWithSM(sm, EfIdGlobal.SOD);

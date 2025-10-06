@@ -312,8 +312,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     internal ResponseCommand ParseEncryptedReponse(byte[] packet, byte[] iv)
     {
-        Debug.Assert(packet[0] == 0x87);
-        Debug.Assert(packet[2] == 0x01);
+
         byte sw1 = 0;
         byte sw2 = 0;
         if (packet.Length == 4)
@@ -324,6 +323,18 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
             return new ResponseCommand(sw1, sw2, null);
         }
+
+        if (packet.Length == 2)
+        {
+            sw1 = packet[0];
+            sw2 = packet[1];
+            return new ResponseCommand(sw1, sw2, null);
+        }
+
+        Log.Info(BitConverter.ToString(packet));
+
+        Debug.Assert(packet[0] == 0x87);
+        Debug.Assert(packet[2] == 0x01);
 
         byte dataLen = packet[1];
 
@@ -347,7 +358,10 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         ResponseCommand response = messageType.ParseCommand(this, result.Value);
 
-        return TResult.Success(response);
+        if (response.status.IsSuccess())
+            return TResult.Success(response);
+
+        return TResult.Fail(new Error.SwError(response.status));
     }
 
     private byte[] CalculateCMAC(byte[] data)
@@ -373,20 +387,23 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return chipToken.SequenceEqual(calculatedToken);
 
     }
-
+    // SID 91 part 11
+    // SSC -> HEADER  -> PADDING -> DO87
+    // Add padding to it then calculate MAC over it
+ 
     internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte lc = 0x00)
     {
         if ((ins % 2) != 0)
             throw new NotImplementedException("Ins for Odd, is not implemented");
 
 
-        byte[] lePacket = AlignData16([0x97, 1, 0x00]);
+        byte[] lePacket = AlignData16([0x97, 0x01, 0x00]);
         byte[] encryptedData = EncryptDataFormatENC(data, iv);
 
         //* 0x00 0x00, for extended length type
         byte lengthType = 0x00;
 
-        byte[] packet = [0x0C, ins, p1, p2, .. encryptedData, .. lePacket, lengthType];
+        byte[] packet = [0x0C, ins, p1, p2, 0x87, (byte)(encryptedData.Length + 1), 0x01, .. encryptedData, .. lePacket, lengthType];
 
         byte[] cmacToken = CalculateCMAC(packet);
 
@@ -420,7 +437,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] encryptedData = encryptor.TransformFinalBlock(dataFormat, 0, dataFormat.Length);
 
         // !0x01 says in documentation but wierd af, dunno if correct
-        return [0x87, (byte)encryptedData.Length, 0x01, .. encryptedData];
+        return [.. encryptedData];
     }
 
     // sid 72, part 11 för secure messaging
