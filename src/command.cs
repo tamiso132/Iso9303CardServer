@@ -8,6 +8,10 @@ using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Asn1;
+using System.Security.Cryptography;
+using System.Diagnostics;
+using System.Text;
+using System.Numerics;
 
 namespace Command;
 
@@ -162,7 +166,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public void SetEncryption(byte[] enc, byte[] mac)
     {
-        this.enc = enc;
+        this.encKey = enc;
         this.mac = mac;
     }
 
@@ -297,6 +301,88 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     }
 
+    private byte[] encryptDataENC(byte[] decryptedData, byte[] iv)
+    {
+        //         Append a single byte 0x80.
+        // Append zero bytes (0x00) until the total length is a multiple of the block size (16 bytes for AES).
+        using var aes = System.Security.Cryptography.Aes.Create();
+
+
+        var aligned = (decryptedData.Length + 1) % 16;
+        byte[] zeroes = [];
+        if (aligned != 0)
+        {
+            zeroes = new byte[16 - aligned];
+        }
+
+        byte[] dataFormat = [.. decryptedData, 0x80, .. zeroes];
+
+        // Check so it is aligned by 16
+        Debug.Assert(dataFormat.Length % 16 == 0);
+
+
+        aes.KeySize = 256;
+        aes.BlockSize = 128;
+        aes.Mode = System.Security.Cryptography.CipherMode.CBC;
+        aes.Key = encKey!;
+        aes.IV = iv;
+
+
+        var encryptor = aes.CreateEncryptor();
+        return encryptor.TransformFinalBlock(dataFormat, 0, dataFormat.Length);
+    }
+
+    // sid 72, part 11 för secure messaging
+    //     The Send Sequence Counter is set to its new start value, see Section 9.8.6.3 for 3DES and Section
+    // 9.8.7.3 for AES.
+
+    private byte[] decryptDataENC(byte[] encryptedData, byte[] iv)
+    {
+
+
+        using var aes = System.Security.Cryptography.Aes.Create();
+
+        aes.KeySize = 256;
+        aes.BlockSize = 128;
+        aes.Mode = System.Security.Cryptography.CipherMode.CBC;
+        aes.Key = encKey!;
+        aes.IV = iv;
+        aes.Mode = CipherMode.CBC;
+
+
+        var decryptor = aes.CreateDecryptor();
+        byte[] decryptedData = decryptor.TransformFinalBlock(encryptedData, 0, encryptedData.Length);
+
+        for (int i = decryptedData.Length - 1; i >= 0; i--)
+        {
+            if (decryptedData[i] == 0x80)
+            {
+                return decryptedData[0..(i - 1)];
+            }
+        }
+
+        throw new Exception("FUCK");
+
+    }
+
+    private byte[] GetIV()
+    {
+        using var aes = System.Security.Cryptography.Aes.Create();
+
+        aes.KeySize = 256;
+        aes.BlockSize = 128;
+        aes.Mode = System.Security.Cryptography.CipherMode.ECB;
+        aes.Key = encKey!;
+        aes.Mode = CipherMode.ECB;
+
+        byte[] msbCounter = [.. sequenceCounter.ToByteArray().Reverse()];
+        var diffLen = 16 - msbCounter.Length;
+        var padding = new byte[diffLen];
+
+        sequenceCounter += 1;
+        return aes.EncryptEcb([.. msbCounter, .. padding], PaddingMode.None);
+    }
+
 
 
 
@@ -306,8 +392,10 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private readonly ICommunicator _communicator = communicator;
     private readonly T _serverFormat = encryption;
 
-    private byte[] enc;
-    private byte[] mac;
+    private byte[]? encKey;
+    private byte[]? mac;
+
+    private BigInteger sequenceCounter = 0;
 }
 
 
