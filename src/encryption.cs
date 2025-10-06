@@ -256,7 +256,7 @@ public class TestClass
         if (!IsEqual(val, testVal))
         {
             Log.Error("Fail: 1");
-            
+
             return false;
         }
 
@@ -312,7 +312,7 @@ public class TestClass
             return false;
         }
 
-        
+
 
         return true;
 
@@ -504,15 +504,24 @@ public class TestClass
     // TODO, read more. so I can support stuff
     public static byte[] DerivePaceKey(EncryptionInfo info)
     {
-        // get mrz
-        // SHA1 the mrz
-        byte[] shaMrz = MrzUtils.GetMrz("XA0000002", "820821", "270101");
+
+        // MRZ fields
+
+        byte[] mrzBytes = MrzUtils.GetMrz("XA0000002", "820821", "270101");
+
+        // Concatenate MRZ info (as bytes, typically ASCII)
+        //    string mrzString = documentNumber + dateOfBirth + dateOfExpiry;
+
+        // Compute SHA-1 hash to derive Kπ
+        using var sha1 = SHA1.Create();
+        byte[] kMrz = sha1.ComputeHash(mrzBytes);
 
         byte[] PACEMODE = [0x00, 0x00, 0x00, 0x03];
 
-        byte[] data = [.. shaMrz, .. PACEMODE];
+        byte[] data = [.. kMrz, .. PACEMODE];
         byte[] key = [];
 
+        key = SHA1.HashData(data);
 
         if (info.KeySize <= 128 / 8)
         {
@@ -523,7 +532,12 @@ public class TestClass
             key = SHA256.HashData(data);
         }
 
-        return key[0..info.KeySize];
+
+
+
+        return key;
+
+
 
 
         // the counter is 4 bytes long and ends in either of these
