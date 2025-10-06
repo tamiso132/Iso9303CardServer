@@ -31,7 +31,7 @@ public class ClientSession(ICommunicator comm)
         var packet = ServerPacket.TryFromBytes(buffer);
         if (packet.Type == CommandType.NewNFCScan)
         {
-            var result = await _cmd.SelectDefaultMF();
+            var result = await _cmd.SelectDefaultMF(MessageType.NonSecureMessage);
 
 
 
@@ -41,7 +41,7 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-            result = await _cmd.ReadBinary(EfIdGlobal.CardAccess);
+            result = await _cmd.ReadBinary(MessageType.NonSecureMessage, EfIdGlobal.CardAccess);
 
             if (!result.IsSuccess)
             {
@@ -64,7 +64,7 @@ public class ClientSession(ICommunicator comm)
 
 
 
-            result = await _cmd.MseSetAT(info.OrgOid, info.OrgParameterID);
+            result = await _cmd.MseSetAT(MessageType.NonSecureMessage, info.OrgOid, info.OrgParameterID);
 
 
             if (!result.IsSuccess)
@@ -155,7 +155,7 @@ public class ClientSession(ICommunicator comm)
             Log.Info("Secure Messaging Established using: PACE, Session started.");
         }
 
-       // await ReadFileWithSM(sm, EfIdGlobal.SOD);
+        // await ReadFileWithSM(sm, EfIdGlobal.SOD);
 
     }
 
@@ -206,7 +206,7 @@ public class ClientSession(ICommunicator comm)
 
 
     //     }
-        
+
     //         Log.Info("✅ EF.SOD successfully read");
     //         Log.Info(Convert.ToBase64String(allData.ToArray()));
     // }
