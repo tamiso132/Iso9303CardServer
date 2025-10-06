@@ -18,6 +18,51 @@ namespace Command;
 using TResult = Result<ResponseCommand>;
 using TResultBool = Result<bool>;
 
+public abstract record MessageType
+{
+
+    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data) where T : IServerFormat;
+    public abstract ResponseCommand ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
+
+    public static Secure SecureMessage => new();
+    public static NonSecure NonSecureMessage => new();
+    public sealed record Secure : MessageType
+    {
+        internal Secure() { }
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data)
+        {
+            iv = command.GetIV();
+            return command.FormatEncryptedCommand(data, ins, p1, p2, iv);
+        }
+
+        public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
+        {
+            return command.ParseEncryptedReponse(response, iv);
+        }
+
+        byte[] iv = [];
+
+    }
+
+    public sealed record NonSecure : MessageType
+    {
+        internal NonSecure() { }
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data)
+        {
+            return Command<T>.FormatCommand(0x00, ins, p1, p2, data, 0x00);
+        }
+
+        public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
+        {
+            return ResponseCommand.FromBytes(response).Value;
+        }
+
+    }
+
+}
+
+
+
 
 // TODO, add a command that keeps asking for more bytes if we get error SW that all the bytes has not been sent yet
 // TODO, should also add error check for when parsing to Response Command fails
@@ -28,45 +73,46 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public bool IsActiveApp { get; private set; } = false;
 
-    public async Task<TResult> ReadBinary(IEfID efID, byte offset = 0x00, byte le = 0x00, byte cla = 0x00)
+    public async Task<TResult> ReadBinary(MessageType type, IEfID efID, byte offset = 0x00, byte le = 0x00)
     {
         var app = efID.AppIdentifier();
         if (_appSelected == app || app == null)
         {
-            return await ReadBinaryFullID(efID, offset, le);
+            return await ReadBinaryFullID(type, efID, offset, le);
 
         }
         else
         {
-            await SelectApplication(app);
+            await SelectApplication(type, app);
             _appSelected = app;
-            return await ReadBinaryFullID(efID, offset, le);
+            return await ReadBinaryFullID(type, efID, offset, le);
         }
     }
-    public async Task<TResult> SelectApplication(AppID app)
+    public async Task<TResult> SelectApplication(MessageType type, AppID app)
     {
-        return await ApplicationSelect(app);
+        return await ApplicationSelect(type, app);
     }
 
-    public async Task<TResult> SelectDefaultMF()
+    public async Task<TResult> SelectDefaultMF(MessageType type)
     {
         Log.Info("Selecting Default MF");
-        byte[] cmd = FormatCommand(0x00, 0xA4, 0x00, 0x0C);
-        return await SendPackageDecodeResponse(cmd);
+        byte[] cmd = type.FormatCommand(this, 0xA4, 0x00, 0x0C, []);
+        return await SendPackageDecodeResponse(type, cmd);
     }
 
-    private async Task<TResult> ElementFileSelect(IEfID fileID, byte cla = 0x00)
+    private async Task<TResult> ElementFileSelect(MessageType type, IEfID fileID)
     {
         Log.Info("Selecting EF File: " + fileID.GetName());
-        byte[] cmd = FormatCommand(cla, 0xA4, 0x02, 0x0C, fileID.GetFullID());
-        return await SendPackageDecodeResponse(cmd);
+        byte[] data = fileID.GetFullID();
+        byte[] cmd = type.FormatCommand<T>(this, 0xA4, 0x02, 0x0C, data);
+        return await SendPackageDecodeResponse(type, cmd);
     }
 
-    private async Task<TResult> ApplicationSelect(AppID appID)
+    private async Task<TResult> ApplicationSelect(MessageType type, AppID appID)
     {
         Log.Info("Selecting Application: " + appID.Name);
-        byte[] cmd = FormatCommand(0x00, 0xA4, 0x04, 0x0C, appID.GetID());
-        var result = await SendPackageDecodeResponse(cmd);
+        byte[] cmd = type.FormatCommand(this, 0xA4, 0x04, 0x0C, appID.GetID());
+        var result = await SendPackageDecodeResponse(type, cmd);
         if (result.IsSuccess)
             this._appSelected = appID;
 
@@ -75,9 +121,9 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
 
-    private async Task<TResult> ReadBinaryFullID(IEfID efID, byte offset, byte le, byte cla = 0x00)
+    private async Task<TResult> ReadBinaryFullID(MessageType type, IEfID efID, byte offset, byte cla = 0x00)
     {
-        var selectResult = await ElementFileSelect(efID);
+        var selectResult = await ElementFileSelect(type, efID);
         if (!selectResult.IsSuccess)
         {
             Console.WriteLine("Element File Select Error");
@@ -85,17 +131,17 @@ public class Command<T>(ICommunicator communicator, T encryption)
         }
 
         Log.Info("Reading EF File: " + efID.GetName());
-        byte[] cmd = FormatCommand(0x00, 0xB0, 0x00, 0x00, le: le);
-        return await SendPackageDecodeResponse(cmd);
+        byte[] cmd = type.FormatCommand(this, 0xB0, 0x00, 0x00, []);
+        return await SendPackageDecodeResponse(type, cmd);
     }
 
-    public async Task<TResult> ReadBinaryShort(IEfID efID, byte offset, byte le, byte cla = 0x00)
+    public async Task<TResult> ReadBinaryShort(MessageType type, IEfID efID, byte offset, byte le)
     {
-        byte[] cmd = FormatCommand(cla, 0xB0, efID.ShortID, offset);
-        return await SendPackageDecodeResponse(cmd);
+        byte[] cmd = type.FormatCommand(this, 0xB0, efID.ShortID, offset, []);
+        return await SendPackageDecodeResponse(type, cmd);
     }
 
-    public async Task<TResult> MseSetAT(byte[] oid, int parameterID, byte cla = 0x00)
+    public async Task<TResult> MseSetAT(MessageType type, byte[] oid, int parameterID, byte cla = 0x00)
     {
         Log.Info("Sending MseSetAT Command");
         byte[] data = new AsnBuilder()
@@ -104,13 +150,15 @@ public class Command<T>(ICommunicator communicator, T encryption)
                                         //  .AddCustomTag(0x84, [(byte)parameterID]) // parameter id
             .Build();
 
-        byte[] cmd = FormatCommand(cla, 0x22, 0xC1, 0xA4, data);
-        return await SendPackageDecodeResponse(cmd);
+        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0xC1, 0xA4, data);
+        return await SendPackageDecodeResponse(type, cmd);
     }
 
     public async Task<TResult> GeneralAuthenticate(GenAuthType type, byte cla = 0x10)
     {
         Log.Info("Sending General Authenticate Command");
+
+        var typee = new MessageType.NonSecure();
 
         var writer = new AsnWriter(AsnEncodingRules.DER);
         var ctxSeq = new Asn1Tag(TagClass.ContextSpecific, 0x7C, true);
@@ -126,12 +174,13 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         //        byte[] raw = [0x10, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
 
-        byte[] cmdFormat = FormatCommand(cla, 0x86, 0x00, 0x00, data: writer.Encode()[1..], le: 0x00);
+        byte[] cmdFormat = typee.FormatCommand(this, 0x86, 0x00, 0x00, data: writer.Encode()[1..]);
+        cmdFormat[0] = cla;
 
 
         //Log.Info("Write: " + BitConverter.ToString(raw));
 
-        var result = await SendPackageDecodeResponse(cmdFormat);
+        var result = await SendPackageDecodeResponse(typee, cmdFormat);
 
         if (result.IsSuccess)
             if (result.Value.data.Length == 0)
@@ -143,18 +192,20 @@ public class Command<T>(ICommunicator communicator, T encryption)
     public async Task<TResult> GeneralAuthenticateMapping(byte innerTag, byte[] publicKey)
     {
         Log.Info("General Authentication Mapping");
+        var type = new MessageType.NonSecure();
         // TODO, check if length is bigger then 128
         byte[] innerSequence = [innerTag, (byte)publicKey.Length, .. publicKey];
         byte[] data = [0x7C, (byte)innerSequence.Length, .. innerSequence];
 
 
 
-        byte[] cmdFormat = FormatCommand(0x10, 0x86, 0x00, 0x00, data: data, le: 0x00);
+        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data);
+        cmdFormat[0] = 0x10;
 
 
         //Log.Info("Write: " + BitConverter.ToString(raw));
 
-        var result = await SendPackageDecodeResponse(cmdFormat);
+        var result = await SendPackageDecodeResponse(type, cmdFormat);
 
         if (result.IsSuccess)
             if (result.Value.data.Length == 0)
@@ -172,6 +223,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public async Task<TResultBool> GeneralAuthenticateMutual(byte[] icPubKey, byte[] terminalKey, byte[] oid, byte[] macKey)
     {
+        var type = new MessageType.NonSecure();
         byte[] innerSequence = [0x06, (byte)oid.Length, .. oid];
         byte[] innerSequence2 = [0x86, (byte)icPubKey.Length, .. icPubKey];
 
@@ -182,11 +234,11 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] tokenHeader = [0x85, (byte)token.Length, .. token];
 
         byte[] cmd = [0x7C, (byte)tokenHeader.Length, .. tokenHeader];
-        byte[] cmdFormat = FormatCommand(0x00, 0x86, 0x00, 0x00, data: cmd, le: 0x00);
+        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data: cmd);
 
         Log.Info("Send: " + BitConverter.ToString(cmdFormat));
 
-        var result = await SendPackageDecodeResponse(cmdFormat);
+        var result = await SendPackageDecodeResponse(type, cmdFormat);
 
 
         string Hex(byte[] data) => BitConverter.ToString(data).Replace("-", " ");
@@ -245,7 +297,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         return cmdFormat;
     }
-    private static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, byte? le = null)
+    internal static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, byte? le = null)
     {
         var cmd = new List<byte> { cla, ins, p1, p2 };
         if (data != null && data.Length > 0)
@@ -258,22 +310,44 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return [.. cmd];
     }
 
-    private async Task<TResult> SendPackageDecodeResponse(byte[] cmd)
+    internal ResponseCommand ParseEncryptedReponse(byte[] packet, byte[] iv)
+    {
+        Debug.Assert(packet[0] == 0x87);
+        Debug.Assert(packet[2] == 0x01);
+        byte sw1 = 0;
+        byte sw2 = 0;
+        if (packet.Length == 4)
+        {
+            // No data
+            sw1 = packet[2];
+            sw2 = packet[3];
+
+            return new ResponseCommand(sw1, sw2, null);
+        }
+
+        byte dataLen = packet[1];
+
+        byte[] encryptedData = packet[2..dataLen];
+        sw1 = packet[dataLen + 2];
+        sw2 = packet[dataLen + 3];
+
+        byte[] decryptedData = DecryptDataENC(encryptedData, iv);
+
+        return new ResponseCommand(sw1, sw2, decryptedData);
+
+    }
+
+
+
+    internal async Task<TResult> SendPackageDecodeResponse(MessageType messageType, byte[] cmd)
     {
         var result = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(cmd)));
         if (!result.IsSuccess)
             return Fail(result.Error);
 
-        var response = ResponseCommand.FromBytes(result.Unwrap());
-        if (!response.IsSuccess)
-            return response;
+        ResponseCommand response = messageType.ParseCommand(this, result.Value);
 
-        if (!response.Value.status.IsSuccess())
-        {
-            return Fail(new Error.SwError(response.Value.status));
-        }
-
-        return response;
+        return TResult.Success(response);
     }
 
     private byte[] CalculateCMAC(byte[] data)
@@ -300,15 +374,14 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     }
 
-    private byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte lc = 0x00)
+    internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte lc = 0x00)
     {
         if ((ins % 2) != 0)
             throw new NotImplementedException("Ins for Odd, is not implemented");
 
-        byte[] iv = GetIV();
 
         byte[] lePacket = AlignData16([0x97, 1, 0x00]);
-        byte[] encryptedData = encryptDataFormatENC(data, iv);
+        byte[] encryptedData = EncryptDataFormatENC(data, iv);
 
         //* 0x00 0x00, for extended length type
         byte lengthType = 0x00;
@@ -323,7 +396,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     }
 
-    private byte[] encryptDataFormatENC(byte[] decryptedData, byte[] iv)
+    private byte[] EncryptDataFormatENC(byte[] decryptedData, byte[] iv)
     {
         using var aes = System.Security.Cryptography.Aes.Create();
 
@@ -354,7 +427,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     //     The Send Sequence Counter is set to its new start value, see Section 9.8.6.3 for 3DES and Section
     // 9.8.7.3 for AES.
 
-    private byte[] decryptDataENC(byte[] encryptedData, byte[] iv)
+    private byte[] DecryptDataENC(byte[] encryptedData, byte[] iv)
     {
 
 
@@ -384,7 +457,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     }
 
     //! only allowed to call once per command
-    private byte[] GetIV()
+    internal byte[] GetIV()
     {
 
         sequenceCounter += 1;
