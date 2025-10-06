@@ -57,4 +57,7 @@ If CardSecurity is missing, it should fallback to using BAC instead of PACE
 -The nonce s SHALL be encrypted in CBC mode according to [ISO/IEC 10116] using the key Kπ =
 KDFπ(π) derived from the password π and IV set to the all-0 string
 
-- 
+# OTHER
+
+They exchange and verify the authentication token TIFD = MAC(KSMAC,PKDH,IC) and
+TIC = MAC(KSMAC,PKDH,IFD) as described in Section 4.4.3.4

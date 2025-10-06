@@ -7,10 +7,12 @@ using System.Formats.Asn1;
 using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Parameters;
+using Org.BouncyCastle.Asn1;
 
 namespace Command;
 
 using TResult = Result<ResponseCommand>;
+using TResultBool = Result<bool>;
 
 
 // TODO, add a command that keeps asking for more bytes if we get error SW that all the bytes has not been sent yet
@@ -157,13 +159,64 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         return result;
     }
-    public static byte[] TestGeneralInput(byte[] icPubKey, byte[] oid, byte[] macKey)
+
+    public void SetEncryption(byte[] enc, byte[] mac)
+    {
+        this.enc = enc;
+        this.mac = mac;
+    }
+
+    public async Task<TResultBool> GeneralAuthenticateMutual(byte[] icPubKey, byte[] terminalKey, byte[] oid, byte[] macKey)
     {
         byte[] innerSequence = [0x06, (byte)oid.Length, .. oid];
         byte[] innerSequence2 = [0x86, (byte)icPubKey.Length, .. icPubKey];
 
         byte[] innerPacket = [0x7f, 0x49, (byte)(innerSequence.Length + innerSequence2.Length), .. innerSequence, .. innerSequence2];
 
+        var token = CalculateAuthToken(innerPacket);
+
+        byte[] tokenHeader = [0x85, (byte)token.Length, .. token];
+
+        byte[] cmd = [0x7C, (byte)tokenHeader.Length, .. tokenHeader];
+        byte[] cmdFormat = FormatCommand(0x00, 0x86, 0x00, 0x00, data: cmd, le: 0x00);
+
+        Log.Info("Send: " + BitConverter.ToString(cmdFormat));
+
+        var result = await SendPackageDecodeResponse(cmdFormat);
+
+
+        string Hex(byte[] data) => BitConverter.ToString(data).Replace("-", " ");
+        //  Log.Info("Oid: " + Hex(innerSequence));
+        // Log.Info("IcPubKey: " + Hex(innerSequence2));
+
+        if (result.IsSuccess)
+            if (result.Value.data.Length == 0)
+                return Result<bool>.Fail(new Error.Other("General Authentication not sending the encrypted nounce!"));
+
+
+        byte[] innerSequenceIC = [0x06, (byte)oid.Length, .. oid];
+        byte[] innerSequence2IC = [0x86, (byte)terminalKey.Length, .. terminalKey];
+
+        byte[] innerPacketIC = [0x7f, 0x49, (byte)(innerSequenceIC.Length + innerSequence2IC.Length), .. innerSequenceIC, .. innerSequence2IC];
+
+
+        using (var stream = new Asn1InputStream(result.Value.data))
+        {
+
+            Asn1Object obj = stream.ReadObject();  // top-level object
+            var chipToken = obj.GetDerEncoded()[4..]; // ic publickey
+            bool valid = CMacCheck(chipToken, innerPacketIC);
+            return Result<bool>.Success(valid);
+        }
+
+    }
+
+    public static byte[] TestGeneralInput(byte[] icPubKey, byte[] oid, byte[] macKey)
+    {
+        byte[] innerSequence = [0x06, (byte)oid.Length, .. oid];
+        byte[] innerSequence2 = [0x86, (byte)icPubKey.Length, .. icPubKey];
+
+        byte[] innerPacket = [0x7f, 0x49, (byte)(innerSequence.Length + innerSequence2.Length), .. innerSequence, .. innerSequence2];
 
         return innerPacket;
     }
@@ -187,41 +240,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] cmdFormat = FormatCommand(0x00, 0x86, 0x00, 0x00, data: cmd, le: 0x00);
 
         return cmdFormat;
-    }
-    public async Task<TResult> GeneralAuthenticateMutual(byte[] icPubKey, byte[] oid, byte[] macKey)
-    {
-        byte[] innerSequence = [0x06, (byte)oid.Length, .. oid];
-        byte[] innerSequence2 = [0x86, (byte)icPubKey.Length, .. icPubKey];
-
-        byte[] innerPacket = [0x7f, 0x49, (byte)(innerSequence.Length + innerSequence2.Length), .. innerSequence, .. innerSequence2];
-
-
-        var engine = new CMac(new AesEngine(), 64);
-        var token = new byte[8];
-        engine.Init(new KeyParameter(macKey));
-        engine.BlockUpdate(innerPacket, 0, innerPacket.Length);
-        engine.DoFinal(token);
-
-        byte[] tokenHeader = [0x85, (byte)token.Length, .. token];
-
-        byte[] cmd = [0x7C, (byte)tokenHeader.Length, .. tokenHeader];
-        byte[] cmdFormat = FormatCommand(0x00, 0x86, 0x00, 0x00, data: cmd, le: 0x00);
-
-        Log.Info("Send: " + BitConverter.ToString(cmdFormat));
-
-        var result = await SendPackageDecodeResponse(cmdFormat);
-
-
-        string Hex(byte[] data) => BitConverter.ToString(data).Replace("-", " ");
-        //  Log.Info("Oid: " + Hex(innerSequence));
-        // Log.Info("IcPubKey: " + Hex(innerSequence2));
-
-        if (result.IsSuccess)
-            if (result.Value.data.Length == 0)
-                return TResult.Fail(new Error.Other("General Authentication not sending the encrypted nounce!"));
-
-
-        return result;
     }
     private static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, byte? le = null)
     {
@@ -254,6 +272,31 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return response;
     }
 
+    private byte[] CalculateAuthToken(byte[] data)
+    {
+        var engine = new CMac(new AesEngine(), 64);
+        var calculatedToken = new byte[8];
+        engine.Reset();
+        engine.Init(new KeyParameter(mac));
+        engine.BlockUpdate(data, 0, data.Length);
+        engine.DoFinal(calculatedToken);
+
+        return calculatedToken;
+    }
+
+    private bool CMacCheck(byte[] chipToken, byte[] data)
+    {
+        var engine = new CMac(new AesEngine(), 64);
+        var calculatedToken = new byte[8];
+        engine.Reset();
+        engine.Init(new KeyParameter(mac));
+        engine.BlockUpdate(data, 0, data.Length);
+        engine.DoFinal(calculatedToken);
+
+        return chipToken.SequenceEqual(calculatedToken);
+
+    }
+
 
 
 
@@ -262,6 +305,9 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private AppID? _appSelected;
     private readonly ICommunicator _communicator = communicator;
     private readonly T _serverFormat = encryption;
+
+    private byte[] enc;
+    private byte[] mac;
 }
 
 
