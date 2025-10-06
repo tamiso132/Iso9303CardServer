@@ -12,6 +12,10 @@ using Org.BouncyCastle.Cms;
 using Org.BouncyCastle.Utilities.Collections;
 using Org.BouncyCastle.X509.Store;
 using Org.BouncyCastle.X509;
+using System.Linq.Expressions;
+using Org.BouncyCastle.Security;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
+
 
 
 // Trivialt test, får antagligen modda lite/ ändra implementeringar
@@ -78,19 +82,47 @@ namespace EPassAuth
                 c.Subject.Contains(issuingCountry, StringComparison.OrdinalIgnoreCase));
         }
 
-        public static X509Certificate2 ExtractDscFromSod(byte[] efSodBytes)
+
+public static X509Certificate2 ExtractDscFromSod(byte[] efSodBytes)
+{
+    try
+    {
+        // Läs in CMS-data
+        var cms = new CmsSignedData(efSodBytes);
+
+        // Hämta certifikatstore
+        var store = cms.GetCertificates();
+
+        // Skapa en selector som matchar alla certifikat
+        var selector = new X509CertStoreSelector();
+        var bcCerts = store.EnumerateMatches(selector); // Nu returneras en ICollection
+
+        foreach (var obj in bcCerts)
         {
-            var cms = new CmsSignedData(efSodBytes);
-            var certStore = cms.GetCertificates();
-            var certs = certStore.Equals(null);
-            
-             
-            foreach (X509Certificate2 cert in certs)
+            var bcCert = obj as X509Certificate;
+            if (bcCert != null)
             {
-                return new X509Certificate2(certStore.Equals());
+                var rawData = bcCert.GetEncoded();
+                var dscCert = new X509Certificate2(rawData);
+
+                Log.Info("[INFO] Extraherat DSC-certifikat från EF.SOD");
+                Log.Info($" Subject: {dscCert.Subject}");
+                Log.Info($" Issuer : {dscCert.Issuer}");
+                return dscCert;
             }
-            return null;
         }
+
+        Log.Info("ERROR: Kunde inte hitta DSC i EF.SOD");
+        return null;
+    }
+    catch (Exception ex)
+    {
+        Log.Info("ERROR: Misslyckades med att extrahera DSC: " + ex.Message);
+        return null;
+    }
+}
+
+
 
         public static bool VerifyCertChain(X509Certificate2 dsc, X509Certificate2 csca)
         {
@@ -114,19 +146,21 @@ namespace EPassAuth
             var cms = new CmsSignedData(efSodBytes);
             var signerInfos = cms.GetSignerInfos();
             var signers = signerInfos.GetSigners();
+            var parser = new X509CertificateParser();
+            var bcCert = parser.ReadCertificate(dscCert.RawData);
+
 
             foreach (SignerInformation signer in signers)
             {
-                var verifier = new JcaSimpleSignerInfoVerifierBuilder().Build(dscCert);
-                if (signer.Verify(verifier))
+                var pubKey = bcCert.GetPublicKey();
+                if (signer.Verify(pubKey))
                 {
-                    Log.Info("EF.SOD signature is valid");
-                    
+                    Log.Info("EF.SOD info valid :)");
                     return true;
                 }
-
             }
-            Log.Info("EF.SOD signature not valid :(");
+
+            Log.Info("EF.SOD info not vaid :(");
             return false;
         }
 
