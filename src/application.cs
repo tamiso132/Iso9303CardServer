@@ -136,17 +136,20 @@ public class ClientSession(ICommunicator comm)
 
             byte[] macKey = tuple.Item1;
             byte[] encKey = tuple.Item2;
+            _cmd.SetEncryption(encKey, macKey);
 
-            result = await _cmd.GeneralAuthenticateMutual(icPublicKey[0..], info.OrgOid, macKey);
-
-
-
+            var authResult = await _cmd.GeneralAuthenticateMutual(icPublicKey[0..], ecdh.PublicKey, info.OrgOid, macKey);
 
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
+
+            bool isAuth = authResult.Value;
+
+            if (!isAuth)
+                Log.Info("AuthenticationToken was not correctly calculated");
 
             Log.Info("All commands completed without a problem");
             Log.Info("Secure Messaging Established using: PACE, Session started.");
