@@ -8,6 +8,9 @@ using Parser;
 using System.Security.Cryptography.X509Certificates;
 using static Parser.TLVParser;
 using Microsoft.VisualBasic;
+using Org.BouncyCastle.Cms;
+using Org.BouncyCastle.X509;
+using Org.BouncyCastle.Security;
 
 namespace CertificateTools;
 
@@ -49,65 +52,4 @@ public static class CertificateFinder
 
 
 
-// public class CertificateFinder
-// {
-//     private readonly string _certFolder;
 
-//     public CertificateFinder(string certFolder)
-//     {
-//         _certFolder = certFolder;
-//     }
-
-//     public X509Certificate2? FindByDG12(DG12 dg12Info)
-//     {
-//         string issuingCountry = dg12Info.issuingCountry;
-//         string issuingAuthority = dg12Info.issuingAuthority;
-
-//         foreach (var certFile in Directory.GetFiles(_certFolder, "*.pem"))
-//         {
-//             var pem = File.ReadAllText(certFile);
-//             var cert = PemToX509(pem);
-
-//             if (cert == null) continue;
-
-//             if (cert.Issuer.Contains(issuingCountry, StringComparison.OrdinalIgnoreCase) ||
-//                cert.Issuer.Contains(issuingAuthority, StringComparison.OrdinalIgnoreCase))
-//             {
-//                 return cert;
-//             }
-
-//         }
-
-//         return null;
-//     }
-
-//     private X509Certificate2? PemToX509(string pemString)
-//     {
-//         try
-//         {
-//             var header = "-----BEGIN CERTIFICATE-----";
-//             var footer = "-----END CERTIFICATE-----";
-
-//             int start = pemString.IndexOf(header, StringComparison.Ordinal);
-//             int end = pemString.IndexOf(footer, StringComparison.Ordinal);
-
-//             if (start < 0 || end < 0)
-//                 throw new Exception("PEM Format error: missing header or fotter");
-
-//             string base64 = pemString.Substring(start + header.Length, end - (start + header.Length));
-
-//             base64 = base64.Replace("\r", "").Replace("\n", "").Trim();
-
-//             byte[] rawData = Convert.FromBase64String(base64);
-//             return new X509Certificate2(rawData);
-
-
-//         }
-//         catch (Exception ex)
-//         {
-//             Log.Info("PEM parse error" + ex.Message);
-//             return null;
-//         }
-
-//     }
-// }
