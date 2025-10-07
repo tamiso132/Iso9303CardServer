@@ -1,4 +1,5 @@
 using System.Formats.Asn1;
+using System.Numerics;
 using System.Runtime.Intrinsics.Arm;
 using System.Security.Cryptography;
 using System.Text;
@@ -13,7 +14,7 @@ using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Crypto.Paddings;
 using Org.BouncyCastle.Crypto.Parameters;
-using Org.BouncyCastle.Math;
+using Org.BouncyCastle.Security;
 
 
 namespace Encryption;
@@ -78,6 +79,78 @@ public class TestClass
             Console.Write($"{cVal:X2} ");
         }
         Console.WriteLine();
+    }
+
+    static void TestEncryptionMessage()
+    {
+        byte[] KSEnc = new byte[]
+              {
+            0x97, 0x9E, 0xC1, 0x3B, 0x1C, 0xBF, 0xE9, 0xDC,
+            0xD0, 0x1A, 0xB0, 0xFE, 0xD3, 0x07, 0xEA, 0xE5
+              };
+
+        byte[] KSMAC = new byte[]
+        {
+            0xF1, 0xCB, 0x1F, 0x1F, 0xB5, 0xAD, 0xF2, 0x08,
+            0x80, 0x6B, 0x89, 0xDC, 0x57, 0x9D, 0xC1, 0xF8
+        };
+
+        // SSC as BigInteger (big-endian)
+        byte[] sscBytes = new byte[]
+        {
+            0x88, 0x70, 0x22, 0x12, 0x0C, 0x06, 0xC2, 0x26
+        };
+
+        byte[] EncryptedDataTest = new byte[]
+        {
+            0x63, 0x75, 0x43, 0x29, 0x08, 0xC0, 0x44, 0xF6
+        };
+
+        byte[] PaddedDataTest = new byte[]
+        {
+            0x01, 0x1E, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00
+        };
+
+        byte[] UnEncrypteddata = [0x01, 0x1E];
+        byte[] cmdHeader = [0x0C, 0xA4, 0x02, 0x0C];
+        BigInteger SSC = new BigInteger(sscBytes.ToArray(), true);
+
+
+        var paddedData = Util.AlignData(UnEncrypteddata, 16);
+
+        if (!IsEqual(paddedData, PaddedDataTest))
+        {
+            PrintByteComparison(PaddedDataTest, paddedData);
+            return;
+        }
+
+
+
+
+
+        SSC += 1;
+        var cipher = CipherUtilities.GetCipher($"AES/CBC/NOPADDING");
+        var iv1 = new byte[16];
+        var ivParameter = new ParametersWithIV(new KeyParameter(KSEnc), iv1);
+        cipher.Init(true, ivParameter);
+
+        var paddedSSCBA = SSC.ToPaddedLength(16);
+        var iv2 = cipher.DoFinal(paddedSSCBA);
+
+
+        var ivParameter2 = new ParametersWithIV(new KeyParameter(KSEnc), iv2);
+        cipher.Init(true, ivParameter2);
+        var calculatedEncryptedData = cipher.DoFinal(paddedData);
+
+        if (!IsEqual(EncryptedDataTest, calculatedEncryptedData))
+        {
+            PrintByteComparison(EncryptedDataTest, calculatedEncryptedData);
+            return;
+        }
+
+
+
+
     }
 
     static bool TestingECDH()
@@ -330,6 +403,8 @@ public class TestClass
 
         if (!TestingECDH())
             return false;
+
+        TestEncryptionMessage();
 
         byte[] mrz =
         [
@@ -848,7 +923,7 @@ public sealed record ECDH
 
     public ECDH(DomainParameter param, byte[] privateKey, byte[]? generator = null)
     {
-        PrivateKey = new BigInteger(1, privateKey);
+        PrivateKey = new Org.BouncyCastle.Math.BigInteger(1, privateKey);
         this.param = param;
         _secret = this.param.param.G;
         if (generator == null)
@@ -862,7 +937,7 @@ public sealed record ECDH
     public void MapGenerator(byte[] nonce)
     {
         Log.Info("Calculate new generator, using the nounce, current generator and secret");
-        var iNonce = new BigInteger(1, nonce);
+        var iNonce = new Org.BouncyCastle.Math.BigInteger(1, nonce);
         _generator = _generator.Multiply(iNonce).Add(_secret).Normalize();
 
     }
@@ -877,7 +952,7 @@ public sealed record ECDH
     // Update Private key
     public void GenerateEphemeralKeys(RandomNumberProvider RandomNumberProvider)
     {
-        PrivateKey = new BigInteger(1, RandomNumberProvider.GetNextBytes(32));
+        PrivateKey = new Org.BouncyCastle.Math.BigInteger(1, RandomNumberProvider.GetNextBytes(32));
     }
 
     public byte[] PublicKey
@@ -900,7 +975,7 @@ public sealed record ECDH
     public Org.BouncyCastle.Math.EC.ECPoint _generator;
     public Org.BouncyCastle.Math.EC.ECPoint _secret;
 
-    BigInteger PrivateKey;
+    Org.BouncyCastle.Math.BigInteger PrivateKey;
 }
 
 

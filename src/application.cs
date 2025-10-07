@@ -33,13 +33,12 @@ public class ClientSession(ICommunicator comm)
         {
             var result = await _cmd.SelectDefaultMF(MessageType.NonSecureMessage);
 
-
-
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
+
 
             result = await _cmd.ReadBinary(MessageType.NonSecureMessage, EfIdGlobal.CardAccess);
 
@@ -50,15 +49,16 @@ public class ClientSession(ICommunicator comm)
             }
 
 
+
             var response = result.Value;
+
+
+
+
             var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
             info.PrintInfo();
 
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
+
 
             byte[] key = TestClass.DerivePaceKey(info);
 
@@ -72,6 +72,7 @@ public class ClientSession(ICommunicator comm)
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
+
 
 
             var r = await TestClass.ComputeDecryptedNounce(_cmd, info, key, TestClass.PasswordType.MRZ);
@@ -151,21 +152,23 @@ public class ClientSession(ICommunicator comm)
             if (!isAuth)
                 Log.Info("AuthenticationToken was not correctly calculated");
 
-            Log.Info("All commands completed without a problem");
             Log.Info("Secure Messaging Established using: PACE, Session started.");
-            await _cmd.SelectApplication(MessageType.NonSecureMessage, AppID.IdLDS1);
+            await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Com);
 
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
-            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
+
+            Log.Info("All commands completed without a problem");
+
+            // result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
+            // if (!result.IsSuccess)
+            // {
+            //     Log.Error(result.Error.ErrorMessage());
+            //     return;
+            // }
         }
 
         // await ReadFileWithSM(sm, EfIdGlobal.SOD);
@@ -177,7 +180,7 @@ public class ClientSession(ICommunicator comm)
     // Extract list of data group hashes and what algorithm is used
     // Find the SignerInfo and/or DSC
 
-    
+
     // private async Task ReadFileWithSM(SecureMessaging sm, ushort fileID)
     // {
     //     byte[] fileBytes = [(byte)(fileID >> 8), (byte)(fileID & 0xFF)];

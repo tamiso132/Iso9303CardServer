@@ -44,10 +44,10 @@ namespace EPassAuth
             if (cscaCert == null)
                 throw new Exception("Ingen CSCA hittades för landet " + issuingCountry);
 
-                Log.Info($"[INFO] Hittade CSCA-certifikat för {issuingCountry}:");
-                Log.Info($" Subject: {cscaCert.Subject}");
-                Log.Info($" Issuer : {cscaCert.Issuer}");
-                Log.Info($" FriendlyName: {cscaCert.FriendlyName}");
+            Log.Info($"[INFO] Hittade CSCA-certifikat för {issuingCountry}:");
+            Log.Info($" Subject: {cscaCert.Subject}");
+            Log.Info($" Issuer : {cscaCert.Issuer}");
+            Log.Info($" FriendlyName: {cscaCert.FriendlyName}");
 
             // 2. Extrahera DSC från EF.SOD (ASN.1 parsing krävs här – stub)
             var dscCert = ExtractDscFromSod(efSodBytes);
@@ -83,44 +83,44 @@ namespace EPassAuth
         }
 
 
-public static X509Certificate2 ExtractDscFromSod(byte[] efSodBytes)
-{
-    try
-    {
-        // Läs in CMS-data
-        var cms = new CmsSignedData(efSodBytes);
-
-        // Hämta certifikatstore
-        var store = cms.GetCertificates();
-
-        // Skapa en selector som matchar alla certifikat
-        var selector = new X509CertStoreSelector();
-        var bcCerts = store.EnumerateMatches(selector); // Nu returneras en ICollection
-
-        foreach (var obj in bcCerts)
+        public static X509Certificate2 ExtractDscFromSod(byte[] efSodBytes)
         {
-            var bcCert = obj as X509Certificate;
-            if (bcCert != null)
+            try
             {
-                var rawData = bcCert.GetEncoded();
-                var dscCert = new X509Certificate2(rawData);
+                // Läs in CMS-data
+                var cms = new CmsSignedData(efSodBytes);
 
-                Log.Info("[INFO] Extraherat DSC-certifikat från EF.SOD");
-                Log.Info($" Subject: {dscCert.Subject}");
-                Log.Info($" Issuer : {dscCert.Issuer}");
-                return dscCert;
+                // Hämta certifikatstore
+                var store = cms.GetCertificates();
+
+                // Skapa en selector som matchar alla certifikat
+                var selector = new X509CertStoreSelector();
+                var bcCerts = store.EnumerateMatches(selector); // Nu returneras en ICollection
+
+                // foreach (var obj in bcCerts)
+                // {
+                //     var bcCert = obj as X509Certificate;
+                //     if (bcCert != null)
+                //     {
+                //         var rawData = bcCert.GetEncoded();
+                //         var dscCert = new X509Certificate2(rawData);
+
+                //         Log.Info("[INFO] Extraherat DSC-certifikat från EF.SOD");
+                //         Log.Info($" Subject: {dscCert.Subject}");
+                //         Log.Info($" Issuer : {dscCert.Issuer}");
+                //         return dscCert;
+                //     }
+                // }
+
+                Log.Info("ERROR: Kunde inte hitta DSC i EF.SOD");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Log.Info("ERROR: Misslyckades med att extrahera DSC: " + ex.Message);
+                return null;
             }
         }
-
-        Log.Info("ERROR: Kunde inte hitta DSC i EF.SOD");
-        return null;
-    }
-    catch (Exception ex)
-    {
-        Log.Info("ERROR: Misslyckades med att extrahera DSC: " + ex.Message);
-        return null;
-    }
-}
 
 
 
