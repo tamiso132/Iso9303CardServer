@@ -85,7 +85,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         }
         else
         {
-         //   await SelectApplication(type, app);
+            await SelectApplication(type, app);
             _appSelected = app;
             return await ReadBinaryFullID(type, efID, offset, le);
         }
@@ -505,7 +505,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
             }
         }
 
-        throw new Exception("FUCK");
+        throw new Exception("womp womp no kebab for you :/");
 
     }
 
