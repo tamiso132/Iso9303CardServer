@@ -11,13 +11,33 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Type;
 namespace Helper;
 
+
+
 public static class MrzUtils
 {
+
+    internal class PassportData
+    {
+        public string document_number { get; set; }
+        public string birth_date { get; set; }
+        public string expiry_date { get; set; }
+    }
     public static byte[] GetMrz(string docNr, string birth, string dateExpire)
     {
+        if (File.Exists("mrz.json"))
+        {
+            string json = File.ReadAllText("mrz.json");
+
+            PassportData data = JsonSerializer.Deserialize<PassportData>(json)!;
+            docNr = data.document_number;
+            birth = data.birth_date;
+            dateExpire = data.expiry_date;
+        }
+
         while (docNr.Length < 9)
             docNr += "<";
 

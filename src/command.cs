@@ -85,8 +85,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
         }
         else
         {
-            //  await SelectApplication(type, app);
-            //   _appSelected = app;
+         //   await SelectApplication(type, app);
+            _appSelected = app;
             return await ReadBinaryFullID(type, efID, offset, le);
         }
     }
