@@ -437,5 +437,4 @@ public static class TLVParser
 
 
 
-// DG13 Ytterligare dokumentdetaljer ex dokumentnummer, typ av dokument, utfärdande plats
-// Kan vara onödig
+// DG13 Ytterligare dokumentdetaljer ex dokumentnummer, typ av dokument, utfärdande plats. Detta kan vara överflödigt men om tid finns över kan detta implementeras

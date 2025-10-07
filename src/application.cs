@@ -247,7 +247,7 @@ public class ClientSession(ICommunicator comm)
 
 // TODO Implement Secure messaging
 // Add SSC, Wrapper, unwrapper
-// Read EF.SOD with -- Complete ?? --
+
 
 public class ServerEncryption : IServerFormat
 {
