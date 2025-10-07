@@ -7,6 +7,7 @@ using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -244,5 +245,27 @@ public class ParameterUtil
             _ => throw new NotImplementedException("Parameter ID not implemented"),
         };
 
+    }
+}
+
+public static class Util
+{
+    public static byte[] AlignData(byte[] input, int aligment)
+    {
+        var diffLen = aligment - ((input.Length + 1) % aligment);
+        byte padTag = 0x80;
+        byte[] padding = [padTag, .. new byte[diffLen]];
+        return [.. input, .. padding];
+    }
+}
+
+public static class BIgIntegerExtension
+{
+    public static byte[] ToPaddedLength(this BigInteger value, int length)
+    {
+
+        var sscBA = value.ToByteArray(isUnsigned: true);
+        var remainder = length - sscBA.Length;
+        return new byte[remainder].Concat(sscBA).ToArray();
     }
 }

@@ -74,6 +74,13 @@ public abstract record Error(ErrorSeverity Severity)
         public override string ErrorMessage() => Message;
     }
 
+
+    public sealed record AuthenticationToken(string Message, ErrorSeverity Severity = ErrorSeverity.Recoverable)
+        : Error(Severity)
+    {
+        public override string ErrorMessage() => Message;
+    }
+
     public sealed record Other(string Message, ErrorSeverity Severity = ErrorSeverity.Fatal)
        : Error(Severity)
     {

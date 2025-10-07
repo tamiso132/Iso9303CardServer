@@ -12,6 +12,7 @@ using System.Security.Cryptography;
 using System.Diagnostics;
 using System.Text;
 using System.Numerics;
+using Org.BouncyCastle.Security;
 
 namespace Command;
 
@@ -21,7 +22,7 @@ using TResultBool = Result<bool>;
 public abstract record MessageType
 {
 
-    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data) where T : IServerFormat;
+    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte? le = null) where T : IServerFormat;
     public abstract ResponseCommand ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
 
     public static Secure SecureMessage => new();
@@ -29,7 +30,7 @@ public abstract record MessageType
     public sealed record Secure : MessageType
     {
         internal Secure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte? le = null)
         {
             iv = command.GetIV();
             return command.FormatEncryptedCommand(data, ins, p1, p2, iv);
@@ -47,9 +48,9 @@ public abstract record MessageType
     public sealed record NonSecure : MessageType
     {
         internal NonSecure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte? le = null)
         {
-            return Command<T>.FormatCommand(0x00, ins, p1, p2, data, 0x00);
+            return Command<T>.FormatCommand(0x00, ins, p1, p2, data, le: le);
         }
 
         public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
@@ -126,18 +127,18 @@ public class Command<T>(ICommunicator communicator, T encryption)
         var selectResult = await ElementFileSelect(type, efID);
         if (!selectResult.IsSuccess)
         {
-            Console.WriteLine("Element File Select Error");
+            Log.Info("Element File Select Error: " + efID.GetName());
             return selectResult;
         }
 
         Log.Info("Reading EF File: " + efID.GetName());
-        byte[] cmd = type.FormatCommand(this, 0xB0, 0x00, 0x00, []);
+        byte[] cmd = type.FormatCommand(this, 0xB0, 0x00, 0x00, [], le: 0x00);
         return await SendPackageDecodeResponse(type, cmd);
     }
 
-    public async Task<TResult> ReadBinaryShort(MessageType type, IEfID efID, byte offset, byte le)
+    public async Task<TResult> ReadBinaryShort(MessageType type, IEfID efID, byte offset)
     {
-        byte[] cmd = type.FormatCommand(this, 0xB0, efID.ShortID, offset, []);
+        byte[] cmd = type.FormatCommand(this, 0xB0, efID.ShortID, offset, [], le: 0x00);
         return await SendPackageDecodeResponse(type, cmd);
     }
 
@@ -174,7 +175,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         //        byte[] raw = [0x10, 0x86, 0x00, 0x00, 0x02, 0x7C, 0x00, 0x00];
 
-        byte[] cmdFormat = typee.FormatCommand(this, 0x86, 0x00, 0x00, data: writer.Encode()[1..]);
+        byte[] cmdFormat = typee.FormatCommand(this, 0x86, 0x00, 0x00, data: writer.Encode()[1..], le: 0x00);
         cmdFormat[0] = cla;
 
 
@@ -199,7 +200,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
 
-        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data);
+        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x00);
         cmdFormat[0] = 0x10;
 
 
@@ -234,16 +235,13 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] tokenHeader = [0x85, (byte)token.Length, .. token];
 
         byte[] cmd = [0x7C, (byte)tokenHeader.Length, .. tokenHeader];
-        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data: cmd);
+        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data: cmd, le: 0x00);
 
         Log.Info("Send: " + BitConverter.ToString(cmdFormat));
 
         var result = await SendPackageDecodeResponse(type, cmdFormat);
 
 
-        string Hex(byte[] data) => BitConverter.ToString(data).Replace("-", " ");
-        //  Log.Info("Oid: " + Hex(innerSequence));
-        // Log.Info("IcPubKey: " + Hex(innerSequence2));
 
         if (result.IsSuccess)
             if (result.Value.data.Length == 0)
@@ -261,11 +259,18 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
             Asn1Object obj = stream.ReadObject();  // top-level object
             var chipToken = obj.GetDerEncoded()[4..]; // ic publickey
-            bool valid = CMacCheck(chipToken, innerPacketIC);
-            return Result<bool>.Success(valid);
+            bool valid = CMacCheck(chipToken!, innerPacketIC);
+            if (valid)
+            {
+                Log.Info("Mutual Authentication Success!");
+                return Result<bool>.Success(valid);
+            }
+            return Result<bool>.Fail(new Error.AuthenticationToken("Failed to verify authentication token"));
         }
 
     }
+
+
 
     public static byte[] TestGeneralInput(byte[] icPubKey, byte[] oid, byte[] macKey)
     {
@@ -361,7 +366,22 @@ public class Command<T>(ICommunicator communicator, T encryption)
         if (response.status.IsSuccess())
             return TResult.Success(response);
 
+        var tempStatus = response.status;
+        while (tempStatus == SwStatus.MoreDataAvailable)
+        {
+            messageType.FormatCommand(this, 0xC0, 0x00, 0x00, []);
+            var extra = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(cmd)));
+            ResponseCommand extraResp = messageType.ParseCommand(this, extra.Value);
+            byte[] bytes = extraResp.data[0..(extraResp.data.Length - 3)];
+            response.data = [.. response.data, .. bytes];
+            tempStatus = extraResp.status;
+        }
+
+        if (tempStatus.IsSuccess())
+            return TResult.Success(response);
+
         return TResult.Fail(new Error.SwError(response.status));
+
     }
 
     private byte[] CalculateCMAC(byte[] data)
@@ -379,7 +399,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
     {
         var engine = new CMac(new AesEngine(), 64);
         var calculatedToken = new byte[8];
-        engine.Reset();
         engine.Init(new KeyParameter(mac));
         engine.BlockUpdate(data, 0, data.Length);
         engine.DoFinal(calculatedToken);
@@ -390,57 +409,57 @@ public class Command<T>(ICommunicator communicator, T encryption)
     // SID 91 part 11
     // SSC -> HEADER  -> PADDING -> DO87
     // Add padding to it then calculate MAC over it
- 
+
     internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte lc = 0x00)
     {
+
+
         if ((ins % 2) != 0)
             throw new NotImplementedException("Ins for Odd, is not implemented");
 
+        byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
 
-        byte[] lePacket = AlignData16([0x97, 0x01, 0x00]);
-        byte[] encryptedData = EncryptDataFormatENC(data, iv);
+        byte[] encryptedData = [.. EncryptDataFormatENC(data, iv)];
+        byte[] dataHeader = [0x87, (byte)(encryptedData.Length + 1), 0x01, .. encryptedData];
 
-        //* 0x00 0x00, for extended length type
-        byte lengthType = 0x00;
+        byte[] seqCounterHeader = sequenceCounter.ToPaddedLength(16);
 
-        byte[] packet = [0x0C, ins, p1, p2, 0x87, (byte)(encryptedData.Length + 1), 0x01, .. encryptedData, .. lePacket, lengthType];
 
-        byte[] cmacToken = CalculateCMAC(packet);
+        Log.Info("CmdHeader: " + BitConverter.ToString(cmdHeader));
+        Log.Info("SeqCounterHeader: " + BitConverter.ToString(seqCounterHeader));
+        Log.Info("DataHeader: " + BitConverter.ToString(dataHeader));
+        Log.Info("IV: " + BitConverter.ToString(iv));
 
-        byte[] packetFormat = [.. packet, 0x8e, (byte)cmacToken.Length, .. cmacToken];
+        byte[] N = Util.AlignData([.. seqCounterHeader, .. cmdHeader, .. dataHeader], 16);
+        Log.Info("N: " + BitConverter.ToString(N));
+        byte[] token = CalculateCMAC(N);
+        byte[] macHeader = [0x8E, 0x08, .. token];
 
-        return packetFormat;
+        byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length), .. dataHeader, .. macHeader];
 
+
+
+
+        return package;
     }
 
     private byte[] EncryptDataFormatENC(byte[] decryptedData, byte[] iv)
     {
-        using var aes = System.Security.Cryptography.Aes.Create();
+        var aligned = Util.AlignData(decryptedData, 16);
+        Debug.Assert(aligned.Length % 16 == 0);
 
+        Log.Info("UnencryptedData: " + BitConverter.ToString(decryptedData));
+        Log.Info("UnencryptedPaddedData: " + BitConverter.ToString(aligned));
 
-        var aligned = AlignData16(decryptedData);
+        var cipher = CipherUtilities.GetCipher($"AES/CBC/NOPADDING");
+        var ivParameter = new ParametersWithIV(new KeyParameter(encKey), iv);
+        cipher.Init(true, ivParameter);
+        return cipher.DoFinal(aligned);
 
-        byte[] dataFormat = [.. aligned];
-
-        // Check so it is aligned by 16
-        Debug.Assert(dataFormat.Length % 16 == 0);
-
-
-        aes.KeySize = 256;
-        aes.BlockSize = 128;
-        aes.Mode = System.Security.Cryptography.CipherMode.CBC;
-        aes.Key = encKey!;
-        aes.IV = iv;
-
-
-        var encryptor = aes.CreateEncryptor();
-        byte[] encryptedData = encryptor.TransformFinalBlock(dataFormat, 0, dataFormat.Length);
-
-        // !0x01 says in documentation but wierd af, dunno if correct
-        return [.. encryptedData];
     }
 
     // sid 72, part 11 för secure messaging
+    //sid 91
     //     The Send Sequence Counter is set to its new start value, see Section 9.8.6.3 for 3DES and Section
     // 9.8.7.3 for AES.
 
@@ -473,35 +492,21 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     }
 
+
+
     //! only allowed to call once per command
     internal byte[] GetIV()
     {
 
         sequenceCounter += 1;
-        using var aes = System.Security.Cryptography.Aes.Create();
+        var cipher = CipherUtilities.GetCipher($"AES/CBC/NOPADDING");
+        var iv = new byte[16];
+        var ivParameter = new ParametersWithIV(new KeyParameter(encKey), iv);
+        cipher.Init(true, ivParameter);
 
-        aes.KeySize = 256;
-        aes.BlockSize = 128;
-        aes.Mode = System.Security.Cryptography.CipherMode.ECB;
-        aes.Key = encKey!;
-        aes.Mode = CipherMode.ECB;
-
-        byte[] msbCounter = [.. sequenceCounter.ToByteArray().Reverse()];
-        byte[] alignedData = AlignData16(msbCounter);
-
-        return aes.EncryptEcb([.. alignedData], PaddingMode.None);
+        var paddedSSCBA = sequenceCounter.ToPaddedLength(16);
+        return cipher.DoFinal(paddedSSCBA);
     }
-
-    private byte[] AlignData16(byte[] input)
-    {
-        var diffLen = 16 - ((input.Length + 1) % 16);
-        byte padTag = 0x80;
-        byte[] padding = [padTag, .. new byte[diffLen]];
-        return [.. input, .. padding];
-    }
-
-
-
 
     private static TResult Success(ResponseCommand cmd) => TResult.Success(cmd);
     private static TResult Fail(Error e) => TResult.Fail(e);
@@ -514,6 +519,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     private BigInteger sequenceCounter = 0;
 }
+
+
 
 
 
@@ -563,6 +570,10 @@ public abstract record GenAuthType
 
         private byte[] _authToken = authToken;
     }
+    // LITTLE ENDIAN
+
 }
+
+
 
 
