@@ -59,6 +59,9 @@ namespace EPassAuth
 
             Log.Info("[INFO] Extraherat DSC från EF.SOD");
 
+            // Parsar EF.SOD till EFSodInfo
+            var sodInfo = Parser.EFSodInfo.ParseEFSodLdsV18(efSodBytes);
+
             // 3. Bygg kedja: DSC -> CSCA
             if (!VerifyCertChain(dscCert, cscaCert))
                 throw new Exception("DSC kunde inte verifieras mot CSCA");
@@ -72,7 +75,7 @@ namespace EPassAuth
             Log.Info("[INFO] veridierat EF.SOD signatur");
 
             // 5. Verifiera DG-hashar mot EF.SOD
-            if (!VerifyDataGroupHashes(efSodBytes, dataGroups))
+            if (!VerifyDataGroupHashes(sodInfo, dataGroups))
                 throw new Exception("Datagrupp-hashar matchar inte EF.SOD");
 
             Log.Info("[INFO] DH-hashar verifierade mot SOD");
@@ -169,7 +172,7 @@ namespace EPassAuth
         }
 
         // optional, Verify data group hashes using parser
-        private static bool VerifyDataGroupHashes(EFSodInfo sod, Dictionary<int, byte[]> dataGroups)
+        public static bool VerifyDataGroupHashes(EFSodInfo sod, Dictionary<int, byte[]> dataGroups)
         {
             using var sha256 = SHA256.Create();
 
@@ -196,43 +199,7 @@ namespace EPassAuth
             return true;
         }
 
-        public static List<X509Certificate2> LoadCscaCertsFromFolder(string folderPath)
-        {
-            var certs = new List<X509Certificate2>();
 
-            foreach (var file in Directory.GetFiles(folderPath, "*.pem"))
-            {
-                var pem = File.ReadAllText(file);
-                var cert = PemToX509(pem);
-                if (cert != null) certs.Add(cert);
-            }
-
-            return certs;
-        }
-
-        public static X509Certificate2? PemToX509(string pemString)
-        {
-            try
-            {
-                var header = "-----BEGIN CERTIFICATE-----";
-                var footer = "-----END CERTIFICATE-----";
-
-                int start = pemString.IndexOf(header, StringComparison.Ordinal);
-                int end = pemString.IndexOf(footer, StringComparison.Ordinal);
-
-                if (start < 0 || end < 0) return null;
-
-                string base64 = pemString.Substring(start + header.Length, end - (start + header.Length));
-                base64 = base64.Replace("\r", "").Replace("\n", "").Trim();
-
-                byte[] rawData = Convert.FromBase64String(base64);
-                return new X509Certificate2(rawData);
-            }
-            catch
-            {
-                return null;
-            }
-        }
     }
 }
 
