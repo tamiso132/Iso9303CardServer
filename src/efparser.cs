@@ -1,11 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Formats.Asn1;
+using System.Numerics;
+using System.Security.Cryptography;
+using System.Security.Cryptography.Pkcs;
 using System.Text;
 using Asn1;
 using Encryption;
 using Helper;
 using Interfaces;
+using Org.BouncyCastle.Asn1.Icao;
+using Org.BouncyCastle.Cms;
 using Type;
 
 namespace Parser;
@@ -125,97 +130,88 @@ public class EFSodInfo
     public string LdsVersion { get; set; } = "";
     public string UnicodeVersion { get; set; } = "";
     public string DigestAlgorithm { get; set; } = "";
-    public Dictionary<int, byte[]> DgHashes { get; } = new();
-    public byte[] Signature { get; set; } = Array.Empty<byte>();
-}
 
-public class ImplEfSod : IEfParser<EFSodInfo>
-{
-    public string Name()
+    public List<DataGroupHashEntry> DataGroupHashes { get; set; } = new();
+
+    // public Dictionary<int, byte[]> DgHashes { get; } = new();
+    // public byte[] Signature { get; set; } = Array.Empty<byte>();
+
+
+    public class DataGroupHashEntry
     {
-        return "Sod";
+        public int DataGroupNumber { get; set; } //DG1-16
+        public byte[] HashValue { get; set; } //SHA256 Hash
     }
 
-    public EFSodInfo ParseFromBytes(byte[] bytes)
+    public static EFSodInfo ParseEFSodLdsV18(byte[] bytes)
     {
         var ef = new EFSodInfo();
-        //var reader = new ByteReader(bytes);
         var reader = new AsnReader(bytes, AsnEncodingRules.DER);
-        //int tag = reader.ReadInt(1);
-        //if (tag != 0x77) throw new Exception("Not a valid EF.SOD");
+        var outerSeq = reader.ReadSequence(); // Outer sequence 
 
-        var sodSeq = reader.ReadSequence(); // Outer sequence   
-        ef.LdsVersion = sodSeq.ReadInteger().ToString(); // Version
 
-        // int length = reader.ReadLength();
-        // int versionTag = reader.ReadInt(1);
-        // int versionLength = reader.ReadLength();
-        // ef.LdsVersion = Encoding.ASCII.GetString(reader.ReadBytes(versionLength));
+        BigInteger versionInt = (int)reader.ReadInteger(); // Se version
+        if (versionInt == 0)
+            Log.Info("LDS Legacy version");
+        else if (versionInt == 1)
+            Log.Info("LDS Version 1.8 (REQUIRED FOR NEW PASSPORTS)");
+        else
+            Log.Info("UNKNOWN LDS VERSION :(");
+
+
 
         // Digest Algorithm
-        var digestSeq = sodSeq.ReadSequence();
+        var digestSeq = outerSeq.ReadSequence();
         var digestOid = digestSeq.ReadObjectIdentifier();
         ef.DigestAlgorithm = digestOid;
         if (digestSeq.HasData)
             digestSeq.ReadNull();
 
+
+
         // Sequence of sequence
-        var dgHashesSeq = sodSeq.ReadSequence();
+        var dgHashesSeq = outerSeq.ReadSequence();
         while (dgHashesSeq.HasData)
         {
-            var dgSeq = dgHashesSeq.ReadSequence();
-            int dgNumber = (int)dgSeq.ReadInteger();
-            byte[] hashValue = dgSeq.ReadOctetString();
-            ef.DgHashes[dgNumber] = hashValue;
+            var dgEntrySeq = dgHashesSeq.ReadSequence();
+            var dgNum = (int)dgEntrySeq.ReadInteger();
+            var dgHash = dgEntrySeq.ReadOctetString();
+
+            ef.DataGroupHashes.Add(new DataGroupHashEntry { DataGroupNumber = dgNum, HashValue = dgHash });
 
         }
 
-        if (sodSeq.HasData)
-        {
-            // Läs sekvensen som innehåller LDSVersionInfo
-            var ldsVersionSeq = sodSeq.ReadSequence();
-            ef.LdsVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString);    // ldsVersion
-            ef.UnicodeVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString); // unicodeVersion
-        }
+        // Läs sekvensen som innehåller LDSVersionInfo, Finns redan?
+        var ldsVersionSeq = outerSeq.ReadSequence();
+        ef.LdsVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString);    // ldsVersion
+        ef.UnicodeVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString); // unicodeVersion
 
-        ef.Signature = sodSeq.ReadOctetString();
 
-        // int digestTag = reader.ReadInt(1);
-        // int digestLength = reader.ReadLength();
-        // ef.DigestAlgorithm = Encoding.ASCII.GetString(reader.ReadBytes(digestLength));
-
-        // int dgHashTag = reader.ReadInt(1);
-        // int dgHashLength = reader.ReadLength();
-        // int dgHashEnd = reader.Offset + dgHashLength;
-
-        // while (reader.Offset < dgHashEnd)
-        // {
-        //     int dgNumber = reader.ReadInt(1);
-        //     int hashLen = reader.ReadLength();
-        //     ef.DgHashes[dgNumber] = reader.ReadBytes(hashLen);
-        // }
-
-        // int signatureTag = reader.ReadInt(1);
-        // int signatureLength = reader.ReadLength();
-        // ef.Signature = reader.ReadBytes(signatureLength);
-
-        // Utskrift
-        Console.WriteLine("LDS Version: " + ef.LdsVersion);
-        Console.WriteLine("Digest Algorithm: " + ef.DigestAlgorithm);
-
-        foreach (var kvp in ef.DgHashes)
-        {
-            Console.WriteLine($"DG{kvp.Key} Hash: {BitConverter.ToString(kvp.Value)}");
-        }
-
-        Console.WriteLine("Signature: " + BitConverter.ToString(ef.Signature));
 
         return ef;
         // throw new NotImplementedException();
 
 
     }
+
+
+
+
+
+    public static byte[] GetSignedDataFromSod(byte[] efSodBytes)
+    {
+
+        var cms = new CmsSignedData(efSodBytes);
+        var signedContent = cms.SignedContent;
+
+        if (signedContent == null)
+            Log.Info("No signed content found in EF.SOD");
+
+        return efSodBytes;
+    }
 }
+
+
 
 public class TLV
 {
@@ -392,17 +388,17 @@ public static class TLVParser
         }
     }
 
-    // DG12 Utfärdande myndighet
+    // DG12 Utfärdande myndighet VIKTIG för passiveAuthTest.cs
 
     public class Dg12Info
     {
         public string issuingAuthority { get; set; } = "";
         public string IssuingState { get; set; } = "";
         public string Endorsements { get; set; } = "";
-        public string OtherDetails{ get; set; } = "";
+        public string OtherDetails { get; set; } = "";
 
 
-}
+    }
     public static Dg12Info ParseDG12(byte[] dg12)
     {
         var tlvs = TLVParser.Parse(dg12);
@@ -442,4 +438,4 @@ public static class TLVParser
 
 
 // DG13 Ytterligare dokumentdetaljer ex dokumentnummer, typ av dokument, utfärdande plats
-// Kan vara onödig 
+// Kan vara onödig

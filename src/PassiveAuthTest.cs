@@ -15,23 +15,26 @@ using Org.BouncyCastle.X509;
 using System.Linq.Expressions;
 using Org.BouncyCastle.Security;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Parser;
 
 
 
 // Trivialt test, får antagligen modda lite/ ändra implementeringar
 
+/// <summary>
+/// Kör hela passive authentication-flödet:
+/// 1. Hitta CSCA från masterlist baserat på DG12
+/// 2. Extrahera DSC från EF.SOD
+/// 3. Verifiera kedja (DSC -> CSCA)
+/// 4. Verifiera EF.SOD signatur
+/// 5. Verifiera hashvärden för alla DGs
+/// </summary>
+
 namespace EPassAuth
 {
     public static class PassiveAuthentication
     {
-        /// <summary>
-        /// Kör hela passive authentication-flödet:
-        /// 1. Hitta CSCA från masterlist baserat på DG12
-        /// 2. Extrahera DSC från EF.SOD
-        /// 3. Verifiera kedja (DSC -> CSCA)
-        /// 4. Verifiera EF.SOD signatur
-        /// 5. Verifiera hashvärden för alla DGs
-        /// </summary>
+
         public static bool Verify(
             string issuingCountry,
             byte[] efSodBytes,
@@ -49,7 +52,7 @@ namespace EPassAuth
             Log.Info($" Issuer : {cscaCert.Issuer}");
             Log.Info($" FriendlyName: {cscaCert.FriendlyName}");
 
-            // 2. Extrahera DSC från EF.SOD (ASN.1 parsing krävs här – stub)
+            // 2. Extrahera DSC från EF.SOD (ASN.1 parsing)
             var dscCert = ExtractDscFromSod(efSodBytes);
             if (dscCert == null)
                 throw new Exception("Kunde inte extrahera DSC från EF.SOD");
@@ -83,6 +86,7 @@ namespace EPassAuth
         }
 
 
+        // Extracts DSC from SOD file to verify the signature
         public static X509Certificate2 ExtractDscFromSod(byte[] efSodBytes)
         {
             try
@@ -97,20 +101,20 @@ namespace EPassAuth
                 var selector = new X509CertStoreSelector();
                 var bcCerts = store.EnumerateMatches(selector); // Nu returneras en ICollection
 
-                // foreach (var obj in bcCerts)
-                // {
-                //     var bcCert = obj as X509Certificate;
-                //     if (bcCert != null)
-                //     {
-                //         var rawData = bcCert.GetEncoded();
-                //         var dscCert = new X509Certificate2(rawData);
+                foreach (var obj in bcCerts)
+                {
+                    var bcCert2 = obj as Org.BouncyCastle.X509.X509Certificate;
+                    if (bcCert2 != null)
+                    {
+                        var rawData = bcCert2.GetEncoded();
+                        var dscCert = new X509Certificate2(rawData);
 
-                //         Log.Info("[INFO] Extraherat DSC-certifikat från EF.SOD");
-                //         Log.Info($" Subject: {dscCert.Subject}");
-                //         Log.Info($" Issuer : {dscCert.Issuer}");
-                //         return dscCert;
-                //     }
-                // }
+                        Log.Info("[INFO] Extraherat DSC-certifikat från EF.SOD");
+                        Log.Info($" Subject: {dscCert.Subject}");
+                        Log.Info($" Issuer : {dscCert.Issuer}");
+                        return dscCert;
+                    }
+                }
 
                 Log.Info("ERROR: Kunde inte hitta DSC i EF.SOD");
                 return null;
@@ -164,10 +168,31 @@ namespace EPassAuth
             return false;
         }
 
-        private static bool VerifyDataGroupHashes(byte[] efSodBytes, Dictionary<int, byte[]> dataGroups)
+        // optional, Verify data group hashes using parser
+        private static bool VerifyDataGroupHashes(EFSodInfo sod, Dictionary<int, byte[]> dataGroups)
         {
-            // TODO: ASN.1 parsing av EF.SOD för att hämta lagrade DG-hashar
-            // Jämför sedan med SHA256/SHA1 på dina faktiska DG bytes
+            using var sha256 = SHA256.Create();
+
+            foreach (var dgHashEntry in sod.DataGroupHashes)
+            {
+                int dgNum = dgHashEntry.DataGroupNumber;
+                if (!dataGroups.TryGetValue(dgNum, out byte[] dgBytes))
+                {
+                    Log.Info("Warning :(");
+                    return false;
+                }
+
+                byte[] hash = sha256.ComputeHash(dgBytes);
+
+                if (!hash.SequenceEqual(dgHashEntry.HashValue))
+                {
+                    Log.Info("Warning 2 :(");
+                    return false;
+                }
+
+                Log.Info($" DG{dgNum} hash matchar EF.SOD");
+            }
+
             return true;
         }
 
