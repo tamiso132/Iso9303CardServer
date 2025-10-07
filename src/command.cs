@@ -488,7 +488,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
             }
         }
 
-        throw new Exception("FUCK");
+        throw new Exception("womp womp no kebab for you :/");
 
     }
 
