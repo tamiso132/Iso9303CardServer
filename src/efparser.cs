@@ -388,7 +388,7 @@ public static class TLVParser
         }
     }
 
-    // DG12 Utfärdande myndighet
+    // DG12 Utfärdande myndighet VIKTIG för passiveAuthTest.cs
 
     public class Dg12Info
     {
