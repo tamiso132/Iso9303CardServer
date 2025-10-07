@@ -10,6 +10,7 @@ using Encryption;
 using Helper;
 using Interfaces;
 using Org.BouncyCastle.Asn1.Icao;
+using Org.BouncyCastle.Cms;
 using Type;
 
 namespace Parser;
@@ -134,28 +135,20 @@ public class EFSodInfo
 
     // public Dictionary<int, byte[]> DgHashes { get; } = new();
     // public byte[] Signature { get; set; } = Array.Empty<byte>();
-}
 
-public class DataGroupHashEntry
-{
-    public int DataGroupNumber { get; set; } //DG1-16
-    public byte[] HashValue { get; set; } //SHA256 Hash
-}
 
-public class ImplEfSod : IEfParser<EFSodInfo>
-{
-    public string Name()
+    public class DataGroupHashEntry
     {
-        return "Sod";
+        public int DataGroupNumber { get; set; } //DG1-16
+        public byte[] HashValue { get; set; } //SHA256 Hash
     }
 
-    public EFSodInfo ParseFromBytes(byte[] bytes)
+    public static EFSodInfo ParseEFSodLdsV18(byte[] bytes)
     {
         var ef = new EFSodInfo();
         var reader = new AsnReader(bytes, AsnEncodingRules.DER);
         var outerSeq = reader.ReadSequence(); // Outer sequence 
 
-        
 
         BigInteger versionInt = (int)reader.ReadInteger(); // Se version
         if (versionInt == 0)
@@ -184,37 +177,41 @@ public class ImplEfSod : IEfParser<EFSodInfo>
             var dgNum = (int)dgEntrySeq.ReadInteger();
             var dgHash = dgEntrySeq.ReadOctetString();
 
-            ef.DataGroupHashes.Add(new DataGroupHashEntry {DataGroupNumber = dgNum, HashValue = dgHash});
+            ef.DataGroupHashes.Add(new DataGroupHashEntry { DataGroupNumber = dgNum, HashValue = dgHash });
 
         }
 
-        if (outerSeq.HasData)
-        {
-            // Läs sekvensen som innehåller LDSVersionInfo, Finns redan?
-            var ldsVersionSeq = outerSeq.ReadSequence();
-            ef.LdsVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString);    // ldsVersion
-            ef.UnicodeVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString); // unicodeVersion
-        }
+        // Läs sekvensen som innehåller LDSVersionInfo, Finns redan?
+        var ldsVersionSeq = outerSeq.ReadSequence();
+        ef.LdsVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString);    // ldsVersion
+        ef.UnicodeVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString); // unicodeVersion
 
-      //  ef.Signature = outerSeq.ReadOctetString();
 
-        // Utskrift
-        // Console.WriteLine("LDS Version: " + ef.LdsVersion);
-        // Console.WriteLine("Digest Algorithm: " + ef.DigestAlgorithm);
-
-        // foreach (var kvp in ef.DataGroupHashes)
-        // {
-        //     Console.WriteLine($"DG{kvp.Key} Hash: {BitConverter.ToString(kvp.Value)}");
-        // }
-
-        // Console.WriteLine("Signature: " + BitConverter.ToString(ef.Signature));
 
         return ef;
         // throw new NotImplementedException();
 
 
     }
+
+
+
+
+
+    public static byte[] GetSignedDataFromSod(byte[] efSodBytes)
+    {
+
+        var cms = new CmsSignedData(efSodBytes);
+        var signedContent = cms.SignedContent;
+
+        if (signedContent == null)
+            Log.Info("No signed content found in EF.SOD");
+
+        return efSodBytes;
+    }
 }
+
+
 
 public class TLV
 {
@@ -441,4 +438,4 @@ public static class TLVParser
 
 
 // DG13 Ytterligare dokumentdetaljer ex dokumentnummer, typ av dokument, utfärdande plats
-// Kan vara onödig 
+// Kan vara onödig
