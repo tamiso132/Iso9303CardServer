@@ -28,7 +28,7 @@ public static class CertificateFinder
     {
         var relevant = new List<X509Certificate2>();
 
-        foreach (var cert in masterlist)
+        foreach (var cert in masterlist)    
         {
             var subject = cert.Subject ?? "";
             if (!string.IsNullOrEmpty(dg12.IssuingState) && subject.Contains(dg12.IssuingState, StringComparison.OrdinalIgnoreCase))
