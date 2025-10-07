@@ -60,6 +60,8 @@ public class ClientSession(ICommunicator comm)
 
 
 
+
+
             byte[] key = TestClass.DerivePaceKey(info);
 
 
@@ -75,7 +77,10 @@ public class ClientSession(ICommunicator comm)
 
 
 
+
             var r = await TestClass.ComputeDecryptedNounce(_cmd, info, key, TestClass.PasswordType.MRZ);
+
+
 
 
             if (!r.IsSuccess)
@@ -152,8 +157,12 @@ public class ClientSession(ICommunicator comm)
             if (!isAuth)
                 Log.Info("AuthenticationToken was not correctly calculated");
 
+
+
+
             Log.Info("Secure Messaging Established using: PACE, Session started.");
-            await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Com);
+
+            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Com);
 
             if (!result.IsSuccess)
             {
