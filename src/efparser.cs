@@ -9,6 +9,7 @@ using Asn1;
 using Encryption;
 using Helper;
 using Interfaces;
+using Org.BouncyCastle.Asn1.Icao;
 using Type;
 
 namespace Parser;
@@ -128,8 +129,17 @@ public class EFSodInfo
     public string LdsVersion { get; set; } = "";
     public string UnicodeVersion { get; set; } = "";
     public string DigestAlgorithm { get; set; } = "";
-    public Dictionary<int, byte[]> DgHashes { get; } = new();
-    public byte[] Signature { get; set; } = Array.Empty<byte>();
+
+    public List<DataGroupHashEntry> DataGroupHashes { get; set; } = new();
+
+    // public Dictionary<int, byte[]> DgHashes { get; } = new();
+    // public byte[] Signature { get; set; } = Array.Empty<byte>();
+}
+
+public class DataGroupHashEntry
+{
+    public int DataGroupNumber { get; set; } //DG1-16
+    public byte[] HashValue { get; set; } //SHA256 Hash
 }
 
 public class ImplEfSod : IEfParser<EFSodInfo>
@@ -143,12 +153,11 @@ public class ImplEfSod : IEfParser<EFSodInfo>
     {
         var ef = new EFSodInfo();
         var reader = new AsnReader(bytes, AsnEncodingRules.DER);
+        var outerSeq = reader.ReadSequence(); // Outer sequence 
 
+        
 
-        var sodSeq = reader.ReadSequence(); // Outer sequence   
-        ef.LdsVersion = sodSeq.ReadInteger().ToString(); // Version
-
-        BigInteger versionInt = reader.ReadInteger(); // Se version
+        BigInteger versionInt = (int)reader.ReadInteger(); // Se version
         if (versionInt == 0)
             Log.Info("LDS Legacy version");
         else if (versionInt == 1)
@@ -156,51 +165,49 @@ public class ImplEfSod : IEfParser<EFSodInfo>
         else
             Log.Info("UNKNOWN LDS VERSION :(");
 
-        
-            
-        
-
-        
 
 
         // Digest Algorithm
-        var digestSeq = sodSeq.ReadSequence();
+        var digestSeq = outerSeq.ReadSequence();
         var digestOid = digestSeq.ReadObjectIdentifier();
         ef.DigestAlgorithm = digestOid;
         if (digestSeq.HasData)
             digestSeq.ReadNull();
 
+
+
         // Sequence of sequence
-        var dgHashesSeq = sodSeq.ReadSequence();
+        var dgHashesSeq = outerSeq.ReadSequence();
         while (dgHashesSeq.HasData)
         {
-            var dgSeq = dgHashesSeq.ReadSequence();
-            int dgNumber = (int)dgSeq.ReadInteger();
-            byte[] hashValue = dgSeq.ReadOctetString();
-            ef.DgHashes[dgNumber] = hashValue;
+            var dgEntrySeq = dgHashesSeq.ReadSequence();
+            var dgNum = (int)dgEntrySeq.ReadInteger();
+            var dgHash = dgEntrySeq.ReadOctetString();
+
+            ef.DataGroupHashes.Add(new DataGroupHashEntry {DataGroupNumber = dgNum, HashValue = dgHash});
 
         }
 
-        if (sodSeq.HasData)
+        if (outerSeq.HasData)
         {
-            // Läs sekvensen som innehåller LDSVersionInfo
-            var ldsVersionSeq = sodSeq.ReadSequence();
+            // Läs sekvensen som innehåller LDSVersionInfo, Finns redan?
+            var ldsVersionSeq = outerSeq.ReadSequence();
             ef.LdsVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString);    // ldsVersion
             ef.UnicodeVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString); // unicodeVersion
         }
 
-        ef.Signature = sodSeq.ReadOctetString();
+      //  ef.Signature = outerSeq.ReadOctetString();
 
         // Utskrift
-        Console.WriteLine("LDS Version: " + ef.LdsVersion);
-        Console.WriteLine("Digest Algorithm: " + ef.DigestAlgorithm);
+        // Console.WriteLine("LDS Version: " + ef.LdsVersion);
+        // Console.WriteLine("Digest Algorithm: " + ef.DigestAlgorithm);
 
-        foreach (var kvp in ef.DgHashes)
-        {
-            Console.WriteLine($"DG{kvp.Key} Hash: {BitConverter.ToString(kvp.Value)}");
-        }
+        // foreach (var kvp in ef.DataGroupHashes)
+        // {
+        //     Console.WriteLine($"DG{kvp.Key} Hash: {BitConverter.ToString(kvp.Value)}");
+        // }
 
-        Console.WriteLine("Signature: " + BitConverter.ToString(ef.Signature));
+        // Console.WriteLine("Signature: " + BitConverter.ToString(ef.Signature));
 
         return ef;
         // throw new NotImplementedException();
@@ -391,10 +398,10 @@ public static class TLVParser
         public string issuingAuthority { get; set; } = "";
         public string IssuingState { get; set; } = "";
         public string Endorsements { get; set; } = "";
-        public string OtherDetails{ get; set; } = "";
+        public string OtherDetails { get; set; } = "";
 
 
-}
+    }
     public static Dg12Info ParseDG12(byte[] dg12)
     {
         var tlvs = TLVParser.Parse(dg12);
