@@ -38,7 +38,8 @@ public abstract record MessageType
 
         public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
         {
-            return command.ParseEncryptedReponse(response, iv);
+            //return command.ParseEncryptedReponse(response, iv);
+            return ResponseCommand.FromBytes(response).Value;
         }
 
         byte[] iv = [];
@@ -84,8 +85,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
         }
         else
         {
-            await SelectApplication(type, app);
-            _appSelected = app;
+            //  await SelectApplication(type, app);
+            //   _appSelected = app;
             return await ReadBinaryFullID(type, efID, offset, le);
         }
     }
@@ -218,6 +219,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public void SetEncryption(byte[] enc, byte[] mac)
     {
+        Log.Info("EncKey: " + BitConverter.ToString(enc));
+        Log.Info("macKey: " + BitConverter.ToString(mac));
         this.encKey = enc;
         this.mac = mac;
     }
@@ -236,8 +239,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         byte[] cmd = [0x7C, (byte)tokenHeader.Length, .. tokenHeader];
         byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data: cmd, le: 0x00);
-
-        Log.Info("Send: " + BitConverter.ToString(cmdFormat));
 
         var result = await SendPackageDecodeResponse(type, cmdFormat);
 
@@ -369,6 +370,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         var tempStatus = response.status;
         while (tempStatus == SwStatus.MoreDataAvailable)
         {
+            Log.Info("Asking for more data");
             messageType.FormatCommand(this, 0xC0, 0x00, 0x00, []);
             var extra = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(cmd)));
             ResponseCommand extraResp = messageType.ParseCommand(this, extra.Value);
@@ -410,6 +412,12 @@ public class Command<T>(ICommunicator communicator, T encryption)
     // SSC -> HEADER  -> PADDING -> DO87
     // Add padding to it then calculate MAC over it
 
+    //     For message encryption AES [FIPS 197] SHALL be used in CBC-mode according to [ISO/IEC 10116] with key KSEnc and
+    // IV = E(KSEnc, SSC).
+
+    //     For message authentication AES SHALL be used in CMAC-mode [SP 800-38B] with KSMAC with a MAC length of 8 bytes.
+    // The datagram to be authenticated SHALL be prepended by the Send Sequence Counter.
+
     internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte lc = 0x00)
     {
 
@@ -418,6 +426,11 @@ public class Command<T>(ICommunicator communicator, T encryption)
             throw new NotImplementedException("Ins for Odd, is not implemented");
 
         byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
+
+        byte dataTag = (ins % 2) == 0 ? (byte)0x87 : (byte)0x85;
+        byte macTag = 0x8E;
+        byte leTag = 0x97;
+
 
         byte[] encryptedData = [.. EncryptDataFormatENC(data, iv)];
         byte[] dataHeader = [0x87, (byte)(encryptedData.Length + 1), 0x01, .. encryptedData];
@@ -433,10 +446,14 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] N = Util.AlignData([.. seqCounterHeader, .. cmdHeader, .. dataHeader], 16);
         Log.Info("N: " + BitConverter.ToString(N));
         byte[] token = CalculateCMAC(N);
-        byte[] macHeader = [0x8E, 0x08, .. token];
+        byte[] macHeader = [macTag, 0x08, .. token];
 
-        byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length), .. dataHeader, .. macHeader];
+        Log.Info("macHeader: " + BitConverter.ToString(macHeader));
 
+
+        byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length), .. dataHeader, .. macHeader, 0x00];
+
+        Log.Info("Cmd: " + BitConverter.ToString(package));
 
 
 
