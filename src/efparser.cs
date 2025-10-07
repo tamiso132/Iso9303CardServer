@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Formats.Asn1;
+using System.Numerics;
+using System.Security.Cryptography;
+using System.Security.Cryptography.Pkcs;
 using System.Text;
 using Asn1;
 using Encryption;
@@ -139,18 +142,26 @@ public class ImplEfSod : IEfParser<EFSodInfo>
     public EFSodInfo ParseFromBytes(byte[] bytes)
     {
         var ef = new EFSodInfo();
-        //var reader = new ByteReader(bytes);
         var reader = new AsnReader(bytes, AsnEncodingRules.DER);
-        //int tag = reader.ReadInt(1);
-        //if (tag != 0x77) throw new Exception("Not a valid EF.SOD");
+
 
         var sodSeq = reader.ReadSequence(); // Outer sequence   
         ef.LdsVersion = sodSeq.ReadInteger().ToString(); // Version
 
-        // int length = reader.ReadLength();
-        // int versionTag = reader.ReadInt(1);
-        // int versionLength = reader.ReadLength();
-        // ef.LdsVersion = Encoding.ASCII.GetString(reader.ReadBytes(versionLength));
+        BigInteger versionInt = reader.ReadInteger(); // Se version
+        if (versionInt == 0)
+            Log.Info("LDS Legacy version");
+        else if (versionInt == 1)
+            Log.Info("LDS Version 1.8 (REQUIRED FOR NEW PASSPORTS)");
+        else
+            Log.Info("UNKNOWN LDS VERSION :(");
+
+        
+            
+        
+
+        
+
 
         // Digest Algorithm
         var digestSeq = sodSeq.ReadSequence();
@@ -179,25 +190,6 @@ public class ImplEfSod : IEfParser<EFSodInfo>
         }
 
         ef.Signature = sodSeq.ReadOctetString();
-
-        // int digestTag = reader.ReadInt(1);
-        // int digestLength = reader.ReadLength();
-        // ef.DigestAlgorithm = Encoding.ASCII.GetString(reader.ReadBytes(digestLength));
-
-        // int dgHashTag = reader.ReadInt(1);
-        // int dgHashLength = reader.ReadLength();
-        // int dgHashEnd = reader.Offset + dgHashLength;
-
-        // while (reader.Offset < dgHashEnd)
-        // {
-        //     int dgNumber = reader.ReadInt(1);
-        //     int hashLen = reader.ReadLength();
-        //     ef.DgHashes[dgNumber] = reader.ReadBytes(hashLen);
-        // }
-
-        // int signatureTag = reader.ReadInt(1);
-        // int signatureLength = reader.ReadLength();
-        // ef.Signature = reader.ReadBytes(signatureLength);
 
         // Utskrift
         Console.WriteLine("LDS Version: " + ef.LdsVersion);

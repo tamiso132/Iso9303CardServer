@@ -20,11 +20,7 @@ using Microsoft.AspNetCore.Mvc.ApplicationModels;
 
 // Trivialt test, får antagligen modda lite/ ändra implementeringar
 
-namespace EPassAuth
-{
-    public static class PassiveAuthentication
-    {
-        /// <summary>
+      /// <summary>
         /// Kör hela passive authentication-flödet:
         /// 1. Hitta CSCA från masterlist baserat på DG12
         /// 2. Extrahera DSC från EF.SOD
@@ -32,6 +28,12 @@ namespace EPassAuth
         /// 4. Verifiera EF.SOD signatur
         /// 5. Verifiera hashvärden för alla DGs
         /// </summary>
+
+namespace EPassAuth
+{
+    public static class PassiveAuthentication
+    {
+
         public static bool Verify(
             string issuingCountry,
             byte[] efSodBytes,
@@ -49,7 +51,7 @@ namespace EPassAuth
             Log.Info($" Issuer : {cscaCert.Issuer}");
             Log.Info($" FriendlyName: {cscaCert.FriendlyName}");
 
-            // 2. Extrahera DSC från EF.SOD (ASN.1 parsing krävs här – stub)
+            // 2. Extrahera DSC från EF.SOD (ASN.1 parsing)
             var dscCert = ExtractDscFromSod(efSodBytes);
             if (dscCert == null)
                 throw new Exception("Kunde inte extrahera DSC från EF.SOD");
@@ -100,10 +102,10 @@ namespace EPassAuth
 
                 foreach (var obj in bcCerts)
                 {
-                    var bcCert = ;
-                    if (bcCert != null)
+                    var bcCert2 = obj as Org.BouncyCastle.X509.X509Certificate;
+                    if (bcCert2 != null)
                     {
-                        var rawData = bcCert.GetEncoded();
+                        var rawData = bcCert2.GetEncoded();
                         var dscCert = new X509Certificate2(rawData);
 
                         Log.Info("[INFO] Extraherat DSC-certifikat från EF.SOD");
