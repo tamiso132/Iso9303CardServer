@@ -8,6 +8,7 @@ using System.Security.Cryptography.X509Certificates;
 using Helper;
 using Encryption;
 
+
 // Load the ML file (DER encoded)
 // byte[] mlBytes = [File.ReadAllBytes("masterlist-cscas/C=AT,O=GV,OU=BMI,CN=CSCA-AUSTRIA56.pem")];
 
@@ -124,6 +125,7 @@ public class WsSession : WebSocketBehavior
 // byte[] dg12Bytes = ReadFileFromChip(0x??);
 // DG12 dg12 = DG12.Parse(dg12Bytes);
 
-//var masterlist = Load("masterlist-cscas");
-//var dg12Info = TLVParser.ParseDG12(dg12Bytes);
-//var relevantCerts = CertificateFinder.FindRelevantCertificates(dg12Info, masterList);
+// var masterlist = CertificateFinder.LoadCscaCertsFromFolder(@"C:\Users\foffe\Iso9303CardServer\masterlist-cscas"); //Load masterlist from folder
+// var relevantCerts = CertificateFinder.FindRelevantCertificates(dg12Info, masterlist); // Find the relevant certificate
+// var cscaCert = relevantCerts.FirstOrDefault(); 
+// if (cscaCert == null) throw new Exception("Ingen relevant CSCA hittades för detta pass");
