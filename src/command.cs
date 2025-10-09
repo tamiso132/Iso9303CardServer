@@ -123,7 +123,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
 
-    private async Task<TResult> ReadBinaryFullID(MessageType type, IEfID efID, byte offset, byte cla = 0x00)
+    private async Task<TResult> ReadBinaryFullID(MessageType type, IEfID efID, byte offset, byte le = 0x00, byte cla = 0x00)
     {
         var selectResult = await ElementFileSelect(type, efID);
         if (!selectResult.IsSuccess)
@@ -137,9 +137,9 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return await SendPackageDecodeResponse(type, cmd);
     }
 
-    public async Task<TResult> ReadBinaryShort(MessageType type, IEfID efID, byte offset)
+    public async Task<TResult> ReadBinaryShort(MessageType type, IEfID efID, byte le = 0x00, byte offset = 0x00)
     {
-        byte[] cmd = type.FormatCommand(this, 0xB0, efID.ShortID, offset, [], le: 0x00);
+        byte[] cmd = type.FormatCommand(this, 0xB0, efID.ShortID, offset, [], le: le);
         return await SendPackageDecodeResponse(type, cmd);
     }
 
@@ -362,6 +362,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         if (!result.IsSuccess)
             return Fail(result.Error);
 
+
         ResponseCommand response = messageType.ParseCommand(this, result.Value);
 
         if (response.status.IsSuccess())
@@ -417,9 +418,11 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     //     For message authentication AES SHALL be used in CMAC-mode [SP 800-38B] with KSMAC with a MAC length of 8 bytes.
     // The datagram to be authenticated SHALL be prepended by the Send Sequence Counter.
-
-    internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte lc = 0x00)
+// !TODO fix for LE
+    internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte le = 0x00, byte lc = 0x00)
     {
+
+        Log.Info($"data: {BitConverter.ToString(data)}, ins: 0x{ins:X2}, p1: 0x{p1:X2}, p2: 0x{p2:X2}, iv: {BitConverter.ToString(iv)}, lc: 0x{lc:X2}");
 
 
         byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
@@ -434,6 +437,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
             byte[] encryptedData = [.. EncryptDataFormatENC(data, iv)];
             dataHeader = [dataTag, (byte)(encryptedData.Length + 1), 0x01, .. encryptedData];
         }
+        byte[] leHeader = [];
+
 
         byte[] seqCounterHeader = sequenceCounter.ToPaddedLength(16);
 
