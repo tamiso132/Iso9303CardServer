@@ -45,7 +45,7 @@ if (ip == null || port == null)
     Console.WriteLine("IP or Port not found in config.");
     return;
 }
-
+Log.Info("Listening to " + ip + ":" + port);
 var wssv = new WebSocketServer($"ws://{ip}:{port}");
 
 wssv.AddWebSocketService<WsSession>("/");

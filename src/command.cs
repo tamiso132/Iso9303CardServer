@@ -422,38 +422,38 @@ public class Command<T>(ICommunicator communicator, T encryption)
     {
 
 
-        if ((ins % 2) != 0)
-            throw new NotImplementedException("Ins for Odd, is not implemented");
-
         byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
 
         byte dataTag = (ins % 2) == 0 ? (byte)0x87 : (byte)0x85;
         byte macTag = 0x8E;
         byte leTag = 0x97;
 
-
-        byte[] encryptedData = [.. EncryptDataFormatENC(data, iv)];
-        byte[] dataHeader = [0x87, (byte)(encryptedData.Length + 1), 0x01, .. encryptedData];
+        byte[] dataHeader = [];
+        if (data.Length > 0)
+        {
+            byte[] encryptedData = [.. EncryptDataFormatENC(data, iv)];
+            dataHeader = [dataTag, (byte)(encryptedData.Length + 1), 0x01, .. encryptedData];
+        }
 
         byte[] seqCounterHeader = sequenceCounter.ToPaddedLength(16);
 
 
-        Log.Info("CmdHeader: " + BitConverter.ToString(cmdHeader));
-        Log.Info("SeqCounterHeader: " + BitConverter.ToString(seqCounterHeader));
-        Log.Info("DataHeader: " + BitConverter.ToString(dataHeader));
-        Log.Info("IV: " + BitConverter.ToString(iv));
+        //  Log.Info("CmdHeader: " + BitConverter.ToString(cmdHeader));
+        //  Log.Info("SeqCounterHeader: " + BitConverter.ToString(seqCounterHeader));
+        // Log.Info("DataHeader: " + BitConverter.ToString(dataHeader));
+        // Log.Info("IV: " + BitConverter.ToString(iv));
 
         byte[] N = Util.AlignData([.. seqCounterHeader, .. cmdHeader, .. dataHeader], 16);
-        Log.Info("N: " + BitConverter.ToString(N));
+        //  Log.Info("N: " + BitConverter.ToString(N));
         byte[] token = CalculateCMAC(N);
         byte[] macHeader = [macTag, 0x08, .. token];
 
-        Log.Info("macHeader: " + BitConverter.ToString(macHeader));
+        //  Log.Info("macHeader: " + BitConverter.ToString(macHeader));
 
 
         byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length), .. dataHeader, .. macHeader, 0x00];
 
-        Log.Info("Cmd: " + BitConverter.ToString(package));
+        //   Log.Info("Cmd: " + BitConverter.ToString(package));
 
 
 
@@ -465,8 +465,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
         var aligned = Util.AlignData(decryptedData, 16);
         Debug.Assert(aligned.Length % 16 == 0);
 
-        Log.Info("UnencryptedData: " + BitConverter.ToString(decryptedData));
-        Log.Info("UnencryptedPaddedData: " + BitConverter.ToString(aligned));
+        //Log.Info("UnencryptedData: " + BitConverter.ToString(decryptedData));
+        //Log.Info("UnencryptedPaddedData: " + BitConverter.ToString(aligned));
 
         var cipher = CipherUtilities.GetCipher($"AES/CBC/NOPADDING");
         var ivParameter = new ParametersWithIV(new KeyParameter(encKey), iv);
