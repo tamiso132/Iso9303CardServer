@@ -162,7 +162,7 @@ public class ClientSession(ICommunicator comm)
 
             Log.Info("Secure Messaging Established using: PACE, Session started.");
 
-            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdGlobal.AtrInfo, le: 0x04);
+            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdGlobal.AtrInfo);
 
             if (!result.IsSuccess)
             {
@@ -182,10 +182,10 @@ public class ClientSession(ICommunicator comm)
             response = result.Value;
             var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
 
+            Log.Info("Found EF.SOD");
 
 
-
-            //await EPassAuth.PassiveAuthentication.VerifySodSignature(); ??
+            await EPassAuth.PassiveAuthentication.VerifySodSignature();
 
             try
             {
@@ -210,66 +210,11 @@ public class ClientSession(ICommunicator comm)
 
         }
 
-        // await ReadFileWithSM(sm, EfIdGlobal.SOD);
+
 
     }
 
-    // Read EF.SOD file in terminal, From this we need to: TODO
-    // Parse??
-    // Extract list of data group hashes and what algorithm is used
-    // Find the SignerInfo and/or DSC
 
-
-    // private async Task ReadFileWithSM(SecureMessaging sm, ushort fileID)
-    // {
-    //     byte[] fileBytes = [(byte)(fileID >> 8), (byte)(fileID & 0xFF)];
-    //     byte[] select = [0x00, 0xA4, 0x02, 0x0C, 0x02, .. fileBytes];
-
-    //     var wrappedSelect = sm.WrapCommand(select);
-    //     var result = _cmd.SendRaw(wrappedSelect);
-    //     if (!result.IsSuccess)
-    //     {
-    //         Log.Error("Failed selecting EF.SOD");
-    //         return;
-    //     }
-
-    //     List<byte> allData = new();
-    //     int offset = 0;
-    //     const int chunkSize = 0xFF;
-
-    //     while (true)
-    //     {
-    //         byte p1 = (byte)((offset >> 8) & 0xFF);
-    //         byte p2 = (byte)(offset & 0xFF);
-    //         byte[] read = [0x00, 0xB0, p1, p2, (byte)chunkSize];
-    //         var wrappedRead = sm.WrapCommand(read);
-
-    //         var readResult = await _cmd.SendRaw(wrappedRead);
-    //         if (!readResult.IsSuccess)
-    //         {
-    //             Log.Error("Failed Reading EF.SOD");
-    //             break;
-    //         }
-
-    //         var response = sm.UnwrapResponse(readResult.Value);
-
-    //         if (response.Length == 0)
-    //             break;
-
-    //         allData.AddRange(response);
-    //         offset += response.Length;
-
-    //         if (response.Length < chunkSize)
-    //             break;
-
-
-
-
-    //     }
-
-    //         Log.Info("✅ EF.SOD successfully read");
-    //         Log.Info(Convert.ToBase64String(allData.ToArray()));
-    // }
 
     private readonly ICommunicator _comm = comm;
     private readonly Command<ServerEncryption> _cmd = new(comm, new ServerEncryption());
