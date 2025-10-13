@@ -162,7 +162,16 @@ public class ClientSession(ICommunicator comm)
 
             Log.Info("Secure Messaging Established using: PACE, Session started.");
 
-            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Com);
+            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdGlobal.AtrInfo, le: 0x04);
+
+            if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
+                return;
+            }
+
+            // Time for EF.SOD
+            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
 
             if (!result.IsSuccess)
             {
@@ -176,14 +185,29 @@ public class ClientSession(ICommunicator comm)
 
 
 
+            //await EPassAuth.PassiveAuthentication.VerifySodSignature(); ??
+
+            try
+            {
+                var efSodInfo = EFSodInfo.ParseEFSodLdsV18(result.Value.data);
+
+                Log.Info("EF.SOD is parsed!");
+                Log.Info("Digest algorithm: " + efSodInfo.DigestAlgorithm);
+                Log.Info("LDS Version: " + efSodInfo.LdsVersion);
+                Log.Info("Unicode Version: " + efSodInfo.UnicodeVersion);
+
+                foreach (var dg in efSodInfo.DataGroupHashes)
+                {
+                    Log.Info($"DG{dg.DataGroupNumber}: : {BitConverter.ToString(dg.HashValue)}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error("Failed to parse: " + ex.Message);
+            }
+
             Log.Info("All commands completed without a problem");
 
-            // result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
-            // if (!result.IsSuccess)
-            // {
-            //     Log.Error(result.Error.ErrorMessage());
-            //     return;
-            // }
         }
 
         // await ReadFileWithSM(sm, EfIdGlobal.SOD);

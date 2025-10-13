@@ -128,11 +128,7 @@ public class EFSodInfo
 
     public List<DataGroupHashEntry> DataGroupHashes { get; set; } = new();
 
-    // public Dictionary<int, byte[]> DgHashes { get; } = new();
-    // public byte[] Signature { get; set; } = Array.Empty<byte>();
-
-
-    public class DataGroupHashEntry
+     public class DataGroupHashEntry
     {
         public int DataGroupNumber { get; set; } //DG1-16
         public byte[] HashValue { get; set; } //SHA256 Hash
