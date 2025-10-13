@@ -47,7 +47,7 @@ namespace EPassAuth
             if (cscaCert == null)
                 throw new Exception("Ingen CSCA hittades för landet " + issuingCountry);
 
-            Log.Info($"[INFO] Hittade CSCA-certifikat för {issuingCountry}:");
+            Log.Info($"[INFO] Found CSCA-certificate for {issuingCountry}:");
             Log.Info($" Subject: {cscaCert.Subject}");
             Log.Info($" Issuer : {cscaCert.Issuer}");
             Log.Info($" FriendlyName: {cscaCert.FriendlyName}");
@@ -55,30 +55,30 @@ namespace EPassAuth
             // 2. Extrahera DSC från EF.SOD (ASN.1 parsing)
             var dscCert = ExtractDscFromSod(efSodBytes);
             if (dscCert == null)
-                throw new Exception("Kunde inte extrahera DSC från EF.SOD");
+                throw new Exception("Could not extract DSC from EF.SOD file");
 
-            Log.Info("[INFO] Extraherat DSC från EF.SOD");
+            Log.Info("[INFO] Extracted DSC from EF.SOD");
 
             // Parsar EF.SOD till EFSodInfo
             var sodInfo = Parser.EFSodInfo.ParseEFSodLdsV18(efSodBytes);
 
             // 3. Bygg kedja: DSC -> CSCA
             if (!VerifyCertChain(dscCert, cscaCert))
-                throw new Exception("DSC kunde inte verifieras mot CSCA");
+                throw new Exception("DSC couldnt be verified against CSCA");
 
-            Log.Info("[INFO] Verifierat kedja mellan DSC och CSCA");
+            Log.Info("[INFO] Verified chain between DSC och CSCA");
 
             // 4. Verifiera EF.SOD signaturen
             if (!VerifySodSignature(efSodBytes, dscCert))
-                throw new Exception("EF.SOD signaturen är ogiltig");
+                throw new Exception("EF.SOD signature is invalid");
 
-            Log.Info("[INFO] veridierat EF.SOD signatur");
+            Log.Info("[INFO] verified EF.SOD signature");
 
             // 5. Verifiera DG-hashar mot EF.SOD
             if (!VerifyDataGroupHashes(sodInfo, dataGroups))
-                throw new Exception("Datagrupp-hashar matchar inte EF.SOD");
+                throw new Exception("Datagrupp-hashes does not match EF.SOD");
 
-            Log.Info("[INFO] DH-hashar verifierade mot SOD");
+            Log.Info("[INFO] DH-hashes verified against SOD");
             return true;
         }
 
