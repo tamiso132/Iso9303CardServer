@@ -55,7 +55,7 @@ public class TestClass
         }
         return null;
     }
-    static void PrintByteComparison(byte[] correct, byte[] b)
+    public static void PrintByteComparison(byte[] correct, byte[] b)
     {
         int length = Math.Max(b.Length, correct.Length);
 

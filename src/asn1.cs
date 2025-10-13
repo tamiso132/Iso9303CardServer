@@ -153,6 +153,7 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
     }
 
 
+
     // Can only be used when all the tags are defined in tagids, otherwise error
     // public void PrintTree(int indent = 0)
     // {

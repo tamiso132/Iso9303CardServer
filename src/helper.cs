@@ -289,3 +289,57 @@ public static class BIgIntegerExtension
         return new byte[remainder].Concat(sscBA).ToArray();
     }
 }
+
+
+
+
+public static class TagReader
+{
+    public class TagEntry
+    {
+        public byte Tag { get; set; }
+        public byte[] Data { get; set; } = [];
+    }
+    public static List<TagEntry> ReadTagData(byte[] buffer)
+    {
+        var list = new List<TagEntry>();
+        int i = 0;
+
+        while (i + 2 <= buffer.Length)
+        {
+            byte tag = buffer[i++];
+            int length = buffer[i++];
+
+            if (i + length > buffer.Length)
+                break; // safety check
+
+            byte[] data = new byte[length];
+            Array.Copy(buffer, i, data, 0, length);
+            i += length;
+
+            list.Add(new TagEntry { Tag = tag, Data = data });
+        }
+
+        return list;
+    }
+
+
+
+
+}
+
+public static class TagReaderExtensions
+{
+    public static List<TagReader.TagEntry> FilterByTag(this List<TagReader.TagEntry> entries, byte tag)
+    {
+        return entries.Where(e => e.Tag == tag).ToList();
+    }
+
+    public static void PrintAll(this List<TagReader.TagEntry> tags)
+    {
+        for (int i = 0; i < tags.Count; i++)
+        {
+            Log.Info("Tag: " + BitConverter.ToString([tags[i].Tag]) + "\nData: " + BitConverter.ToString(tags[i].Data));
+        }
+    }
+}

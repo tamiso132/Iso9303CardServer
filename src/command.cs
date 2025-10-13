@@ -13,6 +13,8 @@ using System.Diagnostics;
 using System.Text;
 using System.Numerics;
 using Org.BouncyCastle.Security;
+using System;
+using Encryption;
 
 namespace Command;
 
@@ -39,6 +41,7 @@ public abstract record MessageType
         public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
         {
             //return command.ParseEncryptedReponse(response, iv);
+            command.DecryptDataENC(response, iv);
             return ResponseCommand.FromBytes(response).Value;
         }
 
@@ -492,13 +495,37 @@ public class Command<T>(ICommunicator communicator, T encryption)
     //     The Send Sequence Counter is set to its new start value, see Section 9.8.6.3 for 3DES and Section
     // 9.8.7.3 for AES.
 
-    private byte[] DecryptDataENC(byte[] encryptedData, byte[] iv)
+    public byte[] DecryptDataENC(byte[] encryptedData, byte[] iv)
     {
 
 
         using var aes = System.Security.Cryptography.Aes.Create();
-       
-       
+        var tags = TagReader.ReadTagData(encryptedData[0..(encryptedData.Length - 2)]);
+
+
+        byte[] newIV = GetIV();
+
+        var swTag = tags.FilterByTag(0x99)[0];
+        var macTag = tags.FilterByTag(0x8E)[0];
+
+        var paddedMacInput = Util.AlignData([swTag.Tag, 0x02, .. swTag.Data], 16);
+
+        Log.Info("Padded Mac Input: " + BitConverter.ToString(paddedMacInput));
+
+        byte[] calcCmac = CalculateCMAC(paddedMacInput);
+
+        if (!calcCmac.SequenceEqual(macTag.Data))
+        {
+            TestClass.PrintByteComparison(calcCmac, macTag.Data);
+            throw new Exception("GOD IS GOOD");
+        }
+
+
+
+
+
+        return [];
+
         aes.KeySize = 256;
         aes.BlockSize = 128;
         aes.Mode = System.Security.Cryptography.CipherMode.CBC;
