@@ -181,11 +181,13 @@ public class ClientSession(ICommunicator comm)
 
             Log.Info(BitConverter.ToString(result.Value.data));
 
+            //await EPassAuth.PassiveAuthentication.VerifySodSignature(); ??
+
             try
             {
                 var efSodInfo = EFSodInfo.ParseEFSodLdsV18(result.Value.data);
 
-                Log.Info("EF.SOD is parsed");
+                Log.Info("EF.SOD is parsed!");
                 Log.Info("Digest algorithm: " + efSodInfo.DigestAlgorithm);
                 Log.Info("LDS Version: " + efSodInfo.LdsVersion);
                 Log.Info("Unicode Version: " + efSodInfo.UnicodeVersion);
@@ -195,7 +197,7 @@ public class ClientSession(ICommunicator comm)
                     Log.Info($"DG{dg.DataGroupNumber}: : {BitConverter.ToString(dg.HashValue)}");
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 Log.Error("Failed to parse: " + ex.Message);
             }
