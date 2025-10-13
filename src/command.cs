@@ -104,7 +104,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     private async Task<TResult> ElementFileSelect(MessageType type, IEfID fileID)
     {
-        Log.Info("Selecting EF File: " + fileID.GetName());
         byte[] data = fileID.GetFullID();
         byte[] cmd = type.FormatCommand<T>(this, 0xA4, 0x02, 0x0C, data);
         return await SendPackageDecodeResponse(type, cmd);
@@ -131,6 +130,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
             Log.Info("Element File Select Error: " + efID.GetName());
             return selectResult;
         }
+
+        Log.Info("Selecting Element File: " + efID.GetName());
 
         Log.Info("Reading EF File: " + efID.GetName());
         byte[] cmd = type.FormatCommand(this, 0xB0, 0x00, 0x00, [], le: 0x00);
@@ -462,7 +463,11 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         //   Log.Info("Cmd: " + BitConverter.ToString(package));
 
+        // add sequence +1 for response
+        sequenceCounter += BigInteger.One + BigInteger.One;
 
+
+        Log.Info("SequenceNumber: " + sequenceCounter);
 
         return package;
     }
@@ -492,7 +497,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
         using var aes = System.Security.Cryptography.Aes.Create();
-
+       
+       
         aes.KeySize = 256;
         aes.BlockSize = 128;
         aes.Mode = System.Security.Cryptography.CipherMode.CBC;
@@ -522,7 +528,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
     internal byte[] GetIV()
     {
 
-        sequenceCounter += 1;
         var cipher = CipherUtilities.GetCipher($"AES/CBC/NOPADDING");
         var iv = new byte[16];
         var ivParameter = new ParametersWithIV(new KeyParameter(encKey), iv);
@@ -541,7 +546,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private byte[]? encKey;
     private byte[]? mac;
 
-    private BigInteger sequenceCounter = 0;
+    private BigInteger sequenceCounter = BigInteger.One;
 }
 
 
