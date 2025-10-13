@@ -160,7 +160,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     {
         Log.Info("Sending General Authenticate Command");
 
-        var typee = new MessageType.NonSecure();
+        var typee = MessageType.NonSecureMessage;
 
         var writer = new AsnWriter(AsnEncodingRules.DER);
         var ctxSeq = new Asn1Tag(TagClass.ContextSpecific, 0x7C, true);
@@ -194,7 +194,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     public async Task<TResult> GeneralAuthenticateMapping(byte innerTag, byte[] publicKey)
     {
         Log.Info("General Authentication Mapping");
-        var type = new MessageType.NonSecure();
+        var type = MessageType.NonSecureMessage;
         // TODO, check if length is bigger then 128
         byte[] innerSequence = [innerTag, (byte)publicKey.Length, .. publicKey];
         byte[] data = [0x7C, (byte)innerSequence.Length, .. innerSequence];
@@ -227,7 +227,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public async Task<TResultBool> GeneralAuthenticateMutual(byte[] icPubKey, byte[] terminalKey, byte[] oid, byte[] macKey)
     {
-        var type = new MessageType.NonSecure();
+        var type = MessageType.NonSecureMessage;
         byte[] innerSequence = [0x06, (byte)oid.Length, .. oid];
         byte[] innerSequence2 = [0x86, (byte)icPubKey.Length, .. icPubKey];
 
@@ -248,6 +248,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
             if (result.Value.data.Length == 0)
                 return Result<bool>.Fail(new Error.Other("General Authentication not sending the encrypted nounce!"));
 
+        if (!result.IsSuccess)
+            return Result<bool>.Fail(result.Error);
 
         byte[] innerSequenceIC = [0x06, (byte)oid.Length, .. oid];
         byte[] innerSequence2IC = [0x86, (byte)terminalKey.Length, .. terminalKey];
@@ -418,7 +420,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     //     For message authentication AES SHALL be used in CMAC-mode [SP 800-38B] with KSMAC with a MAC length of 8 bytes.
     // The datagram to be authenticated SHALL be prepended by the Send Sequence Counter.
-// !TODO fix for LE
+    // !TODO fix for LE
     internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte le = 0x00, byte lc = 0x00)
     {
 
