@@ -179,6 +179,8 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
+            Log.Info(BitConverter.ToString(result.Value.data));
+
             Log.Info("All commands completed without a problem");
 
         }

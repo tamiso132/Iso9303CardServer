@@ -25,7 +25,7 @@ public abstract record MessageType
 {
 
     public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte le = 0x00) where T : IServerFormat;
-    public abstract ResponseCommand ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
+    public abstract Task<ResponseCommand> ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
 
     public static Secure SecureMessage => new();
     public static NonSecure NonSecureMessage => new();
@@ -34,6 +34,12 @@ public abstract record MessageType
         internal Secure() { }
         public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte le = 0x00)
         {
+            _ins = ins;
+            _p1 = p1;
+            _p2 = p2;
+            _data = data;
+            _le = le;
+
 
             iv = command.GetIV();
             var bytes = command.FormatEncryptedCommand(data, ins, p1, p2, iv, le: le);
@@ -41,18 +47,129 @@ public abstract record MessageType
             return bytes;
         }
 
-        public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
+        public override async Task<ResponseCommand> ParseCommand<T>(Command<T> command, byte[] response)
         {
 
-            Log.Info("SSC: " + command.sequenceCounter);
-            //return command.ParseEncryptedReponse(response, iv);
-            command.DecryptDataENC(response, iv);
-            var resp = ResponseCommand.FromBytes(response).Value;
+
+            if (!CMacCheck(command, response))
+            {
+                throw new Exception("CMac Response Check Failed");
+            }
+
+
+            var tags = TagReader.ReadTagData(response);
+
+            byte swTag = 0x99;
+            var swData = tags.FilterByTag(swTag)[0].Data;
+
+            ResponseCommand respCommand = new(swData[0], swData[1]);
+
+
+
+
+
+            var dataTag = tags.FilterByTag(0x87);
+
+            if (dataTag.Count > 0)
+            {
+                var respIv = command.GetIV();
+                var encryptedData = dataTag[0].Data[1..];
+                // var aligned = Util.AlignData(encryptedData, 16);
+                var aligned = encryptedData;
+
+                var cipher = CipherUtilities.GetCipher($"AES/CBC/NOPADDING");
+                var ivParameter = new ParametersWithIV(new KeyParameter(command.encKey), respIv);
+                cipher.Init(false, ivParameter);
+                byte[] fullData = cipher.DoFinal(aligned);
+
+                if (!DecryptCheck(fullData))
+                    throw new Exception("DecryptFailed: " + fullData);
+
+                respCommand.data = fullData[0.._le];
+                byte dataLen = (byte)(respCommand.data[1] + 2);
+
+                Log.Info("le: " + _le + ", dataLen: " + dataLen);
+
+
+                // must get the rest of the bytes
+                if (dataLen > _le)
+                {
+                    Log.Info("Before: " + BitConverter.ToString(respCommand.data));
+                    command.sequenceCounter += BigInteger.One;
+                    byte[] fullResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: dataLen))).Value;
+                    respCommand = await ParseCommand(command, fullResp);
+                }
+                else
+                {
+
+                    Log.Info("DecryptedData: " + BitConverter.ToString(respCommand.data));
+                }
+            }
+            // make ready for next command
             command.sequenceCounter += BigInteger.One;
-            return resp;
+            return respCommand;
+        }
+
+        private bool CMacCheck<T>(Command<T> command, byte[] response) where T : IServerFormat
+        {
+            //return command.ParseEncryptedReponse(response, iv);
+            using var aes = System.Security.Cryptography.Aes.Create();
+            var tags = TagReader.ReadTagData(response[0..(response.Length - 2)]);
+
+
+            byte dataTag = 0x87;
+            byte swTag = 0x99;
+            byte macTag = 0x8E;
+
+            byte[] macFormat = command.sequenceCounter.ToPaddedLength(16);
+
+            var tag = tags.FilterByTag(dataTag);
+            if (tag.Count > 0)
+            {
+                macFormat = [.. macFormat, .. tag[0].GetHeaderFormat];
+            }
+
+            tag = tags.FilterByTag(swTag);
+
+            if (tag.Count > 0)
+            {
+                macFormat = [.. macFormat, .. tag[0].GetHeaderFormat];
+            }
+
+            byte[] chipToken = tags.FilterByTag(macTag)[0].Data;
+
+
+            byte[] paddedMacInput = Util.AlignData(macFormat, 16);
+
+            byte[] calcCmac = command.CalculateCMAC(paddedMacInput);
+
+            return calcCmac.SequenceEqual(chipToken);
+
+        }
+
+        private bool DecryptCheck(byte[] fullData)
+        {
+            byte[] paddingData = fullData[_le..];
+
+            if (!(paddingData[0] == 0x80))
+                throw new Exception("Decryption Failed, " + BitConverter.ToString(fullData));
+
+            if (paddingData.Length > 1)
+                return new BigInteger(paddingData[1..]) == 0;
+
+            return true;
+
+
+
+
         }
 
         byte[] iv = [];
+        int _le = 0;
+        byte _ins;
+        byte _p1;
+        byte _p2;
+        byte[] _data;
 
     }
 
@@ -64,7 +181,7 @@ public abstract record MessageType
             return Command<T>.FormatCommand(0x00, ins, p1, p2, data, le: le);
         }
 
-        public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
+        public override async Task<ResponseCommand> ParseCommand<T>(Command<T> command, byte[] response)
         {
             return ResponseCommand.FromBytes(response).Value;
         }
@@ -85,19 +202,20 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public bool IsActiveApp { get; private set; } = false;
 
-    public async Task<TResult> ReadBinary(MessageType type, IEfID efID, byte offset = 0x00, byte le = 0x00)
+    public async Task<TResult> ReadBinary(MessageType type, IEfID efID, byte offset = 0x00)
     {
+        byte le = type == MessageType.SecureMessage ? (byte)0x02 : (byte)0x00;
         var app = efID.AppIdentifier();
         if (_appSelected == app || app == null)
         {
-            return await ReadBinaryFullID(type, efID, offset, le);
+            return await ReadBinaryFullID(type, efID, offset, le: le);
 
         }
         else
         {
             await SelectApplication(type, app);
             _appSelected = app;
-            return await ReadBinaryFullID(type, efID, offset, le);
+            return await ReadBinaryFullID(type, efID, offset, le: le);
         }
     }
     public async Task<TResult> SelectApplication(MessageType type, AppID app)
@@ -330,44 +448,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return [.. cmd];
     }
 
-    internal ResponseCommand ParseEncryptedReponse(byte[] packet, byte[] iv)
-    {
-
-        byte sw1 = 0;
-        byte sw2 = 0;
-        if (packet.Length == 4)
-        {
-            // No data
-            sw1 = packet[2];
-            sw2 = packet[3];
-
-            return new ResponseCommand(sw1, sw2, null);
-        }
-
-        if (packet.Length == 2)
-        {
-            sw1 = packet[0];
-            sw2 = packet[1];
-            return new ResponseCommand(sw1, sw2, null);
-        }
-
-        Log.Info(BitConverter.ToString(packet));
-
-        Debug.Assert(packet[0] == 0x87);
-        Debug.Assert(packet[2] == 0x01);
-
-        byte dataLen = packet[1];
-
-        byte[] encryptedData = packet[2..dataLen];
-        sw1 = packet[dataLen + 2];
-        sw2 = packet[dataLen + 3];
-
-        byte[] decryptedData = DecryptDataENC(encryptedData, iv);
-
-        return new ResponseCommand(sw1, sw2, decryptedData);
-
-    }
-
 
 
     internal async Task<TResult> SendPackageDecodeResponse(MessageType messageType, byte[] cmd)
@@ -377,7 +457,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
             return Fail(result.Error);
 
 
-        ResponseCommand response = messageType.ParseCommand(this, result.Value);
+        ResponseCommand response = await messageType.ParseCommand(this, result.Value);
 
         if (response.status.IsSuccess())
             return TResult.Success(response);
@@ -388,7 +468,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
             Log.Info("Asking for more data");
             messageType.FormatCommand(this, 0xC0, 0x00, 0x00, []);
             var extra = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(cmd)));
-            ResponseCommand extraResp = messageType.ParseCommand(this, extra.Value);
+            ResponseCommand extraResp = await messageType.ParseCommand(this, extra.Value);
             byte[] bytes = extraResp.data[0..(extraResp.data.Length - 3)];
             response.data = [.. response.data, .. bytes];
             tempStatus = extraResp.status;
@@ -401,7 +481,13 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     }
 
-    private byte[] CalculateCMAC(byte[] data)
+    internal async Task<Result<byte[]>> SendPackageRaw(byte[] package)
+    {
+        var result = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(package)));
+        return result;
+    }
+
+    internal byte[] CalculateCMAC(byte[] data)
     {
         var engine = new CMac(new AesEngine(), 64);
         var calculatedToken = new byte[8];
@@ -436,7 +522,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte le = 0x00, byte lc = 0x00)
     {
 
-        Log.Info($"data: {BitConverter.ToString(data)}, ins: 0x{ins:X2}, p1: 0x{p1:X2}, p2: 0x{p2:X2}, iv: {BitConverter.ToString(iv)}, lc: 0x{lc:X2}, le: 0x{le:X2}");
+        //        Log.Info($"data: {BitConverter.ToString(data)}, ins: 0x{ins:X2}, p1: 0x{p1:X2}, p2: 0x{p2:X2}, iv: {BitConverter.ToString(iv)}, lc: 0x{lc:X2}, le: 0x{le:X2}");
 
 
         byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
@@ -503,78 +589,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
     //sid 91
     //     The Send Sequence Counter is set to its new start value, see Section 9.8.7.3 for AES.
 
-    public byte[] DecryptDataENC(byte[] encryptedData, byte[] iv)
-    {
-
-
-        using var aes = System.Security.Cryptography.Aes.Create();
-        var tags = TagReader.ReadTagData(encryptedData[0..(encryptedData.Length - 2)]);
-
-
-        byte dataTag = 0x87;
-        byte swTag = 0x99;
-        byte macTag = 0x8E;
-
-        byte[] newIV = GetIV();
-        byte[] macFormat = sequenceCounter.ToPaddedLength(16);
-
-        var tag = tags.FilterByTag(dataTag);
-        if (tag.Count > 0)
-        {
-            macFormat = [.. macFormat, .. tag[0].GetHeaderFormat];
-        }
-
-        tag = tags.FilterByTag(swTag);
-
-        if (tag.Count > 0)
-        {
-            macFormat = [.. macFormat, .. tag[0].GetHeaderFormat];
-        }
-
-        byte[] chipToken = tags.FilterByTag(macTag)[0].Data;
-
-
-        var paddedMacInput = Util.AlignData(macFormat, 16);
-
-        Log.Info("Padded Mac Input: " + BitConverter.ToString(paddedMacInput));
-
-        byte[] calcCmac = CalculateCMAC(paddedMacInput);
-
-        if (!calcCmac.SequenceEqual(chipToken))
-        {
-            TestClass.PrintByteComparison(chipToken, calcCmac);
-            throw new Exception("GOD IS GOOD");
-        }
-
-
-
-
-
-        return [];
-
-        aes.KeySize = 256;
-        aes.BlockSize = 128;
-        aes.Mode = System.Security.Cryptography.CipherMode.CBC;
-        aes.Key = encKey!;
-        aes.IV = iv;
-        aes.Mode = CipherMode.CBC;
-
-
-        var decryptor = aes.CreateDecryptor();
-        byte[] decryptedData = decryptor.TransformFinalBlock(encryptedData, 0, encryptedData.Length);
-
-        for (int i = decryptedData.Length - 1; i >= 0; i--)
-        {
-            if (decryptedData[i] == 0x80)
-            {
-                return decryptedData[0..(i - 1)];
-            }
-        }
-
-        throw new Exception("womp womp no kebab for you :/");
-
-    }
-
 
 
     //! only allowed to call once per command
@@ -596,8 +610,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private readonly ICommunicator _communicator = communicator;
     private readonly T _serverFormat = encryption;
 
-    private byte[]? encKey;
-    private byte[]? mac;
+    public byte[]? encKey;
+    public byte[]? mac;
 
     // Initialise SSC to pace starting value
     public BigInteger sequenceCounter = 1;
