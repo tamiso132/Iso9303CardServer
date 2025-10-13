@@ -40,6 +40,9 @@ public abstract record MessageType
 
         public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
         {
+            command.sequenceCounter += BigInteger.One;
+
+            Log.Info("SSC: " + command.sequenceCounter);
             //return command.ParseEncryptedReponse(response, iv);
             command.DecryptDataENC(response, iv);
             return ResponseCommand.FromBytes(response).Value;
@@ -194,6 +197,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
         return result;
+
     }
     public async Task<TResult> GeneralAuthenticateMapping(byte innerTag, byte[] publicKey)
     {
@@ -466,7 +470,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         //   Log.Info("Cmd: " + BitConverter.ToString(package));
 
-        // add sequence +1 for response
+        // add sequence +2 for response - must be even
         sequenceCounter += BigInteger.One + BigInteger.One;
 
 
@@ -492,8 +496,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     // sid 72, part 11 för secure messaging
     //sid 91
-    //     The Send Sequence Counter is set to its new start value, see Section 9.8.6.3 for 3DES and Section
-    // 9.8.7.3 for AES.
+    //     The Send Sequence Counter is set to its new start value, see Section 9.8.7.3 for AES.
 
     public byte[] DecryptDataENC(byte[] encryptedData, byte[] iv)
     {
@@ -573,7 +576,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private byte[]? encKey;
     private byte[]? mac;
 
-    private BigInteger sequenceCounter = BigInteger.One;
+    // Initialise SSC to pace starting value
+    public BigInteger sequenceCounter = BigInteger.One;
 }
 
 
