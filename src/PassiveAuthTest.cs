@@ -41,13 +41,13 @@ namespace EPassAuth
             List<X509Certificate2> masterListCscas,
             Dictionary<int, byte[]> dataGroups)
         {
-            Log.Info($"[INFO] Identifierar land...");
+            Log.Info($"Identifying country...");
             // 1. Hitta CSCA i masterlist baserat på DG12
             var cscaCert = FindCscaCert(issuingCountry, masterListCscas);
             if (cscaCert == null)
-                throw new Exception("Ingen CSCA hittades för landet " + issuingCountry);
+                throw new Exception(" No CSCA found for the country" + issuingCountry);
 
-            Log.Info($"[INFO] Found CSCA-certificate for {issuingCountry}:");
+            Log.Info($" Found CSCA-certificate for {issuingCountry}:");
             Log.Info($" Subject: {cscaCert.Subject}");
             Log.Info($" Issuer : {cscaCert.Issuer}");
             Log.Info($" FriendlyName: {cscaCert.FriendlyName}");
@@ -57,7 +57,7 @@ namespace EPassAuth
             if (dscCert == null)
                 throw new Exception("Could not extract DSC from EF.SOD file");
 
-            Log.Info("[INFO] Extracted DSC from EF.SOD");
+            Log.Info("Extracted DSC from EF.SOD");
 
             // Parsar EF.SOD till EFSodInfo
             var sodInfo = Parser.EFSodInfo.ParseEFSodLdsV18(efSodBytes);
@@ -66,19 +66,19 @@ namespace EPassAuth
             if (!VerifyCertChain(dscCert, cscaCert))
                 throw new Exception("DSC couldnt be verified against CSCA");
 
-            Log.Info("[INFO] Verified chain between DSC och CSCA");
+            Log.Info("Verified chain between DSC och CSCA");
 
             // 4. Verifiera EF.SOD signaturen
             if (!VerifySodSignature(efSodBytes, dscCert))
                 throw new Exception("EF.SOD signature is invalid");
 
-            Log.Info("[INFO] verified EF.SOD signature");
+            Log.Info("Verified EF.SOD signature");
 
             // 5. Verifiera DG-hashar mot EF.SOD
             if (!VerifyDataGroupHashes(sodInfo, dataGroups))
                 throw new Exception("Datagrupp-hashes does not match EF.SOD");
 
-            Log.Info("[INFO] DH-hashes verified against SOD");
+            Log.Info("DH-hashes verified against SOD");
             return true;
         }
 
@@ -112,19 +112,19 @@ namespace EPassAuth
                         var rawData = bcCert2.GetEncoded();
                         var dscCert = new X509Certificate2(rawData);
 
-                        Log.Info("[INFO] Extraherat DSC-certifikat från EF.SOD");
+                        Log.Info("Extracted DSC-certifikate from EF.SOD");
                         Log.Info($" Subject: {dscCert.Subject}");
                         Log.Info($" Issuer : {dscCert.Issuer}");
                         return dscCert;
                     }
                 }
 
-                Log.Info("ERROR: Kunde inte hitta DSC i EF.SOD");
+                Log.Info("ERROR: could not find DSC in EF.SOD");
                 return null;
             }
             catch (Exception ex)
             {
-                Log.Info("ERROR: Misslyckades med att extrahera DSC: " + ex.Message);
+                Log.Info("ERROR: Failed extraction of DSC: " + ex.Message);
                 return null;
             }
         }
@@ -167,7 +167,7 @@ namespace EPassAuth
                 }
             }
 
-            Log.Info("EF.SOD info not vaid :(");
+            Log.Info("EF.SOD info not valid :(");
             return false;
         }
 
@@ -193,7 +193,7 @@ namespace EPassAuth
                     return false;
                 }
 
-                Log.Info($" DG{dgNum} hash matchar EF.SOD");
+                Log.Info($" DG{dgNum} hash matches EF.SOD");
             }
 
             return true;
