@@ -191,6 +191,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
         return result;
+
     }
     public async Task<TResult> GeneralAuthenticateMapping(byte innerTag, byte[] publicKey)
     {
@@ -353,6 +354,11 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         byte[] decryptedData = DecryptDataENC(encryptedData, iv);
 
+        // Increment SSC by 1 - must be uneven for command
+        sequenceCounter += BigInteger.One;
+
+        Log.Info("SSC is: " + sequenceCounter);
+
         return new ResponseCommand(sw1, sw2, decryptedData);
 
     }
@@ -463,7 +469,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         //   Log.Info("Cmd: " + BitConverter.ToString(package));
 
-        // add sequence +1 for response
+        // add sequence +2 for response - must be even
         sequenceCounter += BigInteger.One + BigInteger.One;
 
 
@@ -489,16 +495,15 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     // sid 72, part 11 för secure messaging
     //sid 91
-    //     The Send Sequence Counter is set to its new start value, see Section 9.8.6.3 for 3DES and Section
-    // 9.8.7.3 for AES.
+    //     The Send Sequence Counter is set to its new start value, see Section 9.8.7.3 for AES.
 
     private byte[] DecryptDataENC(byte[] encryptedData, byte[] iv)
     {
 
 
         using var aes = System.Security.Cryptography.Aes.Create();
-       
-       
+
+
         aes.KeySize = 256;
         aes.BlockSize = 128;
         aes.Mode = System.Security.Cryptography.CipherMode.CBC;
@@ -546,7 +551,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private byte[]? encKey;
     private byte[]? mac;
 
-    private BigInteger sequenceCounter = BigInteger.One;
+    // Initialise SSC to pace starting value
+    public BigInteger sequenceCounter = BigInteger.One;
 }
 
 
