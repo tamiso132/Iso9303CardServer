@@ -170,14 +170,17 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
+            // Time for EF.SOD
+            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
+
+            if (!result.IsSuccess)
+            {
+                Log.Error(result.Error.ErrorMessage());
+                return;
+            }
+
             Log.Info("All commands completed without a problem");
 
-            // result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
-            // if (!result.IsSuccess)
-            // {
-            //     Log.Error(result.Error.ErrorMessage());
-            //     return;
-            // }
         }
 
         // await ReadFileWithSM(sm, EfIdGlobal.SOD);
