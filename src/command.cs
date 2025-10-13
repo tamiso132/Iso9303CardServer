@@ -38,6 +38,9 @@ public abstract record MessageType
 
         public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
         {
+            command.sequenceCounter += BigInteger.One;
+
+            Log.Info("SSC: " + command.sequenceCounter);
             //return command.ParseEncryptedReponse(response, iv);
             return ResponseCommand.FromBytes(response).Value;
         }
@@ -353,11 +356,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
         sw2 = packet[dataLen + 3];
 
         byte[] decryptedData = DecryptDataENC(encryptedData, iv);
-
-        // Increment SSC by 1 - must be uneven for command
-        sequenceCounter += BigInteger.One;
-
-        Log.Info("SSC is: " + sequenceCounter);
 
         return new ResponseCommand(sw1, sw2, decryptedData);
 
