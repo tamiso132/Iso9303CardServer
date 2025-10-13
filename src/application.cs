@@ -170,7 +170,11 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-            Log.Info(BitConverter.ToString(result.Value.data));
+            response = result.Value;
+            var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
+
+
+
 
             Log.Info("All commands completed without a problem");
 

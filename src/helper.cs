@@ -290,44 +290,65 @@ public static class BIgIntegerExtension
     }
 }
 
-
-
-
 public static class TagReader
 {
     public class TagEntry
     {
-        public byte Tag { get; set; }
+        public int Tag { get; set; }           // 1- or 2-byte tags
         public byte[] Data { get; set; } = [];
+        public List<TagEntry> Children { get; set; } = [];
 
-        public byte[] GetHeaderFormat => [Tag, (byte)Data.Length, .. Data];
+        public byte[] GetHeaderFormat()
+        {
+            byte[] tagBytes = Tag > 0xFF ? new[] { (byte)(Tag >> 8), (byte)Tag } : new[] { (byte)Tag };
+            return [.. tagBytes, (byte)Data.Length, .. Data];
+        }
     }
-    public static List<TagEntry> ReadTagData(byte[] buffer)
+
+    public static List<TagEntry> ReadTagData(byte[] buffer, HashSet<int>? sequenceTags = null)
     {
         var list = new List<TagEntry>();
         int i = 0;
 
-        while (i + 2 <= buffer.Length)
-        {
-            byte tag = buffer[i++];
-            int length = buffer[i++];
+        Log.Info(": " + BitConverter.ToString(buffer));
 
-            if (i + length > buffer.Length)
-                break; // safety check
+        while (i < buffer.Length)
+        {
+            if (i + 2 > buffer.Length) break;
+
+            // read tag
+            int tag = buffer[i];
+            i += 1;
+
+            if ((tag & 0x1F) == 0x1F) // multi-byte tag
+            {
+                if (i >= buffer.Length) break;
+                tag = (tag << 8) | buffer[i];
+                i++;
+            }
+
+            if (i >= buffer.Length) break;
+            int length = buffer[i];
+
+
+            if (i + length > buffer.Length) break;
+            i++;
 
             byte[] data = new byte[length];
             Array.Copy(buffer, i, data, 0, length);
             i += length;
 
-            list.Add(new TagEntry { Tag = tag, Data = data });
+            var entry = new TagEntry { Tag = tag, Data = data };
+
+            // parse children if this is a user-specified sequence tag
+            if (sequenceTags != null && sequenceTags.Contains(tag))
+                entry.Children = ReadTagData(entry.Data, sequenceTags);
+
+            list.Add(entry);
         }
 
         return list;
     }
-
-
-
-
 }
 
 public static class TagReaderExtensions
@@ -337,11 +358,32 @@ public static class TagReaderExtensions
         return entries.Where(e => e.Tag == tag).ToList();
     }
 
-    public static void PrintAll(this List<TagReader.TagEntry> tags)
+    public static void PrintAll(this List<TagReader.TagEntry> tags, int indent = 0)
     {
-        for (int i = 0; i < tags.Count; i++)
+        string indentStr = new string(' ', indent * 2);
+
+        foreach (var tag in tags)
         {
-            Log.Info("Tag: " + BitConverter.ToString([tags[i].Tag]) + "\nData: " + BitConverter.ToString(tags[i].Data));
+            Console.Write($"{indentStr}Tag: 0x{tag.Tag:X4} ");
+            Console.Write($"Data: {BitConverter.ToString(tag.Data)} ");
+
+            if (tag.Children != null && tag.Children.Count > 0)
+            {
+                Console.WriteLine();
+                tag.Children.PrintAll(indent + 1);
+            }
+            else
+            {
+                Console.WriteLine();
+            }
         }
+    }
+}
+
+public static class IntExtensions
+{
+    public static string ToHex(this int value, int digits = 2)
+    {
+        return value.ToString($"X{digits}");
     }
 }

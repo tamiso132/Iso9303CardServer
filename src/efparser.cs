@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Formats.Asn1;
 using System.Numerics;
 using System.Security.Cryptography;
@@ -16,48 +17,42 @@ using Type;
 namespace Parser;
 
 
-public class EfComInfo
-{
-    public string LdsVersion { get; set; } = "";
-    public string UnicodeVersion { get; set; } = "";
-    public List<int> DgTags { get; set; } = new();
-}
 
 //EFCOM
-public class ImplEfCom : IEfParser<EfComInfo>
+public class ImplEfCom : IEfParser<ImplEfCom.Info>
 {
+
+    public class Info
+    {
+        public List<int> DgTags { get; set; } = new();
+    }
     public string Name()
     {
         return "Com";
     }
 
-    public EfComInfo ParseFromBytes(byte[] bytes)
+    public Info ParseFromBytes(byte[] bytes)
     {
-        // var ef = new EfComInfo();
-        // var reader = new ByteReader(bytes);
+        var sequenceTags = new HashSet<int> { 0x60 };
+        Log.Info("bytesCom: " + BitConverter.ToString(bytes));
+        var sequenceTagss = TagReader.ReadTagData(bytes, sequenceTags);
+        sequenceTagss.PrintAll();
+        var sequenceTag = sequenceTagss[0];
 
-        // int tag = reader.ReadInt(1);
-        // if (tag != 0x60) throw new Exception("Not a valid EF.COM file");
 
-        // int length = reader.ReadLength();
-        // while (reader.HasRemaining())
-        // {
-        //     int innerTag = reader.ReadInt(1);
-        //     int innerLength = reader.ReadLength();
-        //     var value = reader.ReadBytes(innerLength);
 
-        //     switch (innerTag)
-        //     {
-        //         case 0x5F01: ef.LdsVersion = Encoding.ASCII.GetString(value); break;
-        //         case 0x5F36: ef.UnicodeVersion = Encoding.ASCII.GetString(value); break;
-        //         case 0x5C: ef.DgTags = new List<int>(value); break;
-        //         default: break;
-        //     }
-        // }
+
+
+
+        Debug.Assert(sequenceTag.Children.Count == 3, "ChildCount: " + sequenceTag.Children.Count);
+
+        var groupTags = sequenceTag.Children!.FilterByTag(0x5C)[0].Data;
+
+        Log.Info(BitConverter.ToString(groupTags));
+
         throw new NotImplementedException();
     }
 }
-
 
 
 public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>

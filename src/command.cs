@@ -126,14 +126,14 @@ public abstract record MessageType
             var tag = tags.FilterByTag(dataTag);
             if (tag.Count > 0)
             {
-                macFormat = [.. macFormat, .. tag[0].GetHeaderFormat];
+                macFormat = [.. macFormat, .. tag[0].GetHeaderFormat()];
             }
 
             tag = tags.FilterByTag(swTag);
 
             if (tag.Count > 0)
             {
-                macFormat = [.. macFormat, .. tag[0].GetHeaderFormat];
+                macFormat = [.. macFormat, .. tag[0].GetHeaderFormat()];
             }
 
             byte[] chipToken = tags.FilterByTag(macTag)[0].Data;
