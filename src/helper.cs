@@ -299,6 +299,8 @@ public static class TagReader
     {
         public byte Tag { get; set; }
         public byte[] Data { get; set; } = [];
+
+        public byte[] GetHeaderFormat => [Tag, (byte)Data.Length, .. Data];
     }
     public static List<TagEntry> ReadTagData(byte[] buffer)
     {

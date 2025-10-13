@@ -162,7 +162,7 @@ public class ClientSession(ICommunicator comm)
 
             Log.Info("Secure Messaging Established using: PACE, Session started.");
 
-            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdGlobal.AtrInfo, 0x00);
+            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdGlobal.AtrInfo, le: 0x04);
 
             if (!result.IsSuccess)
             {

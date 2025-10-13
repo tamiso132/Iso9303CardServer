@@ -24,7 +24,7 @@ using TResultBool = Result<bool>;
 public abstract record MessageType
 {
 
-    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte? le = null) where T : IServerFormat;
+    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte le = 0x00) where T : IServerFormat;
     public abstract ResponseCommand ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
 
     public static Secure SecureMessage => new();
@@ -32,20 +32,24 @@ public abstract record MessageType
     public sealed record Secure : MessageType
     {
         internal Secure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte? le = null)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte le = 0x00)
         {
+
             iv = command.GetIV();
-            return command.FormatEncryptedCommand(data, ins, p1, p2, iv);
+            var bytes = command.FormatEncryptedCommand(data, ins, p1, p2, iv, le: le);
+            command.sequenceCounter += BigInteger.One;
+            return bytes;
         }
 
         public override ResponseCommand ParseCommand<T>(Command<T> command, byte[] response)
         {
-            command.sequenceCounter += BigInteger.One;
 
             Log.Info("SSC: " + command.sequenceCounter);
             //return command.ParseEncryptedReponse(response, iv);
             command.DecryptDataENC(response, iv);
-            return ResponseCommand.FromBytes(response).Value;
+            var resp = ResponseCommand.FromBytes(response).Value;
+            command.sequenceCounter += BigInteger.One;
+            return resp;
         }
 
         byte[] iv = [];
@@ -55,7 +59,7 @@ public abstract record MessageType
     public sealed record NonSecure : MessageType
     {
         internal NonSecure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte? le = null)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte le = 0x00)
         {
             return Command<T>.FormatCommand(0x00, ins, p1, p2, data, le: le);
         }
@@ -140,7 +144,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         Log.Info("Selecting Element File: " + efID.GetName());
 
         Log.Info("Reading EF File: " + efID.GetName());
-        byte[] cmd = type.FormatCommand(this, 0xB0, 0x00, 0x00, [], le: 0x00);
+        byte[] cmd = type.FormatCommand(this, 0xB0, 0x00, 0x00, [], le: le);
         return await SendPackageDecodeResponse(type, cmd);
     }
 
@@ -432,7 +436,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte le = 0x00, byte lc = 0x00)
     {
 
-        Log.Info($"data: {BitConverter.ToString(data)}, ins: 0x{ins:X2}, p1: 0x{p1:X2}, p2: 0x{p2:X2}, iv: {BitConverter.ToString(iv)}, lc: 0x{lc:X2}");
+        Log.Info($"data: {BitConverter.ToString(data)}, ins: 0x{ins:X2}, p1: 0x{p1:X2}, p2: 0x{p2:X2}, iv: {BitConverter.ToString(iv)}, lc: 0x{lc:X2}, le: 0x{le:X2}");
 
 
         byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
@@ -440,6 +444,11 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte dataTag = (ins % 2) == 0 ? (byte)0x87 : (byte)0x85;
         byte macTag = 0x8E;
         byte leTag = 0x97;
+        byte[] leHeader = [];
+        if (le > 0)
+        {
+            leHeader = [leTag, 0x01, le];
+        }
 
         byte[] dataHeader = [];
         if (data.Length > 0)
@@ -447,7 +456,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
             byte[] encryptedData = [.. EncryptDataFormatENC(data, iv)];
             dataHeader = [dataTag, (byte)(encryptedData.Length + 1), 0x01, .. encryptedData];
         }
-        byte[] leHeader = [];
 
 
         byte[] seqCounterHeader = sequenceCounter.ToPaddedLength(16);
@@ -458,7 +466,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         // Log.Info("DataHeader: " + BitConverter.ToString(dataHeader));
         // Log.Info("IV: " + BitConverter.ToString(iv));
 
-        byte[] N = Util.AlignData([.. seqCounterHeader, .. cmdHeader, .. dataHeader], 16);
+        byte[] N = Util.AlignData([.. seqCounterHeader, .. cmdHeader, .. dataHeader, .. leHeader], 16);
         //  Log.Info("N: " + BitConverter.ToString(N));
         byte[] token = CalculateCMAC(N);
         byte[] macHeader = [macTag, 0x08, .. token];
@@ -466,15 +474,12 @@ public class Command<T>(ICommunicator communicator, T encryption)
         //  Log.Info("macHeader: " + BitConverter.ToString(macHeader));
 
 
-        byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length), .. dataHeader, .. macHeader, 0x00];
+        byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length + leHeader.Length), .. dataHeader, .. leHeader, .. macHeader, 0x00];
 
         //   Log.Info("Cmd: " + BitConverter.ToString(package));
 
         // add sequence +2 for response - must be even
-        sequenceCounter += BigInteger.One + BigInteger.One;
 
-
-        Log.Info("SequenceNumber: " + sequenceCounter);
 
         return package;
     }
@@ -506,20 +511,38 @@ public class Command<T>(ICommunicator communicator, T encryption)
         var tags = TagReader.ReadTagData(encryptedData[0..(encryptedData.Length - 2)]);
 
 
+        byte dataTag = 0x87;
+        byte swTag = 0x99;
+        byte macTag = 0x8E;
+
         byte[] newIV = GetIV();
+        byte[] macFormat = sequenceCounter.ToPaddedLength(16);
 
-        var swTag = tags.FilterByTag(0x99)[0];
-        var macTag = tags.FilterByTag(0x8E)[0];
+        var tag = tags.FilterByTag(dataTag);
+        if (tag.Count > 0)
+        {
+            macFormat = [.. macFormat, .. tag[0].GetHeaderFormat];
+        }
 
-        var paddedMacInput = Util.AlignData([swTag.Tag, 0x02, .. swTag.Data], 16);
+        tag = tags.FilterByTag(swTag);
+
+        if (tag.Count > 0)
+        {
+            macFormat = [.. macFormat, .. tag[0].GetHeaderFormat];
+        }
+
+        byte[] chipToken = tags.FilterByTag(macTag)[0].Data;
+
+
+        var paddedMacInput = Util.AlignData(macFormat, 16);
 
         Log.Info("Padded Mac Input: " + BitConverter.ToString(paddedMacInput));
 
         byte[] calcCmac = CalculateCMAC(paddedMacInput);
 
-        if (!calcCmac.SequenceEqual(macTag.Data))
+        if (!calcCmac.SequenceEqual(chipToken))
         {
-            TestClass.PrintByteComparison(calcCmac, macTag.Data);
+            TestClass.PrintByteComparison(chipToken, calcCmac);
             throw new Exception("GOD IS GOOD");
         }
 
@@ -577,7 +600,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private byte[]? mac;
 
     // Initialise SSC to pace starting value
-    public BigInteger sequenceCounter = BigInteger.One;
+    public BigInteger sequenceCounter = 1;
 }
 
 
