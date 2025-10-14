@@ -327,7 +327,7 @@ public static class TagReader
         {
             if (i + 2 > buffer.Length) break;
 
-            // read tag
+            // Read Tag
             int tag = buffer[i];
             i += 1;
 
@@ -338,17 +338,27 @@ public static class TagReader
             //     i++;
             // }
             {
-                while (i < buffer.Length && (buffer[i] & 0x80) == 0x80) ;
+                while (i < buffer.Length && (buffer[i] & 0x80) == 0x80)
                 {
                     tag = (tag << 8) | buffer[i];
+                    i++;
                 }
                 if (i < buffer.Length)
+                {
+
+
                     tag = (tag << 8) | buffer[i];
+                    i++;
+                }
             }
 
             if (i >= buffer.Length) break;
 
+            // Read length
             int lengthByte = buffer[i];
+            i++;
+
+
             int length;
             if ((lengthByte & 0x80) == 0)
             {
@@ -359,12 +369,15 @@ public static class TagReader
             {
                 // Long form
                 int numBytes = lengthByte & 0x7F;
-                if (i + numBytes > buffer.Length) break;
+                //if (i + numBytes > buffer.Length) break;
 
                 length = 0;
+
                 for (int j = 0; j < numBytes; j++)
                 {
+                    
                     length = (length << 8) | buffer[i];
+                    i++;
                 }
             }
 
@@ -388,6 +401,8 @@ public static class TagReader
                 entry.Children = ReadTagData(entry.Data, sequenceTags);
 
             list.Add(entry);
+
+            
         }
 
         return list;
