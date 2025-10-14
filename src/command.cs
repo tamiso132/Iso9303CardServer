@@ -44,7 +44,10 @@ public abstract record MessageType
             iv = command.GetIV();
             var bytes = command.FormatEncryptedCommand(data, ins, p1, p2, iv, le: le);
             command.sequenceCounter += BigInteger.One;
+            Log.Info("SSC: " + command.sequenceCounter);
             return bytes;
+
+
         }
 
         public override async Task<ResponseCommand> ParseCommand<T>(Command<T> command, byte[] response)
@@ -107,6 +110,7 @@ public abstract record MessageType
             }
             // make ready for next command
             command.sequenceCounter += BigInteger.One;
+            Log.Info("SSC: " + command.sequenceCounter);
             return respCommand;
         }
 
@@ -528,6 +532,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
 
         byte dataTag = (ins % 2) == 0 ? (byte)0x87 : (byte)0x85;
+        //byte dataTag = 0x87;
         byte macTag = 0x8E;
         byte leTag = 0x97;
         byte[] leHeader = [];
@@ -561,6 +566,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
         byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length + leHeader.Length), .. dataHeader, .. leHeader, .. macHeader, 0x00];
+      //int payloadLen = dataHeader.Length + macHeader.Length + leHeader.Length;
+       // byte[] package = [0x0C, ins, p1, p2, (byte)payloadLen, .. dataHeader, .. leHeader, .. macHeader];
 
         //   Log.Info("Cmd: " + BitConverter.ToString(package));
 

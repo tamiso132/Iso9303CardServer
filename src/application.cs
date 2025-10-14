@@ -162,12 +162,11 @@ public class ClientSession(ICommunicator comm)
 
             Log.Info("Secure Messaging Established using: PACE, Session started.");
 
-            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdGlobal.AtrInfo);
+            // result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdGlobal.AtrInfo);
 
-            //Change to LDS1 has to be secure
+            // Change to LDS1 MUST be secure
             result = await _cmd.SelectApplication(MessageType.SecureMessage, AppID.IdLDS1);
 
-           // Log.Info("SSC: " + command.sequenceCounter);
 
             if (!result.IsSuccess)
             {
