@@ -158,6 +158,16 @@ public class ByteReader(byte[] data)
 
         int numBytes = first & 0x7F;
         return ReadInt(numBytes);
+
+        // if (numBytes > 4)
+        //     throw new InvalidOperationException("Unsupported ASN.1 lenght (to big)");
+
+        // byte[] lengthBytes = ReadBytes(numBytes);
+        // int length = 0;
+        // foreach (byte b in lengthBytes)
+        //     length = (length << 8) | b;
+        // return length;
+        //return ReadInt(numBytes);
     }
 
     public AsnInfo ReadASN1()
