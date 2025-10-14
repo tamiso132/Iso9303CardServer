@@ -142,7 +142,6 @@ public abstract record MessageType
 
             byte[] chipToken = tags.FilterByTag(macTag)[0].Data;
 
-
             byte[] paddedMacInput = Util.AlignData(macFormat, 16);
 
             byte[] calcCmac = command.CalculateCMAC(paddedMacInput);
