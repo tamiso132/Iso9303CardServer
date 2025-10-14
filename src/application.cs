@@ -164,28 +164,40 @@ public class ClientSession(ICommunicator comm)
 
             result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdGlobal.AtrInfo);
 
+            //Change to LDS1 has to be secure
+            result = await _cmd.SelectApplication(MessageType.SecureMessage, AppID.IdLDS1);
+
+           // Log.Info("SSC: " + command.sequenceCounter);
+
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
+
 
             // Time for EF.SOD
             result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
 
+
             if (!result.IsSuccess)
             {
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
 
-            response = result.Value;
-            var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
-
             Log.Info("Found EF.SOD");
 
 
-            await EPassAuth.PassiveAuthentication.VerifySodSignature();
+
+
+            response = result.Value;
+            var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
+
+
+
+
+            //await EPassAuth.PassiveAuthentication.VerifySodSignature();
 
             try
             {
