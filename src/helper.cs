@@ -321,8 +321,13 @@ public static class TagReader
         var list = new List<TagEntry>();
         int i = 0;
 
-        Log.Info(": " + BitConverter.ToString(buffer));
+        Log.Info("BufferSize: " + buffer.Length);
+        Log.Info(((int)buffer[1]).ToString());
 
+        if (buffer.Length > 130)
+        {
+            Log.Info(((int)buffer[(int)buffer[1] + 1]).ToString());
+        }
         while (i < buffer.Length)
         {
             if (i + 2 > buffer.Length) break;
@@ -352,37 +357,24 @@ public static class TagReader
                 }
             }
 
-            if (i >= buffer.Length) break;
-
-            // Read length
-            int lengthByte = buffer[i];
-            i++;
-
-
-            int length;
-            if ((lengthByte & 0x80) == 0)
+            // longform
+            int length = buffer[i];
+            if ((length & 0x80) == 0x80)
             {
-                // Short form
-                length = lengthByte;
-            }
-            else
-            {
-                // Long form
-                int numBytes = lengthByte & 0x7F;
-                //if (i + numBytes > buffer.Length) break;
 
+                // how many bytes 
+                int byteCount = (length & ~(0x80));
                 length = 0;
-
-                for (int j = 0; j < numBytes; j++)
+                for (int ii = 0; ii < byteCount; ii++)
                 {
-
-                    length = (length << 8) | buffer[i];
                     i++;
+                    length = (length << 8) | buffer[i];
                 }
-            }
 
-            if (i + length > buffer.Length) break;
-            i++;
+                Log.Info("long form length: " + length);
+                // for now
+                i++;
+            }
 
             // Read Value
 
@@ -391,6 +383,7 @@ public static class TagReader
             // i++;
 
             byte[] data = new byte[length];
+            Log.Info("Copy from i= (" + i + "), copy size(" + length + ")");
             Array.Copy(buffer, i, data, 0, length);
             i += length;
 
@@ -398,8 +391,11 @@ public static class TagReader
 
             // parse children if this is a user-specified sequence tag
             if (sequenceTags != null && sequenceTags.Contains(tag))
+            {
+                Log.Info("hello man?: " + entry.Tag.ToHex());
                 entry.Children = ReadTagData(entry.Data, sequenceTags);
-
+            }
+            Log.Info("Tag: " + entry.Tag.ToHex() + ", Length: " + entry.Data.Length);
             list.Add(entry);
 
 

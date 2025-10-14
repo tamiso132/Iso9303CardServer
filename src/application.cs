@@ -192,8 +192,9 @@ public class ClientSession(ICommunicator comm)
 
 
 
-            // response = result.Value;
-            // var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
+            response = result.Value;
+            return;
+          //  var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
 
 
             //Log.Info("response: " + response);

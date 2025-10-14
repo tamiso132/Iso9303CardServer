@@ -12,7 +12,6 @@ using Encryption;
 // Load the ML file (DER encoded)
 // byte[] mlBytes = [File.ReadAllBytes("masterlist-cscas/C=AT,O=GV,OU=BMI,CN=CSCA-AUSTRIA56.pem")];
 
-
 // // Step 1: unwrap CMS chain
 // var cmsChain = new System.Collections.Generic.List<byte[]>();
 // byte[] currentBytes = mlBytes;

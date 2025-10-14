@@ -25,7 +25,7 @@ public abstract record MessageType
 {
 
     public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte le = 0x00) where T : IServerFormat;
-    public abstract Task<ResponseCommand> ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
+    public abstract Task<TResult> ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
 
     public static Secure SecureMessage => new();
     public static NonSecure NonSecureMessage => new();
@@ -50,7 +50,7 @@ public abstract record MessageType
 
         }
 
-        public override async Task<ResponseCommand> ParseCommand<T>(Command<T> command, byte[] response)
+        public override async Task<TResult> ParseCommand<T>(Command<T> command, byte[] response)
         {
 
 
@@ -100,7 +100,7 @@ public abstract record MessageType
                     Log.Info("Before: " + BitConverter.ToString(respCommand.data));
                     command.sequenceCounter += BigInteger.One;
                     byte[] fullResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: dataLen))).Value;
-                    respCommand = await ParseCommand(command, fullResp);
+                    respCommand = (await ParseCommand(command, fullResp)).Value;
                 }
                 else
                 {
@@ -111,16 +111,16 @@ public abstract record MessageType
             // make ready for next command
             command.sequenceCounter += BigInteger.One;
             Log.Info("SSC: " + command.sequenceCounter);
-            return respCommand;
+            return TResult.Success(respCommand);
         }
 
         private bool CMacCheck<T>(Command<T> command, byte[] response) where T : IServerFormat
         {
+            Log.Info(BitConverter.ToString(response));
             //return command.ParseEncryptedReponse(response, iv);
             using var aes = System.Security.Cryptography.Aes.Create();
-            var tags = TagReader.ReadTagData(response[0..(response.Length - 2)]);
-
-
+            List<TagReader.TagEntry> tags = TagReader.ReadTagData(response[0..(response.Length - 2)]);
+            tags.PrintAll();
             byte dataTag = 0x87;
             byte swTag = 0x99;
             byte macTag = 0x8E;
@@ -184,9 +184,9 @@ public abstract record MessageType
             return Command<T>.FormatCommand(0x00, ins, p1, p2, data, le: le);
         }
 
-        public override async Task<ResponseCommand> ParseCommand<T>(Command<T> command, byte[] response)
+        public override async Task<TResult> ParseCommand<T>(Command<T> command, byte[] response)
         {
-            return ResponseCommand.FromBytes(response).Value;
+            return ResponseCommand.FromBytes(response);
         }
 
     }
@@ -490,7 +490,12 @@ public class Command<T>(ICommunicator communicator, T encryption)
             return Fail(result.Error);
 
 
-        ResponseCommand response = await messageType.ParseCommand(this, result.Value);
+        var parseResult = await messageType.ParseCommand(this, result.Value);
+
+        if (!parseResult.IsSuccess)
+            return parseResult;
+
+        var response = parseResult.Value;
 
         if (response.status.IsSuccess())
             return TResult.Success(response);
@@ -501,7 +506,13 @@ public class Command<T>(ICommunicator communicator, T encryption)
             Log.Info("Asking for more data");
             messageType.FormatCommand(this, 0xC0, 0x00, 0x00, []);
             var extra = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(cmd)));
-            ResponseCommand extraResp = await messageType.ParseCommand(this, extra.Value);
+            var parseExtraResult = await messageType.ParseCommand(this, extra.Value);
+
+            if (!parseResult.IsSuccess)
+                return parseResult;
+
+            var extraResp = parseExtraResult.Value;
+
             byte[] bytes = extraResp.data[0..(extraResp.data.Length - 3)];
             response.data = [.. response.data, .. bytes];
             tempStatus = extraResp.status;
@@ -595,8 +606,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
         byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length + leHeader.Length), .. dataHeader, .. leHeader, .. macHeader, 0x00];
-      //int payloadLen = dataHeader.Length + macHeader.Length + leHeader.Length;
-       // byte[] package = [0x0C, ins, p1, p2, (byte)payloadLen, .. dataHeader, .. leHeader, .. macHeader];
+        //int payloadLen = dataHeader.Length + macHeader.Length + leHeader.Length;
+        // byte[] package = [0x0C, ins, p1, p2, (byte)payloadLen, .. dataHeader, .. leHeader, .. macHeader];
 
         //   Log.Info("Cmd: " + BitConverter.ToString(package));
 
