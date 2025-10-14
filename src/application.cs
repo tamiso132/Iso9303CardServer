@@ -175,6 +175,7 @@ public class ClientSession(ICommunicator comm)
             }
 
 
+
             // Time for EF.SOD
             result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
 
@@ -185,22 +186,24 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-            Log.Info("Found EF.SOD");
+            Log.Info("Raw EF.SOD bytes: " + BitConverter.ToString(result.Value.data));
+            //Log.Info("Found EF.SOD");
 
 
 
 
-            response = result.Value;
-            var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
+            // response = result.Value;
+            // var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
 
 
-
+            //Log.Info("response: " + response);
 
             //await EPassAuth.PassiveAuthentication.VerifySodSignature();
 
             try
             {
                 var efSodInfo = EFSodInfo.ParseEFSodLdsV18(result.Value.data);
+                Log.Info("Found EF.SOD");
 
                 Log.Info("EF.SOD is parsed!");
                 Log.Info("Digest algorithm: " + efSodInfo.DigestAlgorithm);

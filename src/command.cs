@@ -351,6 +351,36 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return result;
     }
 
+    // public async Task<Result<byte[]>> ReadSecureEf(IEfID efId)
+    // {
+    //     var result = await ReadBinary(MessageType.SecureMessage, efId);
+    //     if (!result.IsSuccess)
+    //         return Result<byte[]>.Fail(result.Error);
+
+    //     var response = result.Value;
+
+    //     var tags = TagReader.ReadTagData(response.data);
+    //     var dataTag = tags.FilterByTag(0x87);
+    //     if (dataTag.Count == 0)
+    //         return Result<byte[]>.Success(response.data);
+
+    //     var encryptedData = dataTag[0].Data[1..]; //Skip tag header??
+    //     var iv = GetIV();
+
+    //     var cipher = CipherUtilities.GetCipher("AES/CBC/NOPADDING");
+    //     var ivParam = new ParametersWithIV(new KeyParameter(encKey), iv);
+    //     cipher.Init(false, ivParam);
+
+    //     var decrypted = cipher.DoFinal(encryptedData);
+
+    //     int paddingStart = Array.IndexOf(decrypted, (byte)(0x80));
+    //     if(paddingStart < 0)
+    //     return Result<byte[]>.Fail(new Error.Other("Decrypt failed"))
+        
+        
+    //     return;
+    // }
+
     public void SetEncryption(byte[] enc, byte[] mac)
     {
         Log.Info("EncKey: " + BitConverter.ToString(enc));
