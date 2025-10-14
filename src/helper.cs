@@ -375,7 +375,7 @@ public static class TagReader
 
                 for (int j = 0; j < numBytes; j++)
                 {
-                    
+
                     length = (length << 8) | buffer[i];
                     i++;
                 }
@@ -402,7 +402,7 @@ public static class TagReader
 
             list.Add(entry);
 
-            
+
         }
 
         return list;
