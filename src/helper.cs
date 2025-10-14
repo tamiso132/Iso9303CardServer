@@ -2,6 +2,7 @@ using Encryption;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
+using Org.BouncyCastle.Crypto.Modes;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
@@ -157,7 +158,7 @@ public class ByteReader(byte[] data)
         if (first < 0x80) return first;
 
         int numBytes = first & 0x7F;
-        
+
 
         // if (numBytes > 4)
         //     throw new InvalidOperationException("Unsupported ASN.1 lenght (to big)");
@@ -331,18 +332,50 @@ public static class TagReader
             i += 1;
 
             if ((tag & 0x1F) == 0x1F) // multi-byte tag
+            // {
+            //     if (i >= buffer.Length) break;
+            //     tag = (tag << 8) | buffer[i];
+            //     i++;
+            // }
             {
-                if (i >= buffer.Length) break;
-                tag = (tag << 8) | buffer[i];
-                i++;
+                while (i < buffer.Length && (buffer[i] & 0x80) == 0x80) ;
+                {
+                    tag = (tag << 8) | buffer[i];
+                }
+                if (i < buffer.Length)
+                    tag = (tag << 8) | buffer[i];
             }
 
             if (i >= buffer.Length) break;
-            int length = buffer[i];
 
+            int lengthByte = buffer[i];
+            int length;
+            if ((lengthByte & 0x80) == 0)
+            {
+                // Short form
+                length = lengthByte;
+            }
+            else
+            {
+                // Long form
+                int numBytes = lengthByte & 0x7F;
+                if (i + numBytes > buffer.Length) break;
+
+                length = 0;
+                for (int j = 0; j < numBytes; j++)
+                {
+                    length = (length << 8) | buffer[i];
+                }
+            }
 
             if (i + length > buffer.Length) break;
             i++;
+
+            // Read Value
+
+            //int length = buffer[i];
+            // if (i + length > buffer.Length) break;
+            // i++;
 
             byte[] data = new byte[length];
             Array.Copy(buffer, i, data, 0, length);
