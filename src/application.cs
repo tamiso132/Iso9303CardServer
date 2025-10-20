@@ -191,9 +191,6 @@ public class ClientSession(ICommunicator comm)
             Log.Info("Raw EF.SOD bytes: " + BitConverter.ToString(result.Value.data));
             //Log.Info("Found EF.SOD");
 
-
-
-
             response = result.Value;
             //  var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
 
