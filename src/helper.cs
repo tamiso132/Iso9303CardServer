@@ -39,6 +39,8 @@ public static class MrzUtils
             dateExpire = data.expiry_date;
         }
 
+        Log.Info("mrz: " + docNr + " " + birth + " " + dateExpire);
+
         while (docNr.Length < 9)
             docNr += "<";
 
@@ -355,7 +357,7 @@ public static class TagReader
             else
             {
                 Log.Info("short form?");
-                length += 1;
+                i += 1;
             }
 
 
