@@ -40,8 +40,8 @@ public abstract record MessageType
             _data = data;
             _le = le;
 
-
             iv = command.GetIV();
+            Log.Info("le: " + le.ToString());
             var bytes = command.FormatEncryptedCommand(data, ins, p1, p2, iv, le: le);
             command.sequenceCounter += BigInteger.One;
             Log.Info("SSC: " + command.sequenceCounter);
@@ -89,7 +89,9 @@ public abstract record MessageType
                     throw new Exception("DecryptFailed: " + fullData);
 
                 respCommand.data = fullData[0.._le];
-                byte dataLen = (byte)(respCommand.data[1] + 2);
+                var lenParser = new TagReader.Length();
+                int i = 1;
+                int dataLen = lenParser.ParseLength(respCommand.data, ref i);
 
                 Log.Info("le: " + _le + ", dataLen: " + dataLen);
 
@@ -97,6 +99,7 @@ public abstract record MessageType
                 // must get the rest of the bytes
                 if (dataLen > _le)
                 {
+                    // calculate
                     Log.Info("Before: " + BitConverter.ToString(respCommand.data));
                     command.sequenceCounter += BigInteger.One;
                     byte[] fullResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: dataLen))).Value;
@@ -105,7 +108,7 @@ public abstract record MessageType
                 else
                 {
 
-                   // Log.Info("DecryptedData: " + BitConverter.ToString(respCommand.data));
+                    // Log.Info("DecryptedData: " + BitConverter.ToString(respCommand.data));
                 }
             }
             // make ready for next command
@@ -226,7 +229,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public async Task<TResult> ReadBinary(MessageType type, IEfID efID, byte offset = 0x00)
     {
-        byte le = type == MessageType.SecureMessage ? (byte)0x02 : (byte)0x00;
+        byte le = type == MessageType.SecureMessage ? (byte)0x10 : (byte)0x00;
         var app = efID.AppIdentifier();
         if (_appSelected == app || app == null)
         {

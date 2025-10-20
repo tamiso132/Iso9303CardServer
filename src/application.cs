@@ -195,7 +195,6 @@ public class ClientSession(ICommunicator comm)
 
 
             response = result.Value;
-            return;
             //  var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
 
 
