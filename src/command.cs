@@ -24,7 +24,7 @@ using TResultBool = Result<bool>;
 public abstract record MessageType
 {
 
-    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte le = 0x00) where T : IServerFormat;
+    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00) where T : IServerFormat;
     public abstract Task<TResult> ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
 
     public static Secure SecureMessage => new();
@@ -32,7 +32,7 @@ public abstract record MessageType
     public sealed record Secure : MessageType
     {
         internal Secure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte le = 0x00)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00)
         {
             _ins = ins;
             _p1 = p1;
@@ -91,20 +91,21 @@ public abstract record MessageType
                 respCommand.data = fullData[0.._le];
                 var lenParser = new TagReader.Length();
                 int i = 1;
-                int dataLen = lenParser.ParseLength(respCommand.data, ref i);
+                int DataPacketLen = lenParser.ParseLength(respCommand.data, ref i);
+                int recLen = fullData.Length;
 
-                Log.Info("le: " + _le + ", dataLen: " + dataLen);
+                Log.Info("le: " + _le + ", dataLen: " + DataPacketLen);
 
 
                 // must get the rest of the bytes
-                if (dataLen > _le)
+                if (DataPacketLen > _le)
                 {
-                    // calculate
                     Log.Info("Before: " + BitConverter.ToString(respCommand.data));
                     command.sequenceCounter += BigInteger.One;
-                    byte[] fullResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: dataLen))).Value;
+                    byte[] fullResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: DataPacketLen))).Value;
                     respCommand = (await ParseCommand(command, fullResp)).Value;
                 }
+
                 else
                 {
 
@@ -174,6 +175,7 @@ public abstract record MessageType
 
         private bool DecryptCheck(byte[] fullData)
         {
+            Log.Info("Data bytes: " + BitConverter.ToString(fullData));
             byte[] paddingData = fullData[_le..];
 
             if (!(paddingData[0] == 0x80))
@@ -201,7 +203,7 @@ public abstract record MessageType
     public sealed record NonSecure : MessageType
     {
         internal NonSecure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, byte le = 0x00)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00)
         {
             return Command<T>.FormatCommand(0x00, ins, p1, p2, data, le: le);
         }
@@ -490,7 +492,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         return cmdFormat;
     }
-    internal static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, byte? le = null)
+    internal static byte[] FormatCommand(byte cla, byte ins, byte p1, byte p2, byte[] data = null!, int? le = null)
     {
         var cmd = new List<byte> { cla, ins, p1, p2 };
         if (data != null && data.Length > 0)
@@ -498,7 +500,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
             cmd.Add((byte)data.Length);
             cmd.AddRange(data);
         }
-        if (le != null) cmd.Add(le.Value);
+        if (le != null) cmd.Add((byte)(le & 0xFF));
 
         return [.. cmd];
     }
@@ -585,7 +587,10 @@ public class Command<T>(ICommunicator communicator, T encryption)
     //     For message authentication AES SHALL be used in CMAC-mode [SP 800-38B] with KSMAC with a MAC length of 8 bytes.
     // The datagram to be authenticated SHALL be prepended by the Send Sequence Counter.
     // !TODO fix for LE
-    internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, byte le = 0x00, byte lc = 0x00)
+
+    //An extended Lc field consists of three bytes: one byte set to '00' followed by two bytes not set to
+    //'0000'. From '0001' to 'FFFF', the two bytes encode Nc from one to 65 535
+    internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, int le = 0x00, byte lc = 0x00)
     {
 
         //        Log.Info($"data: {BitConverter.ToString(data)}, ins: 0x{ins:X2}, p1: 0x{p1:X2}, p2: 0x{p2:X2}, iv: {BitConverter.ToString(iv)}, lc: 0x{lc:X2}, le: 0x{le:X2}");
@@ -600,7 +605,13 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] leHeader = [];
         if (le > 0)
         {
-            leHeader = [leTag, 0x01, le];
+            byte[] leData = le.IntoLeExtended();
+            bool isExtended = (leData[0] | leData[1]) != 0x00;
+            if (isExtended)
+                leHeader = [leTag, (byte)leData.Length, 0x00, 0x1, 0x4C];
+            // leHeader = [leTag, (byte)leData.Length, .. leData];
+            else
+                leHeader = [leTag, 1, leData[2]];
         }
 
         byte[] dataHeader = [];
@@ -626,12 +637,12 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         //  Log.Info("macHeader: " + BitConverter.ToString(macHeader));
 
-
-        byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length + leHeader.Length), .. dataHeader, .. leHeader, .. macHeader, 0x00];
+        byte[] extendedLen = leHeader.Length > 3 ? [0x00, 0x00] : [0x00];
+        byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length + leHeader.Length), .. dataHeader, .. leHeader, .. macHeader, .. extendedLen];
         //int payloadLen = dataHeader.Length + macHeader.Length + leHeader.Length;
         // byte[] package = [0x0C, ins, p1, p2, (byte)payloadLen, .. dataHeader, .. leHeader, .. macHeader];
 
-        //   Log.Info("Cmd: " + BitConverter.ToString(package));
+        Log.Info("Cmd: " + BitConverter.ToString(leHeader));
 
         // add sequence +2 for response - must be even
 

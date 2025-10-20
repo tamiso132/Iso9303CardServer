@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
 using Org.BouncyCastle.Crypto.Modes;
+using Org.BouncyCastle.Utilities;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
@@ -444,5 +445,10 @@ public static class IntExtensions
     public static string ToHex(this int value, int digits = 2)
     {
         return value.ToString($"X{digits}");
+    }
+
+    public static byte[] IntoLeExtended(this int value)
+    {
+        return [0x00, (byte)((value >> 8) & 0xFF), (byte)(value & 0xFF)];
     }
 }

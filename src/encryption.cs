@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Formats.Asn1;
 using System.Numerics;
 using System.Runtime.Intrinsics.Arm;
@@ -81,6 +82,14 @@ public class TestClass
         Console.WriteLine();
     }
 
+    public static bool TestLengthThing()
+    {
+        int first = 0xFF01;
+        byte[] hey = first.IntoLeExtended();
+        Log.Info(hey[1].ToString());
+
+        return hey[0] == 0xFF && hey[1] == 0x01;
+    }
     static void TestEncryptionMessage()
     {
         byte[] KSEnc = new byte[]
@@ -402,6 +411,9 @@ public class TestClass
             return false;
 
         if (!TestingECDH())
+            return false;
+
+        if (!TestLengthThing())
             return false;
 
         TestEncryptionMessage();
