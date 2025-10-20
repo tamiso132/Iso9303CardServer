@@ -303,18 +303,58 @@ public static class BIgIntegerExtension
     }
 }
 
+
+
 public static class TagReader
 {
+    public class Length
+    {
+        public byte[] GetHeaderFormat()
+        {
+            return lengthHeader;
+        }
+
+        public int ParseLength(byte[] data, ref int i)
+        {
+            lengthHeader = [data[i]];
+            int length = data[i];
+            int oldI = i;
+            i++;
+
+
+            if ((length & 0x80) == 0x80) // longform
+            {
+
+                // how many bytes 
+                int byteCount = length & ~0x80;
+                length = 0;
+
+                for (int ii = 0; ii < byteCount; ii++)
+                {
+                    length = (length << 8) | data[i];
+                    i++;
+                }
+
+
+                lengthHeader = data[oldI..i];
+                // for now
+            }
+            return length;
+        }
+        byte[] lengthHeader = [];
+    }
     public class TagEntry
     {
         public int Tag { get; set; }           // 1- or 2-byte tags
         public byte[] Data { get; set; } = [];
+
+        public Length _length = new();
         public List<TagEntry> Children { get; set; } = [];
 
         public byte[] GetHeaderFormat()
         {
             byte[] tagBytes = Tag > 0xFF ? new[] { (byte)(Tag >> 8), (byte)Tag } : new[] { (byte)Tag };
-            return [.. tagBytes, (byte)Data.Length, .. Data];
+            return [.. tagBytes, .. _length.GetHeaderFormat(), .. Data];
         }
     }
 
@@ -323,9 +363,6 @@ public static class TagReader
         var list = new List<TagEntry>();
         int i = 0;
 
-        Log.Info("BufferSize: " + buffer.Length);
-        Log.Info("BufferData: " + BitConverter.ToString(buffer));
-
 
         while (i < buffer.Length)
         {
@@ -333,32 +370,17 @@ public static class TagReader
 
             // Read Tag
             int tag = buffer[i];
+            Log.Info("tag: " + tag.ToHex());
             i += 1;
 
+
+            Length len = new();
+            int length = len.ParseLength(buffer, ref i);
             // shortform
-            int length = buffer[i];
-            i += 1;
+
             // longform
-            if ((length & 0x80) == 0x80) // longform
-            {
-                Log.Info("Long form?");
 
-                // how many bytes 
-                int byteCount = length & ~0x80;
-                length = 0;
-                for (int ii = 0; ii < byteCount; ii++)
-                {
 
-                    length = (length << 8) | buffer[i];
-                }
-                i += byteCount;
-
-                Log.Info("long form length: " + length);
-                // for now
-            }
-            else
-            {
-            }
 
 
             // Read Value
@@ -371,7 +393,7 @@ public static class TagReader
             Array.Copy(buffer, i, data, 0, length);
             i += length;
 
-            var entry = new TagEntry { Tag = tag, Data = data };
+            var entry = new TagEntry { Tag = tag, Data = data, _length = len };
 
             // parse children if this is a user-specified sequence tag
             if (sequenceTags != null && sequenceTags.Contains(tag))
@@ -379,7 +401,6 @@ public static class TagReader
                 Log.Info("hello man?: " + entry.Tag.ToHex());
                 entry.Children = ReadTagData(entry.Data, sequenceTags);
             }
-            Log.Info("Tag: " + entry.Tag.ToHex() + ", Length: " + entry.Data.Length + "EndPos: " + i);
             list.Add(entry);
 
 

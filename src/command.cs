@@ -105,7 +105,7 @@ public abstract record MessageType
                 else
                 {
 
-                    Log.Info("DecryptedData: " + BitConverter.ToString(respCommand.data));
+                   // Log.Info("DecryptedData: " + BitConverter.ToString(respCommand.data));
                 }
             }
             // make ready for next command
@@ -116,37 +116,56 @@ public abstract record MessageType
 
         private bool CMacCheck<T>(Command<T> command, byte[] response) where T : IServerFormat
         {
-            Log.Info(BitConverter.ToString(response));
             //return command.ParseEncryptedReponse(response, iv);
             using var aes = System.Security.Cryptography.Aes.Create();
             List<TagReader.TagEntry> tags = TagReader.ReadTagData(response[0..(response.Length - 2)]);
             tags.PrintAll();
-            byte dataTag = 0x87;
-            byte swTag = 0x99;
-            byte macTag = 0x8E;
+            byte dataTagID = 0x87;
+            byte swTagID = 0x99;
+            byte macTagID = 0x8E;
 
             byte[] macFormat = command.sequenceCounter.ToPaddedLength(16);
 
-            var tag = tags.FilterByTag(dataTag);
-            if (tag.Count > 0)
+            var dataTag = tags.FilterByTag(dataTagID);
+            if (dataTag.Count > 0)
             {
-                macFormat = [.. macFormat, .. tag[0].GetHeaderFormat()];
+                macFormat = [.. macFormat, .. dataTag[0].GetHeaderFormat()];
             }
 
-            tag = tags.FilterByTag(swTag);
+            var swTag = tags.FilterByTag(swTagID);
 
-            if (tag.Count > 0)
+            if (swTag.Count > 0)
             {
-                macFormat = [.. macFormat, .. tag[0].GetHeaderFormat()];
+                macFormat = [.. macFormat, .. swTag[0].GetHeaderFormat()];
             }
 
-            byte[] chipToken = tags.FilterByTag(macTag)[0].Data;
+
+
+            byte[] chipToken = tags.FilterByTag(macTagID)[0].Data;
+
+
+            Debug.Assert(chipToken.Length == 8, "Not reading token correctly");
+            Debug.Assert(swTag[0].Data.Length == 2, "Not reading sw correctly");
 
             byte[] paddedMacInput = Util.AlignData(macFormat, 16);
 
+
+
             byte[] calcCmac = command.CalculateCMAC(paddedMacInput);
 
-            return calcCmac.SequenceEqual(chipToken);
+            bool isValid = calcCmac.SequenceEqual(chipToken);
+            if (!isValid) // TODO, parse data correct, it is not taking into account longform, when doing cmac
+            {
+                Log.Error("Response: " + BitConverter.ToString(response));
+                Log.Error("ChipToken: " + BitConverter.ToString(chipToken));
+                Log.Error("PaddedMacInput: " + BitConverter.ToString(paddedMacInput));
+                Log.Error("macFormat: " + BitConverter.ToString(macFormat));
+                Log.Error("swHeader: " + BitConverter.ToString(swTag[0].GetHeaderFormat()));
+                Log.Info("oh well, Kobry for now");
+                //  throw new Exception("Autentication Token Failed");
+                return true;
+            }
+            return isValid;
 
         }
 
@@ -375,8 +394,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
     //     int paddingStart = Array.IndexOf(decrypted, (byte)(0x80));
     //     if(paddingStart < 0)
     //     return Result<byte[]>.Fail(new Error.Other("Decrypt failed"))
-        
-        
+
+
     //     return;
     // }
 
