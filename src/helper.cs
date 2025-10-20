@@ -322,12 +322,7 @@ public static class TagReader
         int i = 0;
 
         Log.Info("BufferSize: " + buffer.Length);
-        Log.Info(((int)buffer[1]).ToString());
 
-        if (buffer.Length > 130)
-        {
-            Log.Info(((int)buffer[(int)buffer[1] + 1]).ToString());
-        }
         while (i < buffer.Length)
         {
             if (i + 2 > buffer.Length) break;
@@ -336,31 +331,13 @@ public static class TagReader
             int tag = buffer[i];
             i += 1;
 
-            if ((tag & 0x1F) == 0x1F) // multi-byte tag
-            // {
-            //     if (i >= buffer.Length) break;
-            //     tag = (tag << 8) | buffer[i];
-            //     i++;
-            // }
-            {
-                while (i < buffer.Length && (buffer[i] & 0x80) == 0x80)
-                {
-                    tag = (tag << 8) | buffer[i];
-                    i++;
-                }
-                if (i < buffer.Length)
-                {
-
-
-                    tag = (tag << 8) | buffer[i];
-                    i++;
-                }
-            }
+            // shortform
+            int length = buffer[i];
 
             // longform
-            int length = buffer[i];
-            if ((length & 0x80) == 0x80)
+            if ((length & 0x80) == 0x80) // longform
             {
+                Log.Info("Long form?");
 
                 // how many bytes 
                 int byteCount = (length & ~(0x80));
@@ -375,6 +352,12 @@ public static class TagReader
                 // for now
                 i++;
             }
+            else
+            {
+                Log.Info("short form?");
+                length += 1;
+            }
+
 
             // Read Value
 

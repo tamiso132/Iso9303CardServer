@@ -155,8 +155,10 @@ public class ClientSession(ICommunicator comm)
             bool isAuth = authResult.Value;
 
             if (!isAuth)
-                Log.Info("AuthenticationToken was not correctly calculated");
-
+            {
+                Log.Error("AuthenticationToken was not correctly calculated");
+                return;
+            }
 
 
 
@@ -194,7 +196,7 @@ public class ClientSession(ICommunicator comm)
 
             response = result.Value;
             return;
-          //  var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
+            //  var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
 
 
             //Log.Info("response: " + response);

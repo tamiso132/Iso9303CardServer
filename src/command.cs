@@ -425,7 +425,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
             Asn1Object obj = stream.ReadObject();  // top-level object
             var chipToken = obj.GetDerEncoded()[4..]; // ic publickey
-            bool valid = CMacCheck(chipToken!, innerPacketIC);
+            bool valid = CMacCheck(chipToken!, innerPacketIC); // failar här
             if (valid)
             {
                 Log.Info("Mutual Authentication Success!");
