@@ -324,6 +324,8 @@ public static class TagReader
         int i = 0;
 
         Log.Info("BufferSize: " + buffer.Length);
+        Log.Info("BufferData: " + BitConverter.ToString(buffer));
+
 
         while (i < buffer.Length)
         {
@@ -335,29 +337,27 @@ public static class TagReader
 
             // shortform
             int length = buffer[i];
-
+            i += 1;
             // longform
             if ((length & 0x80) == 0x80) // longform
             {
                 Log.Info("Long form?");
 
                 // how many bytes 
-                int byteCount = (length & ~(0x80));
+                int byteCount = length & ~0x80;
                 length = 0;
                 for (int ii = 0; ii < byteCount; ii++)
                 {
-                    i++;
+
                     length = (length << 8) | buffer[i];
                 }
+                i += byteCount;
 
                 Log.Info("long form length: " + length);
                 // for now
-                i++;
             }
             else
             {
-                Log.Info("short form?");
-                i += 1;
             }
 
 
@@ -368,7 +368,6 @@ public static class TagReader
             // i++;
 
             byte[] data = new byte[length];
-            Log.Info("Copy from i= (" + i + "), copy size(" + length + ")");
             Array.Copy(buffer, i, data, 0, length);
             i += length;
 
@@ -380,7 +379,7 @@ public static class TagReader
                 Log.Info("hello man?: " + entry.Tag.ToHex());
                 entry.Children = ReadTagData(entry.Data, sequenceTags);
             }
-            Log.Info("Tag: " + entry.Tag.ToHex() + ", Length: " + entry.Data.Length);
+            Log.Info("Tag: " + entry.Tag.ToHex() + ", Length: " + entry.Data.Length + "EndPos: " + i);
             list.Add(entry);
 
 
