@@ -449,6 +449,6 @@ public static class IntExtensions
 
     public static byte[] IntoLeExtended(this int value)
     {
-        return [0x00, (byte)((value >> 8) & 0xFF), (byte)(value & 0xFF)];
+        return [(byte)((value >> 8) & 0xFF), (byte)(value & 0xFF)];
     }
 }

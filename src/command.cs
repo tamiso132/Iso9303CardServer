@@ -15,6 +15,7 @@ using System.Numerics;
 using Org.BouncyCastle.Security;
 using System;
 using Encryption;
+using System.Runtime.CompilerServices;
 
 namespace Command;
 
@@ -75,6 +76,20 @@ public abstract record MessageType
 
             if (dataTag.Count > 0)
             {
+                int sw1 = response[response.Length - 2];
+                int sw2 = response[response.Length - 1];
+                var swStatus = SwStatus.FromSw1Sw2(sw1, sw2);
+
+
+                while (swStatus == SwStatus.MoreDataAvailable)
+                {
+                    var extraData = await command.SendGetMoreDataRequest(MessageType.SecureMessage);
+                    Log.Info("ExtraData: " + BitConverter.ToString(extraData));
+                    throw new Exception("Test");
+                }
+                Log.Info("sw1: " + sw1.ToHex());
+                Log.Info("resp: " + BitConverter.ToString(response));
+
                 var respIv = command.GetIV();
                 var encryptedData = dataTag[0].Data[1..];
                 // var aligned = Util.AlignData(encryptedData, 16);
@@ -85,8 +100,11 @@ public abstract record MessageType
                 cipher.Init(false, ivParameter);
                 byte[] fullData = cipher.DoFinal(aligned);
 
+
+
                 if (!DecryptCheck(fullData))
                     throw new Exception("DecryptFailed: " + fullData);
+
 
                 respCommand.data = fullData[0.._le];
                 var lenParser = new TagReader.Length();
@@ -103,7 +121,11 @@ public abstract record MessageType
                     Log.Info("Before: " + BitConverter.ToString(respCommand.data));
                     command.sequenceCounter += BigInteger.One;
                     byte[] fullResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: DataPacketLen))).Value;
+
+                    Log.Info("DataPacketLen: " + DataPacketLen + ", Data: " + BitConverter.ToString(fullResp));
                     respCommand = (await ParseCommand(command, fullResp)).Value;
+
+                    throw new Exception("Test");
                 }
 
                 else
@@ -528,8 +550,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
         while (tempStatus == SwStatus.MoreDataAvailable)
         {
             Log.Info("Asking for more data");
-            messageType.FormatCommand(this, 0xC0, 0x00, 0x00, []);
-            var extra = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(cmd)));
+            var cmd2 = messageType.FormatCommand(this, 0xC0, 0x00, 0x00, []);
+            var extra = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(cmd2)));
             var parseExtraResult = await messageType.ParseCommand(this, extra.Value);
 
             if (!parseResult.IsSuccess)
@@ -547,6 +569,15 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         return TResult.Fail(new Error.SwError(response.status));
 
+    }
+
+    internal async Task<byte[]> SendGetMoreDataRequest(MessageType messageType)
+    {
+        Log.Info("Asking for more data");
+        var cmd = messageType.FormatCommand(this, 0xC0, 0x00, 0x00, []);
+        var extra = _serverFormat.DeFormat(await _communicator.TransceiveAsync(_serverFormat.Format(cmd)));
+
+        return extra.Value;
     }
 
     internal async Task<Result<byte[]>> SendPackageRaw(byte[] package)
@@ -606,12 +637,12 @@ public class Command<T>(ICommunicator communicator, T encryption)
         if (le > 0)
         {
             byte[] leData = le.IntoLeExtended();
-            bool isExtended = (leData[0] | leData[1]) != 0x00;
+            bool isExtended = (leData[0]) != 0x00;
             if (isExtended)
-                leHeader = [leTag, (byte)leData.Length, 0x00, 0x1, 0x4C];
+                leHeader = [leTag, (byte)leData.Length, .. leData];
             // leHeader = [leTag, (byte)leData.Length, .. leData];
             else
-                leHeader = [leTag, 1, leData[2]];
+                leHeader = [leTag, 1, leData[1]];
         }
 
         byte[] dataHeader = [];
@@ -632,6 +663,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         byte[] N = Util.AlignData([.. seqCounterHeader, .. cmdHeader, .. dataHeader, .. leHeader], 16);
         //  Log.Info("N: " + BitConverter.ToString(N));
+        Log.Info("MacToken: " + BitConverter.ToString(N));
+        Log.Info("Data Header: " + BitConverter.ToString(dataHeader));
         byte[] token = CalculateCMAC(N);
         byte[] macHeader = [macTag, 0x08, .. token];
 
