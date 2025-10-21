@@ -691,7 +691,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
             byte[] leData = le.IntoLeExtended();
             bool isExtended = (leData[0]) != 0x00;
             if (isExtended)
-                leHeader = [leTag, (byte)leData.Length, .. leData];
+                leHeader = [leTag, (byte)0x1, 0x64];
             // leHeader = [leTag, (byte)leData.Length, .. leData];
             else
                 leHeader = [leTag, 1, leData[1]];
