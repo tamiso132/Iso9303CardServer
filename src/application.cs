@@ -195,6 +195,12 @@ public class ClientSession(ICommunicator comm)
             tags.PrintAll();
 
 
+            var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
+
+            var cmsTags = TagReader.ReadTagData(data, [0x30]);
+            Log.Info("");
+            cmsTags.PrintAll();
+
 
             //  var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
 
