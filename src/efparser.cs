@@ -142,18 +142,16 @@ public class EFSodInfo
         //var appTag = new Asn1Tag(TagClass.Application, 23); // Tag 77 for EF.SOD
 
 
-        //AsnReader outerSeq;
+        AsnReader outerSeq;
         //var peekTag = reader.PeekTag();
 
         var peekTag = reader.PeekTag();
-        var outerSeq = reader.ReadSequence(peekTag); // Outer sequence
-
         //Log.Info("Peektag: " + peekTag);
         //  Log.Info("appTag: " + appTag);
 
         // Be able to switch tags depending on old/new passport
-        // old -> 23 ??
-        // new -> 16, 2 ??
+        // new -> app tag 23
+        // old -> app tag 16
 
         if (peekTag.TagClass == TagClass.Application && peekTag.TagValue == 23)
         {
