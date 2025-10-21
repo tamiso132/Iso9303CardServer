@@ -18,6 +18,7 @@ using Org.BouncyCastle.Crypto.Macs;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Parameters;
 using Microsoft.AspNetCore.Components.Forms;
+using Org.BouncyCastle.Cms;
 namespace App;
 
 
@@ -198,38 +199,15 @@ public class ClientSession(ICommunicator comm)
             var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
 
             var cmsTags = TagReader.ReadTagData(data, [0x30]);
-            Log.Info("");
+            Log.Info("tete");
             cmsTags.PrintAll();
 
+            //ASCII Conversion?
 
-            //  var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
-
-
-            //Log.Info("response: " + response);
-
-            //await EPassAuth.PassiveAuthentication.VerifySodSignature();
-
-            // try
-            // {
-            //     var efSodInfo = EFSodInfo.ParseEFSodLdsV18(result.Value.data);
-            //     Log.Info("EF.SOD IS PARSED WEEEEEEEE");
-
-            //     Log.Info("EF.SOD is parsed!");
-            //     Log.Info("Digest algorithm: " + efSodInfo.DigestAlgorithm);
-            //     Log.Info("LDS Version: " + efSodInfo.LdsVersion);
-            //     Log.Info("Unicode Version: " + efSodInfo.UnicodeVersion);
-
-            //     foreach (var dg in efSodInfo.DataGroupHashes)
-            //     {
-            //         Log.Info($"DG{dg.DataGroupNumber}: : {BitConverter.ToString(dg.HashValue)}");
-            //     }
-            // }
-            // catch (Exception ex)
-            // {
-            //     Log.Error("Failed to parse: " + ex.Message);
-            // }
 
             Log.Info("All commands completed without a problem");
+
+
 
         }
 
