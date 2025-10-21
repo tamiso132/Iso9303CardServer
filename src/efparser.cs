@@ -139,8 +139,40 @@ public class EFSodInfo
         var ef = new EFSodInfo();
         var reader = new AsnReader(bytes, AsnEncodingRules.DER);
 
-        var appTag = new Asn1Tag(TagClass.Application, 23); // Tag 77 for EF.SOD
-        var outerSeq = reader.ReadSequence(appTag); // Outer sequence 
+        //var appTag = new Asn1Tag(TagClass.Application, 23); // Tag 77 for EF.SOD
+
+
+        //AsnReader outerSeq;
+        //var peekTag = reader.PeekTag();
+
+        var peekTag = reader.PeekTag();
+        var outerSeq = reader.ReadSequence(peekTag); // Outer sequence
+
+        //Log.Info("Peektag: " + peekTag);
+      //  Log.Info("appTag: " + appTag);
+
+        if (peekTag.TagClass == TagClass.Application && peekTag.TagValue == 23)
+        {
+            outerSeq = reader.ReadSequence(new Asn1Tag(TagClass.Application, 23));
+        }
+        else if (peekTag.TagClass == TagClass.Application && peekTag.TagValue == 16)
+        {
+            outerSeq = reader.ReadSequence(new Asn1Tag(TagClass.Application, 16));
+        }
+        else if (peekTag.TagClass == TagClass.Universal &&
+                (peekTag.TagValue == (int)UniversalTagNumber.Sequence))
+        {
+            outerSeq = reader.ReadSequence(); // Read as generic sequence
+
+        }
+        else
+        {
+            throw new Exception($"Unknown EF.SOD tag: {peekTag.TagClass} {peekTag.TagValue}");
+        }
+
+        Log.Info("outerseq: " + outerSeq);
+
+        Log.Info("hey");
 
 
 
