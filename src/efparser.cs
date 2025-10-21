@@ -143,6 +143,8 @@ public class EFSodInfo
         var outerSeq = reader.ReadSequence(appTag); // Outer sequence 
 
 
+
+
         BigInteger versionInt = outerSeq.ReadInteger(); // Se version
         if (versionInt == 0)
             Log.Info("LDS Legacy version");
