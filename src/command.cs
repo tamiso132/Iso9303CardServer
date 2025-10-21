@@ -118,7 +118,7 @@ public abstract record MessageType
                         _p1 = (byte)((nextOffset >> 8) & 0xFF);
                         _p2 = (byte)(nextOffset & 0xFF);
                         command.sequenceCounter += BigInteger.One;
-                        byte[] nextDataResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: DataPacketLen))).Value;
+                        byte[] nextDataResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: DataPacketLen - combData.Length + i))).Value;
 
 
                         int sw1_2 = nextDataResp[nextDataResp.Length - 2];
@@ -694,7 +694,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
             byte[] leData = le.IntoLeExtended();
             bool isExtended = (leData[0]) != 0x00;
             if (isExtended)
-                leHeader = [leTag, (byte)0x1, 0x64];
+                leHeader = [leTag, (byte)leData.Length, .. leData];
             // leHeader = [leTag, (byte)leData.Length, .. leData];
             else
                 leHeader = [leTag, 1, leData[1]];
