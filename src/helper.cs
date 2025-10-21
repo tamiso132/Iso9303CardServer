@@ -371,7 +371,6 @@ public static class TagReader
 
             // Read Tag
             int tag = buffer[i];
-            Log.Info("tag: " + tag.ToHex());
             i += 1;
 
 
@@ -399,7 +398,6 @@ public static class TagReader
             // parse children if this is a user-specified sequence tag
             if (sequenceTags != null && sequenceTags.Contains(tag))
             {
-                Log.Info("hello man?: " + entry.Tag.ToHex());
                 entry.Children = ReadTagData(entry.Data, sequenceTags);
             }
             list.Add(entry);
@@ -450,5 +448,26 @@ public static class IntExtensions
     public static byte[] IntoLeExtended(this int value)
     {
         return [(byte)((value >> 8) & 0xFF), (byte)(value & 0xFF)];
+    }
+}
+
+public static class BytesExtensions
+{
+    public static byte[] TruncateData(this byte[] data)
+    {
+        if (data == null || data.Length == 0)
+            return data;
+
+        for (int i = data.Length - 1; i >= 0; i--)
+        {
+            if (data[i] == 0x80)
+            {
+                var truncated = new byte[i];
+                Buffer.BlockCopy(data, 0, truncated, 0, i);
+                return truncated;
+            }
+        }
+
+        return data;
     }
 }

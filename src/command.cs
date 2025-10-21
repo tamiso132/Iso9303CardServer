@@ -32,6 +32,7 @@ public abstract record MessageType
     public static NonSecure NonSecureMessage => new();
     public sealed record Secure : MessageType
     {
+        const int NonDataLen = 2 + 4;
         internal Secure() { }
         public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00)
         {
@@ -42,10 +43,8 @@ public abstract record MessageType
             _le = le;
 
             iv = command.GetIV();
-            Log.Info("le: " + le.ToString());
             var bytes = command.FormatEncryptedCommand(data, ins, p1, p2, iv, le: le);
             command.sequenceCounter += BigInteger.One;
-            Log.Info("SSC: " + command.sequenceCounter);
             return bytes;
 
 
@@ -95,22 +94,74 @@ public abstract record MessageType
                 // var aligned = Util.AlignData(encryptedData, 16);
                 var aligned = encryptedData;
 
+
+
                 var cipher = CipherUtilities.GetCipher($"AES/CBC/NOPADDING");
                 var ivParameter = new ParametersWithIV(new KeyParameter(command.encKey), respIv);
                 cipher.Init(false, ivParameter);
-                byte[] fullData = cipher.DoFinal(aligned);
+                byte[] fullData = cipher.DoFinal(aligned).TruncateData();
+
+                var lenParser = new TagReader.Length();
+                int i = 1;
+                int DataPacketLen = lenParser.ParseLength(fullData, ref i);
+
+                if (fullData.Length < DataPacketLen)
+                {
+                    Log.Info("HeyHey");
+                    byte[] combData = fullData;
 
 
+                    while (DataPacketLen >= combData.Length)
+                    {
+                        int nextOffset = combData.Length - i;
+                        _p1 = (byte)((nextOffset >> 8) & 0xFF);
+                        _p2 = (byte)(nextOffset & 0xFF);
+                        command.sequenceCounter += BigInteger.One;
+                        byte[] nextDataResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: DataPacketLen))).Value;
+
+
+                        int sw1_2 = nextDataResp[nextDataResp.Length - 2];
+                        int sw2_2 = nextDataResp[nextDataResp.Length - 1];
+                        var swStatus_2 = SwStatus.FromSw1Sw2(sw1_2, sw2_2);
+
+                        if (swStatus_2 != SwStatus.Success)
+                        {
+                            Log.Info("big fail: " + swStatus_2.Message);
+                            break;
+                        }
+
+                        var nextDataTags = TagReader.ReadTagData(nextDataResp);
+
+                        var dataTag2 = tags.FilterByTag(0x87);
+
+                        var encryptedData2 = dataTag2[0].Data[1..];
+
+                        var respIv2 = command.GetIV();
+                        var cipher2 = CipherUtilities.GetCipher($"AES/CBC/NOPADDING");
+                        var ivParameter2 = new ParametersWithIV(new KeyParameter(command.encKey), respIv2);
+                        cipher2.Init(false, ivParameter2);
+                        combData = [.. combData, .. cipher2.DoFinal(encryptedData2).TruncateData()];
+
+
+                    }
+
+                    Log.Info("DataPacketLen: " + DataPacketLen);
+                    Log.Info("Our Length: " + combData.Length);
+
+                    ResponseCommand respRet = new(0x90, 0x00, combData);
+
+                    command.sequenceCounter += BigInteger.One;
+                    return TResult.Success(respRet);
+                }
+
+                Log.Info("Length of data " + fullData.Length);
 
                 if (!DecryptCheck(fullData))
                     throw new Exception("DecryptFailed: " + fullData);
 
 
                 respCommand.data = fullData[0.._le];
-                var lenParser = new TagReader.Length();
-                int i = 1;
-                int DataPacketLen = lenParser.ParseLength(respCommand.data, ref i);
-                int recLen = fullData.Length;
+
 
                 Log.Info("le: " + _le + ", dataLen: " + DataPacketLen);
 
@@ -220,6 +271,7 @@ public abstract record MessageType
         byte _p2;
         byte[] _data;
 
+
     }
 
     public sealed record NonSecure : MessageType
@@ -253,7 +305,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public async Task<TResult> ReadBinary(MessageType type, IEfID efID, byte offset = 0x00)
     {
-        byte le = type == MessageType.SecureMessage ? (byte)0x10 : (byte)0x00;
+        byte le = type == MessageType.SecureMessage ? (byte)0x4 : (byte)0x00;
         var app = efID.AppIdentifier();
         if (_appSelected == app || app == null)
         {
@@ -663,12 +715,9 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         byte[] N = Util.AlignData([.. seqCounterHeader, .. cmdHeader, .. dataHeader, .. leHeader], 16);
         //  Log.Info("N: " + BitConverter.ToString(N));
-        Log.Info("MacToken: " + BitConverter.ToString(N));
-        Log.Info("Data Header: " + BitConverter.ToString(dataHeader));
         byte[] token = CalculateCMAC(N);
         byte[] macHeader = [macTag, 0x08, .. token];
         int length = dataHeader.Length + macHeader.Length + leHeader.Length;
-        Log.Info("Length: " + length);
 
         //  Log.Info("macHeader: " + BitConverter.ToString(macHeader));
 
@@ -676,8 +725,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] package = [0x0C, ins, p1, p2, (byte)(length), .. dataHeader, .. leHeader, .. macHeader, .. extendedLen];
         //int payloadLen = dataHeader.Length + macHeader.Length + leHeader.Length;
         // byte[] package = [0x0C, ins, p1, p2, (byte)payloadLen, .. dataHeader, .. leHeader, .. macHeader];
-
-        Log.Info("Cmd: " + BitConverter.ToString(leHeader));
 
         // add sequence +2 for response - must be even
 
