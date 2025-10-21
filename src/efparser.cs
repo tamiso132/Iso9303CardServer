@@ -128,7 +128,7 @@ public class EFSodInfo
 
     public List<DataGroupHashEntry> DataGroupHashes { get; set; } = new();
 
-     public class DataGroupHashEntry
+    public class DataGroupHashEntry
     {
         public int DataGroupNumber { get; set; } //DG1-16
         public byte[] HashValue { get; set; } //SHA256 Hash
@@ -138,10 +138,12 @@ public class EFSodInfo
     {
         var ef = new EFSodInfo();
         var reader = new AsnReader(bytes, AsnEncodingRules.DER);
-        var outerSeq = reader.ReadSequence(); // Outer sequence 
+
+        var appTag = new Asn1Tag(TagClass.Application, 23); // Tag 77 for EF.SOD
+        var outerSeq = reader.ReadSequence(appTag); // Outer sequence 
 
 
-        BigInteger versionInt = (int)reader.ReadInteger(); // Se version
+        BigInteger versionInt = outerSeq.ReadInteger(); // Se version
         if (versionInt == 0)
             Log.Info("LDS Legacy version");
         else if (versionInt == 1)
