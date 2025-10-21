@@ -126,13 +126,13 @@ public abstract record MessageType
 
                         if (swStatus_2 != SwStatus.Success)
                         {
-                            Log.Info("big fail: " + swStatus_2.Message);
+                            Log.Error("big fail: " + swStatus_2.Message);
                             break;
                         }
 
                         var nextDataTags = TagReader.ReadTagData(nextDataResp);
 
-                        var dataTag2 = tags.FilterByTag(0x87);
+                        var dataTag2 = nextDataTags.FilterByTag(0x87);
 
                         var encryptedData2 = dataTag2[0].Data[1..];
 
@@ -148,9 +148,11 @@ public abstract record MessageType
                     Log.Info("DataPacketLen: " + DataPacketLen);
                     Log.Info("Our Length: " + combData.Length);
 
+
                     ResponseCommand respRet = new(0x90, 0x00, combData);
 
                     command.sequenceCounter += BigInteger.One;
+                    Log.Info("SSC: " + command.sequenceCounter);
                     return TResult.Success(respRet);
                 }
 
