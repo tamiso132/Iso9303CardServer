@@ -149,7 +149,11 @@ public class EFSodInfo
         var outerSeq = reader.ReadSequence(peekTag); // Outer sequence
 
         //Log.Info("Peektag: " + peekTag);
-      //  Log.Info("appTag: " + appTag);
+        //  Log.Info("appTag: " + appTag);
+
+        // Be able to switch tags depending on old/new passport
+        // old -> 23 ??
+        // new -> 16, 2 ??
 
         if (peekTag.TagClass == TagClass.Application && peekTag.TagValue == 23)
         {
