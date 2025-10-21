@@ -667,11 +667,13 @@ public class Command<T>(ICommunicator communicator, T encryption)
         Log.Info("Data Header: " + BitConverter.ToString(dataHeader));
         byte[] token = CalculateCMAC(N);
         byte[] macHeader = [macTag, 0x08, .. token];
+        int length = dataHeader.Length + macHeader.Length + leHeader.Length;
+        Log.Info("Length: " + length);
 
         //  Log.Info("macHeader: " + BitConverter.ToString(macHeader));
 
         byte[] extendedLen = leHeader.Length > 3 ? [0x00, 0x00] : [0x00];
-        byte[] package = [0x0C, ins, p1, p2, (byte)(dataHeader.Length + macHeader.Length + leHeader.Length), .. dataHeader, .. leHeader, .. macHeader, .. extendedLen];
+        byte[] package = [0x0C, ins, p1, p2, (byte)(length), .. dataHeader, .. leHeader, .. macHeader, .. extendedLen];
         //int payloadLen = dataHeader.Length + macHeader.Length + leHeader.Length;
         // byte[] package = [0x0C, ins, p1, p2, (byte)payloadLen, .. dataHeader, .. leHeader, .. macHeader];
 
