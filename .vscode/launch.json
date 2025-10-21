@@ -83,6 +83,7 @@
     {
       "name": "Debug in External Console",
       "type": "coreclr",
+      "justMyCode": false,
       "request": "launch",
       "preLaunchTask": "dotnet build",
       "program": "${workspaceFolder}/bin/Debug/net9.0/Backend.dll",

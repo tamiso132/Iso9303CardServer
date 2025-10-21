@@ -103,7 +103,7 @@ public abstract record MessageType
 
                 var lenParser = new TagReader.Length();
                 int i = 1;
-                int DataPacketLen = lenParser.ParseLength(fullData, ref i);
+                int DataPacketLen = lenParser.ParseLength(fullData, ref i, true);
 
                 if (fullData.Length < DataPacketLen)
                 {
@@ -112,7 +112,7 @@ public abstract record MessageType
                     Log.Info("i: " + i);
 
 
-                    while (DataPacketLen >= (combData.Length - i))
+                    while (DataPacketLen >= combData.Length)
                     {
                         int nextOffset = combData.Length;
                         _p1 = (byte)((nextOffset >> 8) & 0xFF);
@@ -121,8 +121,8 @@ public abstract record MessageType
                         byte[] nextDataResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: DataPacketLen - combData.Length + i))).Value;
 
 
-                        int sw1_2 = nextDataResp[nextDataResp.Length - 2];
-                        int sw2_2 = nextDataResp[nextDataResp.Length - 1];
+                        int sw1_2 = nextDataResp[^2];
+                        int sw2_2 = nextDataResp[^1];
                         var swStatus_2 = SwStatus.FromSw1Sw2(sw1_2, sw2_2);
 
                         if (swStatus_2 != SwStatus.Success)
@@ -253,6 +253,7 @@ public abstract record MessageType
         {
             Log.Info("Data bytes: " + BitConverter.ToString(fullData));
             byte[] paddingData = fullData[_le..];
+
 
             if (!(paddingData[0] == 0x80))
                 throw new Exception("Decryption Failed, " + BitConverter.ToString(fullData));

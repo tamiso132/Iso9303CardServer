@@ -315,7 +315,7 @@ public static class TagReader
             return lengthHeader;
         }
 
-        public int ParseLength(byte[] data, ref int i)
+        public int ParseLength(byte[] data, ref int i, bool allowInvalidLen)
         {
             lengthHeader = [data[i]];
             int length = data[i];
@@ -330,6 +330,13 @@ public static class TagReader
                 int byteCount = length & ~0x80;
                 length = 0;
 
+                // INVALID TAG
+                if ((byteCount + i) > data.Length)
+                {
+                    return -1;
+                }
+
+
                 for (int ii = 0; ii < byteCount; ii++)
                 {
                     length = (length << 8) | data[i];
@@ -337,9 +344,13 @@ public static class TagReader
                 }
 
 
+
+
                 lengthHeader = data[oldI..i];
                 // for now
             }
+            // the length is too big, so must be wrong tag
+
             return length;
         }
         byte[] lengthHeader = [];
@@ -369,13 +380,22 @@ public static class TagReader
         {
             if (i + 2 > buffer.Length) break;
 
+
             // Read Tag
             int tag = buffer[i];
             i += 1;
 
 
             Length len = new();
-            int length = len.ParseLength(buffer, ref i);
+            int length = len.ParseLength(buffer, ref i, false);
+
+            if (length == -1)
+                return [];
+
+
+
+
+
             // shortform
 
             // longform
@@ -422,9 +442,8 @@ public static class TagReaderExtensions
 
         foreach (var tag in tags)
         {
-            Console.Write($"{indentStr}Tag: 0x{tag.Tag:X4} ");
-            Console.Write($"Data: {BitConverter.ToString(tag.Data)} ");
 
+            Console.Write($"{indentStr}Tag: 0x{tag.Tag:X4} ");
             if (tag.Children != null && tag.Children.Count > 0)
             {
                 Console.WriteLine();
@@ -432,6 +451,17 @@ public static class TagReaderExtensions
             }
             else
             {
+
+                string hex = BitConverter.ToString(tag.Data);
+                int maxLineLength = 64;
+
+                Console.Write($"\n{indentStr}Data:\n");
+                for (int i = 0; i < hex.Length; i += maxLineLength)
+                {
+                    if (i > 0)
+                        Console.WriteLine();
+                    Console.Write($"{indentStr}       {hex.Substring(i, Math.Min(maxLineLength, hex.Length - i))}");
+                }
                 Console.WriteLine();
             }
         }

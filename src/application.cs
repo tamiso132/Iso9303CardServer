@@ -180,7 +180,7 @@ public class ClientSession(ICommunicator comm)
 
             // Time for EF.SOD
             result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
-
+            Log.Info(BitConverter.ToString(result.Value.data));
 
             if (!result.IsSuccess)
             {
@@ -188,10 +188,14 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-            Log.Info("Raw EF.SOD bytes: " + BitConverter.ToString(result.Value.data));
             //Log.Info("Found EF.SOD");
 
             response = result.Value;
+            var tags = TagReader.ReadTagData(result.Value.data, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
+            tags.PrintAll();
+
+
+
             //  var comInfo = response.Parse<ImplEfCom, ImplEfCom.Info>();
 
 
@@ -199,25 +203,25 @@ public class ClientSession(ICommunicator comm)
 
             //await EPassAuth.PassiveAuthentication.VerifySodSignature();
 
-            try
-            {
-                var efSodInfo = EFSodInfo.ParseEFSodLdsV18(result.Value.data);
-                Log.Info("EF.SOD IS PARSED WEEEEEEEE");
+            // try
+            // {
+            //     var efSodInfo = EFSodInfo.ParseEFSodLdsV18(result.Value.data);
+            //     Log.Info("EF.SOD IS PARSED WEEEEEEEE");
 
-                Log.Info("EF.SOD is parsed!");
-                Log.Info("Digest algorithm: " + efSodInfo.DigestAlgorithm);
-                Log.Info("LDS Version: " + efSodInfo.LdsVersion);
-                Log.Info("Unicode Version: " + efSodInfo.UnicodeVersion);
+            //     Log.Info("EF.SOD is parsed!");
+            //     Log.Info("Digest algorithm: " + efSodInfo.DigestAlgorithm);
+            //     Log.Info("LDS Version: " + efSodInfo.LdsVersion);
+            //     Log.Info("Unicode Version: " + efSodInfo.UnicodeVersion);
 
-                foreach (var dg in efSodInfo.DataGroupHashes)
-                {
-                    Log.Info($"DG{dg.DataGroupNumber}: : {BitConverter.ToString(dg.HashValue)}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Error("Failed to parse: " + ex.Message);
-            }
+            //     foreach (var dg in efSodInfo.DataGroupHashes)
+            //     {
+            //         Log.Info($"DG{dg.DataGroupNumber}: : {BitConverter.ToString(dg.HashValue)}");
+            //     }
+            // }
+            // catch (Exception ex)
+            // {
+            //     Log.Error("Failed to parse: " + ex.Message);
+            // }
 
             Log.Info("All commands completed without a problem");
 
