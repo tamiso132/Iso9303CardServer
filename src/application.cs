@@ -202,7 +202,7 @@ public class ClientSession(ICommunicator comm)
             try
             {
                 var efSodInfo = EFSodInfo.ParseEFSodLdsV18(result.Value.data);
-                Log.Info("Found EF.SOD");
+                Log.Info("EF.SOD IS PARSED WEEEEEEEE");
 
                 Log.Info("EF.SOD is parsed!");
                 Log.Info("Digest algorithm: " + efSodInfo.DigestAlgorithm);
