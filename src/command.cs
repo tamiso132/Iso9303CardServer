@@ -109,11 +109,12 @@ public abstract record MessageType
                 {
                     Log.Info("HeyHey");
                     byte[] combData = fullData;
+                    Log.Info("i: " + i);
 
 
-                    while (DataPacketLen >= combData.Length)
+                    while (DataPacketLen >= (combData.Length - i))
                     {
-                        int nextOffset = combData.Length - i;
+                        int nextOffset = combData.Length;
                         _p1 = (byte)((nextOffset >> 8) & 0xFF);
                         _p2 = (byte)(nextOffset & 0xFF);
                         command.sequenceCounter += BigInteger.One;
