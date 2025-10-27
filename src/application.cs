@@ -200,15 +200,18 @@ public class ClientSession(ICommunicator comm)
             Log.Info("tete");
             cmsTags.PrintAll();
 
-            // Skriver in all data i filer
+            // Skriver in all data i filer, First step of passive authentication
             File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
-            //byte[] binBytes = File.ReadAllBytes("EFSodDumpcmstag.bin");
             byte[] binBytes = tags[0].Data;
+            SodHelper.ReadSodData(binBytes); // Helper to find and print SOD information
 
-            SodHelper.ReadSodData(binBytes);
+            // Use passiveAuthTest.cs for step 2 and 3
 
+            // Step 2: Valideringskedja
+            // Use FindCSCACert??, verifyCertChain
 
-
+            // Step 3: Verify data-group hashes
+            // Use verifyDatagroupHashes
 
             Log.Info("All commands completed without a problem");
 

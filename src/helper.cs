@@ -513,6 +513,7 @@ public static class SodHelper
     {
         try
         {
+            Log.Info("Found EF.SOD! in EFSodDumpcsmtag.bin file");
             var cms = new CmsSignedData(sodBytes);
             var certStore = cms.GetCertificates();
             var signers = cms.GetSignerInfos().GetSigners();
@@ -525,7 +526,8 @@ public static class SodHelper
                 {
                     if (signer.SignerID.Match(cert))
                     {
-                        Log.Info($"Signer cert: {cert.SubjectDN}");
+                        
+                        Log.Info($"Signer certificate (DSC): {cert.SubjectDN}");
                         Log.Info($"Utfärdat av: {cert.IssuerDN}");
                         Log.Info($"Giltigt: {cert.NotBefore} - {cert.NotAfter}");
                         Log.Info($"Signature info: {cert.SigAlgName}");

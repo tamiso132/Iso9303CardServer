@@ -154,7 +154,7 @@ namespace EPassAuth
             var signerInfos = cms.GetSignerInfos();
             var signers = signerInfos.GetSigners();
             var parser = new X509CertificateParser();
-            var bcCert = parser.ReadCertificate(dscCert.RawData);
+            var bcCert = parser.ReadCertificate(dscCert.RawData);   
 
 
             foreach (SignerInformation signer in signers)
