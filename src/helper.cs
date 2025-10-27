@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using System.Runtime.ConstrainedExecution;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -525,9 +526,15 @@ public static class SodHelper
                         Log.Info($"Signer cert: {cert.SubjectDN}");
                         Log.Info($"Utfärdat av: {cert.IssuerDN}");
                         Log.Info($"Giltigt: {cert.NotBefore} - {cert.NotAfter}");
+                        Log.Info($"Signature info: {cert.SigAlgName}");
+                        Log.Info($"what is 2?: {cert.SignatureAlgorithm}");
+                        Log.Info($"what is 3?: {cert.CertificateStructure}");
+                        Log.Info($"Key info: {cert.SubjectPublicKeyInfo}");
+
+
 
                         bool verified = signer.Verify(cert.GetPublicKey());
-                        Log.Info($"Signaturverifiering: {(verified ? "✅ OK" : "❌ FEL")}");
+                        Log.Info($"Digital signatur inuti EF.SOD: {(verified ? "✅ OK" : "❌ FEL")}");
 
 
 
