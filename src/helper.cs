@@ -506,26 +506,52 @@ public static class BytesExtensions
 
 public static class SodHelper
 {
-    private static void VerifySodSign(byte[] cmsData)
+    public static void ReadSodData(byte[] sodBytes)
     {
         try
         {
-            var cms = new CmsSignedData(cmsData);
+            var cms = new CmsSignedData(sodBytes);
             var certStore = cms.GetCertificates();
-            var signerInfos = cms.GetSignerInfos();
+            var signers = cms.GetSignerInfos().GetSigners();
 
-            foreach (SignerInformation signer in signerInfos.GetSigners())
+            foreach (SignerInformation signer in signers)
             {
-                var certs = certStore.Equals(signer.SignerID);
-                foreach (X509Certificate cert in certs)
-                {
-                    bool verified = signer.Verify(cert.GetPublicKey()){
+                var allCerts = certStore.EnumerateMatches(null);
 
+                foreach (Org.BouncyCastle.X509.X509Certificate cert in allCerts)
+                {
+                    if (signer.SignerID.Match(cert))
+                    {
+                        Log.Info($"Signer cert: {cert.SubjectDN}");
+                        Log.Info($"Utfärdat av: {cert.IssuerDN}");
+                        Log.Info($"Giltigt: {cert.NotBefore} - {cert.NotAfter}");
+
+                        bool verified = signer.Verify(cert.GetPublicKey());
+                        Log.Info($"Signaturverifiering: {(verified ? "✅ OK" : "❌ FEL")}");
+
+
+
+                        if (cms.SignedContent != null)
+                        {
+                            using (var ms = new System.IO.MemoryStream())
+                            {
+                                cms.SignedContent.Write(ms);
+                                var contentBytes = ms.ToArray();
+                                Log.Info($"Singed content: {contentBytes.Length} bytes");
+                            }
+
+                        }
+                        break;
                     }
+
                 }
             }
-
-
         }
+        catch (Exception ex)
+        {
+            Log.Error($"Not read :(: {ex.Message} ");
+        }
+
     }
 }
+

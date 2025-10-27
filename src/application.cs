@@ -201,11 +201,11 @@ public class ClientSession(ICommunicator comm)
             cmsTags.PrintAll();
 
             // Skriver in all data i filer
-            File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].Data);
-            byte[] binBytes = File.ReadAllBytes("EFSodDumpcmstag.bin");
+            File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
+            //byte[] binBytes = File.ReadAllBytes("EFSodDumpcmstag.bin");
+            byte[] binBytes = tags[0].Data;
 
-            
-
+            SodHelper.ReadSodData(binBytes);
 
 
 
