@@ -107,7 +107,7 @@ public abstract record MessageType
 
                 if (fullData.Length < DataPacketLen)
                 {
-                    Log.Info("HeyHey");
+                    
                     byte[] combData = fullData;
                     Log.Info("i: " + i);
 

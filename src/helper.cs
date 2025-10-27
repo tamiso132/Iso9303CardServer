@@ -9,12 +9,14 @@ using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.ConstrainedExecution;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using System.Security.Cryptography.Xml;
 using System.Text;
 using System.Text.Json;
 using Type;
@@ -527,14 +529,16 @@ public static class SodHelper
                         Log.Info($"Utfärdat av: {cert.IssuerDN}");
                         Log.Info($"Giltigt: {cert.NotBefore} - {cert.NotAfter}");
                         Log.Info($"Signature info: {cert.SigAlgName}");
-                        Log.Info($"what is 2?: {cert.SignatureAlgorithm}");
-                        Log.Info($"what is 3?: {cert.CertificateStructure}");
-                        Log.Info($"Key info: {cert.SubjectPublicKeyInfo}");
 
-
+                        // Do we need Key info???
 
                         bool verified = signer.Verify(cert.GetPublicKey());
                         Log.Info($"Digital signatur inuti EF.SOD: {(verified ? "✅ OK" : "❌ FEL")}");
+                        Log.Info($"Version??: {cert.Version}");
+
+                        Log.Info($"Certificate Serial Number: {cert.SerialNumber}");
+
+
 
 
 
