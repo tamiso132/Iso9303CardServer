@@ -19,6 +19,7 @@ using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Parameters;
 using Microsoft.AspNetCore.Components.Forms;
 using Org.BouncyCastle.Cms;
+using System.Text;
 namespace App;
 
 
@@ -165,8 +166,6 @@ public class ClientSession(ICommunicator comm)
 
             Log.Info("Secure Messaging Established using: PACE, Session started.");
 
-            // result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdGlobal.AtrInfo);
-
             // Change to LDS1 MUST be secure
             result = await _cmd.SelectApplication(MessageType.SecureMessage, AppID.IdLDS1);
 
@@ -176,7 +175,6 @@ public class ClientSession(ICommunicator comm)
                 Log.Error(result.Error.ErrorMessage());
                 return;
             }
-
 
 
             // Time for EF.SOD
@@ -201,6 +199,13 @@ public class ClientSession(ICommunicator comm)
             var cmsTags = TagReader.ReadTagData(data, [0x30]);
             Log.Info("tete");
             cmsTags.PrintAll();
+
+            // Skriver in all data i filer
+            File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].Data);
+            byte[] binBytes = File.ReadAllBytes("EFSodDumpcmstag.bin");
+
+
+
 
             //ASCII Conversion?
 
