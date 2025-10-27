@@ -2,6 +2,7 @@ using Encryption;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
+using Org.BouncyCastle.Cms;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.Utilities;
 using Serilog;
@@ -12,6 +13,7 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using Type;
@@ -499,5 +501,31 @@ public static class BytesExtensions
         }
 
         return data;
+    }
+}
+
+public static class SodHelper
+{
+    private static void VerifySodSign(byte[] cmsData)
+    {
+        try
+        {
+            var cms = new CmsSignedData(cmsData);
+            var certStore = cms.GetCertificates();
+            var signerInfos = cms.GetSignerInfos();
+
+            foreach (SignerInformation signer in signerInfos.GetSigners())
+            {
+                var certs = certStore.Equals(signer.SignerID);
+                foreach (X509Certificate cert in certs)
+                {
+                    bool verified = signer.Verify(cert.GetPublicKey()){
+
+                    }
+                }
+            }
+
+
+        }
     }
 }

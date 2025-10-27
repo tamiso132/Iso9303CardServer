@@ -204,10 +204,10 @@ public class ClientSession(ICommunicator comm)
             File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].Data);
             byte[] binBytes = File.ReadAllBytes("EFSodDumpcmstag.bin");
 
+            
 
 
 
-            //ASCII Conversion?
 
 
             Log.Info("All commands completed without a problem");
