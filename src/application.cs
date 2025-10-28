@@ -202,7 +202,13 @@ public class ClientSession(ICommunicator comm)
             // Skriver in all data i filer, First step of passive authentication
             File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
             byte[] binBytes = tags[0].Data;
+
+
+            // Felsökning
+            // byte[] binBytesTest = cmsTags[0].GetHeaderFormat();
+            // File.WriteAllBytes("EFSodDumpcmstag.bin", binBytesTest);
             Org.BouncyCastle.X509.X509Certificate? dscCertBouncyCastle = SodHelper.ReadSodData(binBytes); // Helper to find and print SOD information
+
 
             // Use passiveAuthTest.cs for step 2 and 3
             Log.Info("Starting Passive authentication...");
