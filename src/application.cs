@@ -210,6 +210,8 @@ public class ClientSession(ICommunicator comm)
             // Step 2: Valideringskedja
             // Use FindCSCACert??, verifyCertChain
 
+            // Check revokation list??, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
+
             // Step 3: Verify data-group hashes
             // Use verifyDatagroupHashes
 

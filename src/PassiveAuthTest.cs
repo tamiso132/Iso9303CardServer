@@ -16,6 +16,7 @@ using System.Linq.Expressions;
 using Org.BouncyCastle.Security;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Parser;
+using App;
 
 
 
@@ -32,55 +33,64 @@ using Parser;
 
 namespace EPassAuth
 {
-    public static class PassiveAuthentication
+     public static class PassiveAuthentication
     {
 
-        public static bool Verify(
-            string issuingCountry,
-            byte[] efSodBytes,
-            List<X509Certificate2> masterListCscas,
-            Dictionary<int, byte[]> dataGroups)
-        {
-            Log.Info($"Identifying country...");
-            // 1. Hitta CSCA i masterlist baserat på DG12
-            var cscaCert = FindCscaCert(issuingCountry, masterListCscas);
-            if (cscaCert == null)
-                throw new Exception(" No CSCA found for the country" + issuingCountry);
+    //     public static bool Verify(
+    //         string issuingCountry,
+    //         byte[] efSodBytes,
+    //         List<X509Certificate2> masterListCscas,
+    //         Dictionary<int, byte[]> dataGroups)
+    //     {
+    //         Log.Info($"Identifying country...");
+    //         // 1. Hitta CSCA i masterlist baserat på DG12
+    //         var cscaCert = FindCscaCert(issuingCountry, masterListCscas);
+    //         if (cscaCert == null)
+    //             throw new Exception(" No CSCA found for the country" + issuingCountry);
 
-            Log.Info($" Found CSCA-certificate for {issuingCountry}:");
-            Log.Info($" Subject: {cscaCert.Subject}");
-            Log.Info($" Issuer : {cscaCert.Issuer}");
-            Log.Info($" FriendlyName: {cscaCert.FriendlyName}");
+    //         Log.Info($" Found CSCA-certificate for {issuingCountry}:");
+    //         Log.Info($" Subject: {cscaCert.Subject}");
+    //         Log.Info($" Issuer : {cscaCert.Issuer}");
+    //         Log.Info($" FriendlyName: {cscaCert.FriendlyName}");
 
-            // 2. Extrahera DSC från EF.SOD (ASN.1 parsing)
-            var dscCert = ExtractDscFromSod(efSodBytes);
-            if (dscCert == null)
-                throw new Exception("Could not extract DSC from EF.SOD file");
+    //         // 2. Extrahera DSC från EF.SOD (ASN.1 parsing)
+    //         var dscCert = ExtractDscFromSod(efSodBytes);
+    //         if (dscCert == null)
+    //             throw new Exception("Could not extract DSC from EF.SOD file");
 
-            Log.Info("Extracted DSC from EF.SOD");
+    //         Log.Info("Extracted DSC from EF.SOD");
 
-            // Parsar EF.SOD till EFSodInfo
-            var sodInfo = Parser.EFSodInfo.ParseEFSodLdsV18(efSodBytes);
+    //         // Parsar EF.SOD till EFSodInfo
+    //         var sodInfo = Parser.EFSodInfo.ParseEFSodLdsV18(efSodBytes);
 
-            // 3. Bygg kedja: DSC -> CSCA
-            if (!VerifyCertChain(dscCert, cscaCert))
-                throw new Exception("DSC couldnt be verified against CSCA");
+    //         // 3. Bygg kedja: DSC -> CSCA
+    //         if (!VerifyCertChain(dscCert, cscaCert))
+    //             throw new Exception("DSC couldnt be verified against CSCA");
 
-            Log.Info("Verified chain between DSC och CSCA");
+    //         Log.Info("Verified chain between DSC och CSCA");
 
-            // 4. Verifiera EF.SOD signaturen
-            if (!VerifySodSignature(efSodBytes, dscCert))
-                throw new Exception("EF.SOD signature is invalid");
+    //         // 4. Verifiera EF.SOD signaturen
+    //         if (!VerifySodSignature(efSodBytes, dscCert))
+    //             throw new Exception("EF.SOD signature is invalid");
 
-            Log.Info("Verified EF.SOD signature");
+    //         Log.Info("Verified EF.SOD signature");
 
-            // 5. Verifiera DG-hashar mot EF.SOD
-            if (!VerifyDataGroupHashes(sodInfo, dataGroups))
-                throw new Exception("Datagrupp-hashes does not match EF.SOD");
+    //         // 5. Verifiera DG-hashar mot EF.SOD
+    //         if (!VerifyDataGroupHashes(sodInfo, dataGroups))
+    //             throw new Exception("Datagrupp-hashes does not match EF.SOD");
 
-            Log.Info("DH-hashes verified against SOD");
-            return true;
-        }
+    //         Log.Info("DH-hashes verified against SOD");
+    //         return true;
+    //     }
+
+   // public static async Task<bool> VerifyPassiveAuthAsync(
+       // Org.BouncyCastle.X509.X509Certificate verifiedDscCertBouncyCastle,
+       // byte[] efSodBytes_StartingWith_0x77,
+        //Command<ServerEncryption> cmd,
+       // String masterListDirectoryPath)
+       // {
+            
+        //}
 
         public static X509Certificate2? FindCscaCert(string issuingCountry, List<X509Certificate2> masterList)
         {

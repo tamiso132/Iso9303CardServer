@@ -513,7 +513,7 @@ public static class SodHelper
     {
         try
         {
-            Log.Info("Found EF.SOD! in EFSodDumpcsmtag.bin file");
+            Log.Info("Found EF.SOD! in: EFSodDumpcsmtag.bin file");
             var cms = new CmsSignedData(sodBytes);
             var certStore = cms.GetCertificates();
             var signers = cms.GetSignerInfos().GetSigners();
