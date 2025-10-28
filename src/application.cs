@@ -197,34 +197,43 @@ public class ClientSession(ICommunicator comm)
             var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
 
             var cmsTags = TagReader.ReadTagData(data, [0x30]);
-            Log.Info("tete");
             cmsTags.PrintAll();
 
             // Skriver in all data i filer, First step of passive authentication
             File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
             byte[] binBytes = tags[0].Data;
-            SodHelper.ReadSodData(binBytes); // Helper to find and print SOD information
+            Org.BouncyCastle.X509.X509Certificate? dscCertBouncyCastle = SodHelper.ReadSodData(binBytes); // Helper to find and print SOD information
 
             // Use passiveAuthTest.cs for step 2 and 3
+            Log.Info("Starting Passive authentication...");
 
+            string masterListPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "masterlist-cscas"); // Directory to masterlist
+            bool step2Success = SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath);
+
+            if (step2Success)
+            {
+                Log.Info("STEP 2 DONE");
+            }
+            else
+            {
+                Log.Error("Pa failed in step 2");
+            }
+        }
+        
+
+            Log.Info("All commands completed without a problem");
+
+        
+
+    }
             // Step 2: Valideringskedja
             // Use FindCSCACert??, verifyCertChain
 
+            // OSCP (Online Certificate Status Protocol)
             // Check revokation list??, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
 
             // Step 3: Verify data-group hashes
             // Use verifyDatagroupHashes
-
-            Log.Info("All commands completed without a problem");
-
-
-
-        }
-
-
-
-    }
-
 
 
     private readonly ICommunicator _comm = comm;

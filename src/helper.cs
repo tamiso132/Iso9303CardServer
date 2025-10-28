@@ -513,8 +513,9 @@ public static class BytesExtensions
 
 public static class SodHelper
 {
-    public static void ReadSodData(byte[] sodBytes)
+    public static Org.BouncyCastle.X509.X509Certificate? ReadSodData(byte[] sodBytes)
     {
+        Org.BouncyCastle.X509.X509Certificate? verifiedDsc = null; // För att spara det verifierade DSC
         try
         {
             Log.Info("Found EF.SOD! in: EFSodDumpcsmtag.bin file");
@@ -539,7 +540,7 @@ public static class SodHelper
                         // Do we need Key info???
 
                         bool verified = signer.Verify(cert.GetPublicKey());
-                        Log.Info($"Digital signatur inuti EF.SOD: {(verified ? "✅ OK" : "❌ FEL")}");
+                        Log.Info($"Internal signature in EF.SOD: {(verified ? "✅ OK" : "❌ FEL")}");
                         Log.Info($"Version??: {cert.Version}");
 
                         Log.Info($"Certificate Serial Number: {cert.SerialNumber}");
@@ -568,7 +569,7 @@ public static class SodHelper
         {
             Log.Error($"Not read :(: {ex.Message} ");
         }
-
+        return verifiedDsc;
     }
 
     private static bool VerifyDscTrustChainWithPem(
@@ -687,5 +688,9 @@ string masterListDirectoryPath)
         {
 
         }
+    }
+    public static bool PerformPassiveAuthStep2(Org.BouncyCastle.X509.X509Certificate verifiedDscCertBC, string masterListDirectoryPath)
+    {
+        return VerifyDscTrustChainWithPem(verifiedDscCertBC, masterListDirectoryPath);
     }
 }
