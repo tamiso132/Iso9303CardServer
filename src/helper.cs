@@ -676,16 +676,16 @@ string masterListDirectoryPath)
                 Log.Info("Step 2 pa OK");
                 return true;
             }
-            finally
-            {
+            finally { }
+        }
 
-            }
+        catch (Exception ex)
+        {
+            return false;
+        }
+        finally
+        {
 
         }
-    }
-    catch(Exception ex){
-        return false;
-    } finally{
-
     }
 }
