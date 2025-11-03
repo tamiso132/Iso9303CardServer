@@ -225,21 +225,21 @@ public class ClientSession(ICommunicator comm)
                 Log.Error("Pa failed in step 2");
             }
         }
-        
 
-            Log.Info("All commands completed without a problem");
 
-        
+        Log.Info("All commands completed without a problem");
+
+
 
     }
-            // Step 2: Valideringskedja
-            // Use FindCSCACert??, verifyCertChain
+    // Step 2: Valideringskedja
+    // Use FindCSCACert??, verifyCertChain
 
-            // OSCP (Online Certificate Status Protocol)
-            // Check revokation list??, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
+    // OSCP (Online Certificate Status Protocol)
+    // Check revokation list??, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
 
-            // Step 3: Verify data-group hashes
-            // Use verifyDatagroupHashes
+    // Step 3: Verify data-group hashes
+    // Use verifyDatagroupHashes
 
 
     private readonly ICommunicator _comm = comm;
