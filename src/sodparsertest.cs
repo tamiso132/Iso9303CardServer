@@ -136,7 +136,7 @@ public static class EfSodParser
 
         var ldsSeq = ldsRootTags.FilterByTag(0x30).FirstOrDefault();
         // Hitta DataGroupHashes (den *andra* 0x30-sekvensen inuti LDSSecurityObject)
-        var dataGroupHashesSeq = ldsSeq?.Children.FilterByTag(0x30).LastOrDefault();
+        var dataGroupHashesSeq = ldsSeq?.Children.FilterByTag(0x30).Skip(1).FirstOrDefault();
 
         if (dataGroupHashesSeq != null)
         {

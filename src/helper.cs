@@ -394,6 +394,47 @@ public static class BytesExtensions
     }
 }
 
+public static class StringExtension
+{
+    // A dictionary mapping the OID *byte strings* (as our parser outputs them)
+    // to the names .NET's crypto library understands.
+    private static readonly Dictionary<string, string> _oidToNameMap = new()
+    {
+        // OID for SHA-256
+        { "60.86.48.01.65.03.04.02.01", "SHA256" },
+        
+        // OID for SHA-1
+        { "2B.0E.03.02.1A", "SHA1" },
+        
+        // OID for SHA-512
+        { "60.86.48.01.65.03.04.02.03", "SHA512" },
+        
+        // OID for SHA-384
+        { "60.86.48.01.65.03.04.02.02", "SHA384" }
+        
+        // --- Add other common OIDs here as needed ---
+        // e.g., RSA, ECDSA, etc.
+    };
+
+    /// <summary>
+    /// Converts a DER-byte-string-style OID into a .NET algorithm name.
+    /// </summary>
+    /// <param name="oidString">The 'this' string, e.g., "60.86.48.01.65.03.04.02.01"</param>
+    /// <returns>The .NET algorithm name, e.g., "SHA256"</returns>
+    /// <exception cref="NotSupportedException">Thrown if the OID is not in the map.</exception>
+    public static string GetAlgorithmName(this string oidString)
+    {
+        if (_oidToNameMap.TryGetValue(oidString, out string algName))
+        {
+            return algName;
+        }
+
+        // This is a critical error. We can't validate the signature
+        // if we don't recognize the hash algorithm.
+        throw new NotSupportedException($"The OID {oidString} is not a supported hash algorithm.");
+    }
+}
+
 public static class SodHelper
 {
     public static Org.BouncyCastle.X509.X509Certificate? ReadSodData(byte[] sodBytes)
@@ -751,7 +792,7 @@ string masterListDirectoryPath)
                     throw new Exception("Cert chain DSC -> CSCA no valid");
                 }
 
-                
+
                 Log.Info("Step 2 pa OK");
                 return true;
             }
