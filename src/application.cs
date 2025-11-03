@@ -213,8 +213,17 @@ public class ClientSession(ICommunicator comm)
             // Use passiveAuthTest.cs for step 2 and 3
             Log.Info("Starting Passive authentication...");
 
-            string masterListPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "masterlist-cscas"); // Directory to masterlist
+            string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
             bool step2Success = SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath);
+
+            if(dscCertBouncyCastle == null)
+            {
+                Log.Error("dscCertBouncy is null");
+            }
+            else
+            {
+                Log.Info("dscCert is not null");
+            }
 
             if (step2Success)
             {
