@@ -220,7 +220,7 @@ public class ClientSession(ICommunicator comm)
                 }
             }
 
-            return;
+           // return;
 
             var tags = TagReader.ReadTagData(result.Value.data, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
             tags.PrintAll();
@@ -240,21 +240,21 @@ public class ClientSession(ICommunicator comm)
             // byte[] binBytesTest = cmsTags[0].GetHeaderFormat();
             // File.WriteAllBytes("EFSodDumpcmstag.bin", binBytesTest);
 
-            var dgHashes = SodHelper.ParseAndVerifySod(response.data);
+            // var dgHashes = SodHelper.ParseAndVerifySod(response.data);
 
-            if (dgHashes == null)
-            {
-                Log.Error("Unable to parse dg hashes from sod");
-                return;
-            }
+            // if (dgHashes == null)
+            // {
+            //     Log.Error("Unable to parse dg hashes from sod");
+            //     return;
+            // }
 
-            foreach (KeyValuePair<int, byte[]> entry in dgHashes)
-            {
-                // entry.Key är DG ID (int)
-                // entry.Value är Hash-byterna (byte[])
-                string hashHex = BitConverter.ToString(entry.Value).Replace("-", "");
-                Log.Info($"DG{entry.Key}: {hashHex}");
-            }
+            // foreach (KeyValuePair<int, byte[]> entry in dgHashes)
+            // {
+            //     // entry.Key är DG ID (int)
+            //     // entry.Value är Hash-byterna (byte[])
+            //     string hashHex = BitConverter.ToString(entry.Value).Replace("-", "");
+            //     Log.Info($"DG{entry.Key}: {hashHex}");
+            // }
 
 
             Org.BouncyCastle.X509.X509Certificate? dscCertBouncyCastle = SodHelper.ReadSodData(binBytes); // Helper to find and print SOD information
@@ -264,28 +264,28 @@ public class ClientSession(ICommunicator comm)
 
 
             // Use passiveAuthTest.cs for step 2 and 3
-            // Log.Info("Starting Passive authentication...");
+            Log.Info("Starting Passive authentication...");
 
-            // string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
-            // bool step2Success = SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath);
+            string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
+            bool step2Success = SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath);
 
-            // if(dscCertBouncyCastle == null)
-            // {
-            //     Log.Error("dscCertBouncy is null");
-            // }
-            // else
-            // {
-            //     Log.Info("dscCert is not null");
-            // }
+            if(dscCertBouncyCastle == null)
+            {
+                Log.Error("dscCertBouncy is null");
+            }
+            else
+            {
+                Log.Info("dscCert is not null");
+            }
 
-            // if (step2Success)
-            // {
-            //     Log.Info("STEP 2 DONE");
-            // }
-            // else
-            // {
-            //     Log.Error("Pa failed in step 2");
-            // }
+            if (step2Success)
+            {
+                Log.Info("STEP 2 DONE");
+            }
+            else
+            {
+                Log.Error("Pa failed in step 2");
+            }
         }
 
 
