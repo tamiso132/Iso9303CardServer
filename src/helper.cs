@@ -679,6 +679,7 @@ string masterListDirectoryPath)
             disposables.Add(chain);
             try
             {
+                // Big money check
                 chain.ChainPolicy.ExtraStore.Add(matchingCscaCertDotNet); // Trust Anchor
                 chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // No revocation for now
                 chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority; // Not in windows?
