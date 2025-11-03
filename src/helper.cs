@@ -542,16 +542,16 @@ public static class SodHelper
                         bool verified = signer.Verify(cert.GetPublicKey());
                         Log.Info($"Internal signature in EF.SOD: {(verified ? "✅ OK" : "❌ FEL")}");
 
-                        // if (verified)
-                        // {
-                        //     verifiedDsc = cert;
-                        // }
+                        if (verified)
+                        {
+                            verifiedDsc = cert;
+                         }
                         Log.Info($"Version??: {cert.Version}");
 
                         Log.Info($"Certificate Serial Number: {cert.SerialNumber}");
+                        
 
-
-
+                        
 
 
                         if (cms.SignedContent != null)
