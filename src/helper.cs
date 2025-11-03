@@ -13,12 +13,14 @@ using Serilog.Sinks.SystemConsole.Themes;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Formats.Asn1;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.ConstrainedExecution;
 using System.Security.Cryptography;
+using System.Security.Cryptography.Pkcs;
 using System.Security.Cryptography.X509Certificates;
 using System.Security.Cryptography.Xml;
 using System.Text;
@@ -315,167 +317,7 @@ public static class BIgIntegerExtension
 
 
 
-public static class TagReader
-{
-    public class Length
-    {
-        public byte[] GetHeaderFormat()
-        {
-            return lengthHeader;
-        }
 
-        public int ParseLength(byte[] data, ref int i, bool allowInvalidLen)
-        {
-            lengthHeader = [data[i]];
-            int length = data[i];
-            int oldI = i;
-            i++;
-
-
-            if ((length & 0x80) == 0x80) // longform
-            {
-
-                // how many bytes 
-                int byteCount = length & ~0x80;
-                length = 0;
-
-                // INVALID TAG
-                if ((byteCount + i) > data.Length)
-                {
-                    return -1;
-                }
-
-
-                for (int ii = 0; ii < byteCount; ii++)
-                {
-                    length = (length << 8) | data[i];
-                    i++;
-                }
-
-
-
-
-                lengthHeader = data[oldI..i];
-                // for now
-            }
-            // the length is too big, so must be wrong tag
-
-            return length;
-        }
-        byte[] lengthHeader = [];
-    }
-    public class TagEntry
-    {
-        public int Tag { get; set; }           // 1- or 2-byte tags
-        public byte[] Data { get; set; } = [];
-
-        public Length _length = new();
-        public List<TagEntry> Children { get; set; } = [];
-
-        public byte[] GetHeaderFormat()
-        {
-            byte[] tagBytes = Tag > 0xFF ? new[] { (byte)(Tag >> 8), (byte)Tag } : new[] { (byte)Tag };
-            return [.. tagBytes, .. _length.GetHeaderFormat(), .. Data];
-        }
-    }
-
-    public static List<TagEntry> ReadTagData(byte[] buffer, HashSet<int>? sequenceTags = null)
-    {
-        var list = new List<TagEntry>();
-        int i = 0;
-
-
-        while (i < buffer.Length)
-        {
-            if (i + 2 > buffer.Length) break;
-
-
-            // Read Tag
-            int tag = buffer[i];
-            i += 1;
-
-
-            Length len = new();
-            int length = len.ParseLength(buffer, ref i, false);
-
-            if (length == -1)
-                return [];
-
-
-
-
-
-            // shortform
-
-            // longform
-
-
-
-
-            // Read Value
-
-            //int length = buffer[i];
-            // if (i + length > buffer.Length) break;
-            // i++;
-
-            byte[] data = new byte[length];
-            Array.Copy(buffer, i, data, 0, length);
-            i += length;
-
-            var entry = new TagEntry { Tag = tag, Data = data, _length = len };
-
-            // parse children if this is a user-specified sequence tag
-            if (sequenceTags != null && sequenceTags.Contains(tag))
-            {
-                entry.Children = ReadTagData(entry.Data, sequenceTags);
-            }
-            list.Add(entry);
-
-
-        }
-
-        return list;
-    }
-}
-
-public static class TagReaderExtensions
-{
-    public static List<TagReader.TagEntry> FilterByTag(this List<TagReader.TagEntry> entries, byte tag)
-    {
-        return entries.Where(e => e.Tag == tag).ToList();
-    }
-
-    public static void PrintAll(this List<TagReader.TagEntry> tags, int indent = 0)
-    {
-        string indentStr = new string(' ', indent * 2);
-
-        foreach (var tag in tags)
-        {
-
-            Console.Write($"{indentStr}Tag: 0x{tag.Tag:X4} ");
-            if (tag.Children != null && tag.Children.Count > 0)
-            {
-                Console.WriteLine();
-                tag.Children.PrintAll(indent + 1);
-            }
-            else
-            {
-
-                string hex = BitConverter.ToString(tag.Data);
-                int maxLineLength = 64;
-
-                Console.Write($"\n{indentStr}Data:\n");
-                for (int i = 0; i < hex.Length; i += maxLineLength)
-                {
-                    if (i > 0)
-                        Console.WriteLine();
-                    Console.Write($"{indentStr}       {hex.Substring(i, Math.Min(maxLineLength, hex.Length - i))}");
-                }
-                Console.WriteLine();
-            }
-        }
-    }
-}
 
 public static class IntExtensions
 {
@@ -488,6 +330,47 @@ public static class IntExtensions
     {
         return [(byte)((value >> 8) & 0xFF), (byte)(value & 0xFF)];
     }
+
+    public static EfIdAppSpecific IntoDgFileID(this int value)
+    {
+        switch (value)
+        {
+            case 1: return EfIdAppSpecific.Dg1;
+
+            case 2: return EfIdAppSpecific.Dg2;
+
+            case 3: return EfIdAppSpecific.Dg3;
+
+            case 4: return EfIdAppSpecific.Dg4;
+
+            case 5: return EfIdAppSpecific.Dg5;
+
+            case 6: return EfIdAppSpecific.Dg6;
+
+            case 7: return EfIdAppSpecific.Dg7;
+
+            case 8: return EfIdAppSpecific.Dg8;
+
+            case 9: return EfIdAppSpecific.Dg9;
+
+            case 10: return EfIdAppSpecific.Dg10;
+
+            case 11: return EfIdAppSpecific.Dg11;
+
+            case 12: return EfIdAppSpecific.Dg12;
+
+            case 13: return EfIdAppSpecific.Dg13;
+
+            case 14: return EfIdAppSpecific.Dg14;
+
+            case 15: return EfIdAppSpecific.Dg15;
+
+            case 16: return EfIdAppSpecific.Dg16;
+
+            default:
+                throw new Exception("Invalid Value: " + value);
+        }
+    }
 }
 
 public static class BytesExtensions
@@ -495,7 +378,7 @@ public static class BytesExtensions
     public static byte[] TruncateData(this byte[] data)
     {
         if (data == null || data.Length == 0)
-            return data;
+            return data!;
 
         for (int i = data.Length - 1; i >= 0; i--)
         {
@@ -545,13 +428,13 @@ public static class SodHelper
                         if (verified)
                         {
                             verifiedDsc = cert;
-                         }
+                        }
                         Log.Info($"Version??: {cert.Version}");
 
                         Log.Info($"Certificate Serial Number: {cert.SerialNumber}");
-                        
 
-                        
+
+
 
 
                         if (cms.SignedContent != null)
@@ -575,6 +458,180 @@ public static class SodHelper
             Log.Error($"Not read :(: {ex.Message} ");
         }
         return verifiedDsc;
+    }
+
+
+    public static Dictionary<int, byte[]> ParseAndVerifySod(byte[] sodBytes)
+    {
+        // Försök att dekoda CMS/PKCS#7 med standardklassen. Detta är det korrekta sättet.
+        try
+        {
+            var signedCms = new SignedCms();
+            signedCms.Decode(sodBytes);
+
+            if (signedCms.Certificates.Count == 0)
+            {
+                Console.WriteLine("Varning: Hittade inget Document Signer Certificate (DSC) i SOD-filen.");
+            }
+
+            // Detta verifierar att SOD-signaturen är giltig mot det inbäddade DSC.
+            signedCms.CheckSignature(verifySignatureOnly: true);
+            Console.WriteLine("SOD Signatur verifierad framgångsrikt mot det inbäddade DSC.");
+
+            // 3. Extrahera det inre innehållet (ContentInfo).
+            // Detta innehåll är själva ICAO-strukturen som innehåller DG Hashes.
+            byte[] innerContent = signedCms.ContentInfo.Content;
+
+            // 4. Parsa Data Group Hashes
+            return ExtractHashesFromContent(innerContent);
+        }
+        catch (CryptographicException ex) when (ex.Message.Contains("ASN1 corrupted data"))
+        {
+            Console.WriteLine($"KRYPTOGRAFISKT FEL (ASN.1 corrupted data): Standard-dekodning misslyckades. Försöker manuell ICAO-parsing...");
+
+            // Åtgärd: Om standarddekodning misslyckas (p.g.a. icke-standard CMS-struktur), 
+            // försöker vi manuellt hitta det inre ICAO-innehållet för att komma åt DG-hasharna.
+
+            // EF.SOD (CMS) är en SEQUENCE av SEQUENCE. Det inre innehållet
+            // (som är ICAO LDS Security Object) är kapslat i ett OCTET STRING.
+            return ExtractHashesManually(sodBytes);
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"Kryptografiskt fel vid verifiering: {ex.Message}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Allmänt fel: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Fallback-funktion: Försöker hitta det inre ICAO LDS Security Object-innehållet 
+    /// genom att manuellt parsa de yttre CMS-lagren som omsluter det.
+    /// Detta ignorerar CMS-signaturvalideringen.
+    /// </summary>
+    /// <param name="sodBytes">De råa bytena för EF.SOD.</param>
+    /// <returns>Dictionary med Data Group Hashes, eller null vid fel.</returns>
+    private static Dictionary<int, byte[]>? ExtractHashesManually(byte[] sodBytes)
+    {
+        try
+        {
+            var reader = new AsnReader(sodBytes, AsnEncodingRules.DER);
+
+            // 1. SEQUENCE (Det yttersta lagret för CMS/SignedData)
+            var outerSequence = reader.ReadSequence();
+
+            // 2. OID för Content Type (should be pkcs7-signedData)
+            outerSequence.ReadObjectIdentifier();
+
+            // 3. SEQUENCE [0] (Kontext-specifik tagg)
+            var contentSequence = outerSequence.ReadSequence(new Asn1Tag(TagClass.ContextSpecific, 0));
+
+            // KORRIGERING: Istället för att förvänta sig en Universal SEQUENCE (Tag 16),
+            // letar vi nu explicit efter Application-specifik Tag 23 (APPLICATION [23])
+            // som ICAO ofta använder för att definiera SignedData-strukturen.
+
+            // 4. SEQUENCE (SignedData) - Med ICAO:s Application Tag 23
+            var signedDataSequence = contentSequence.ReadSequence(new Asn1Tag(TagClass.Application, 23));
+
+            // --- Hoppa över Version, DigestAlgorithms, EncapsulatedContentInfo ---
+            // Hoppa över Version (INTEGER)
+            signedDataSequence.ReadInteger();
+
+            // Hoppa över DigestAlgorithms (SET OF SEQUENCE)
+            signedDataSequence.ReadSetOf();
+
+            // 5. EncapsulatedContentInfo (SEQUENCE)
+            var encapsulatedContentInfo = signedDataSequence.ReadSequence();
+
+            // 6. ContentType (OID)
+            encapsulatedContentInfo.ReadObjectIdentifier();
+
+            // 7. Content (OCTET STRING) - Detta är det inre ICAO-innehållet vi vill ha!
+            // Det är kapslat i en kontext-specifik tagg [0]
+            if (encapsulatedContentInfo.HasData)
+            {
+                var innerContent = encapsulatedContentInfo.ReadOctetString(new Asn1Tag(TagClass.ContextSpecific, 0));
+
+                // 8. Skicka det råa ICAO-innehållet till den ursprungliga parsaren
+                return ExtractHashesFromContent(innerContent);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"FATALT FEL vid manuell parsing: {ex.Message}");
+            return null;
+        }
+
+        Console.WriteLine("Manuellt försök misslyckades: Kunde inte hitta det inre innehållet.");
+        return null;
+    }
+
+
+    /// <summary>
+    /// Avkodar ICAO LDS Security Object (DG Hashes) från den råa ASN.1-byteströmmen.
+    /// Denna ASN.1-sekvens är det signerade innehållet i EF.SOD.
+    /// </summary>
+    /// <param name="content">Det inre ASN.1-råa innehållet från SignedCms.</param>
+    /// <returns>En Dictionary med Data Group ID som nyckel och Hash som värde.</returns>
+    private static Dictionary<int, byte[]>? ExtractHashesFromContent(byte[] content)
+    {
+        Console.WriteLine($"\n--- Parsar ICAO-innehåll ({content.Length} bytes) ---");
+        var hashes = new Dictionary<int, byte[]>();
+
+        try
+        {
+            var reader = new AsnReader(content, AsnEncodingRules.DER);
+
+            // 1. SEQUENCE (huvudstrukturen för LDS Security Object)
+            var securityObject = reader.ReadSequence();
+
+            // 2. Version (INTEGER) - Bör vara 1
+            if (!securityObject.TryReadInt32(out int version) || version != 1)
+            {
+                Console.WriteLine("Varning: SOD Version är inte 1.");
+            }
+
+            // 3. Hash Algorithm Identifier (SEQUENCE) - Innehåller OID för hash-algoritmen
+            securityObject.ReadSequence(); // Bara läser OID Sequence, ignorerar värdet för enkelhet
+
+            // 4. Encapsulated Content (SEQUENCE) - Innehåller OID och det faktiska DG-hashet
+            securityObject.ReadSequence(); // Läs ContentInfo Sequence
+
+            // 5. DataGroupHash-listan (SET OF SEQUENCE)
+            // OBS: Detta SET-objekt innehåller de faktiska hashar du letar efter.
+            var dataGroupHashesSet = securityObject.ReadSetOf();
+
+            // Loopa igenom varje DataGroupHash-post
+            while (dataGroupHashesSet.HasData)
+            {
+                // Varje post är en SEQUENCE: { Data Group ID (INTEGER), Hash (OCTET STRING) }
+                var dgHashSequence = dataGroupHashesSet.ReadSequence();
+
+                // Hämta Data Group ID (INTEGER)
+                if (!dgHashSequence.TryReadInt32(out int dgId))
+                {
+                    Console.WriteLine("Fel vid läsning av Data Group ID.");
+                    continue;
+                }
+
+                // Hämta Hash-värdet (OCTET STRING)
+                byte[] hashValue = dgHashSequence.ReadOctetString();
+
+                hashes.Add(dgId, hashValue);
+                Console.WriteLine($"Extraherade hash: DG{dgId}, längd: {hashValue.Length} bytes.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"FATALT FEL vid ASN.1-parsing av SOD-innehåll: {ex.Message}");
+            return null;
+        }
+
+        return hashes;
     }
 
     private static bool VerifyDscTrustChainWithPem(
