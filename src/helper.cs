@@ -679,7 +679,21 @@ string masterListDirectoryPath)
             disposables.Add(chain);
             try
             {
-                if (!chain.Build(dscCertDotNet)) throw new Exception();
+                chain.ChainPolicy.ExtraStore.Add(matchingCscaCertDotNet); // Trust Anchor
+                chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // No revocation for now
+                chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority; // Not in windows?
+
+                if (!chain.Build(dscCertDotNet))
+                {
+                    Log.Error("DSC -> CSCA not validated Status:");
+                    foreach (var status in chain.ChainStatus)
+                    {
+                        Log.Error($"{status.Status}: {status.StatusInformation}");
+                    }
+                    throw new Exception("Cert chain DSC -> CSCA no valid");
+                }
+
+                
                 Log.Info("Step 2 pa OK");
                 return true;
             }
