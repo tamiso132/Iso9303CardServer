@@ -178,6 +178,7 @@ public class ClientSession(ICommunicator comm)
             }
 
 
+
             // Time for EF.SOD
             result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
 
@@ -194,12 +195,26 @@ public class ClientSession(ICommunicator comm)
 
             SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
 
+            Log.Info(sodFile.DataGroupHashes.Count.ToString());
+
+            Log.Info(sodFile.HashAlgorithmOid.GetAlgorithmName());
+
             foreach (var dg in sodFile.DataGroupHashes)
             {
+                if (dg.DataGroupNumber == 3 || dg.DataGroupNumber == 4)
+                {
+                    //NEED EAC TO READ THOSE DG
+                    continue;
+                }
+
+                // if (dg.DataGroupNumber != 14)
+                //     continue;
+
                 Log.Info("dg " + dg.DataGroupNumber);
                 Log.Info("hash: " + BitConverter.ToString(dg.Hash));
 
                 EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
+
 
                 result = await _cmd.ReadBinary(MessageType.SecureMessage, dgID);
 
@@ -209,18 +224,31 @@ public class ClientSession(ICommunicator comm)
                     return;
                 }
 
+
                 byte[] dgData = result.Value.data;
+                // if (dgData[0] == 0x6E)
+                // {
+                //     dgData = dgData[4..];
+                // }
+                Log.Info("Data to Hash: " + BitConverter.ToString(dgData));
 
                 byte[] calculatedHashData = System.Security.Cryptography.SHA256.HashData(dgData);
 
+
                 if (!calculatedHashData.SequenceEqual(dg.Hash))
                 {
-                    TestClass.PrintByteComparison(dgData, dg.Hash);
+                    TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                     return;
                 }
+
             }
 
-           // return; i try
+<<<<<<< HEAD
+            Log.Info("Very Ok");
+            return;
+=======
+           // return;
+>>>>>>> 82f96850ced59e43069d27b60a19fac3f178fc21
 
             var tags = TagReader.ReadTagData(result.Value.data, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
             tags.PrintAll();

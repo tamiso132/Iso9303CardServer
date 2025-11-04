@@ -41,7 +41,7 @@ public static class TagReader
                 {
                     return -1;
                 }
-                
+
                 // SÄKERHETSFIX 4 (Del 2): Förhindra overflow till negativt tal
                 // Om 4 bytes används, får den första byten inte vara > 0x7F
                 if (byteCount == 4 && data[i] > 0x7F)
@@ -82,33 +82,37 @@ public static class TagReader
         var list = new List<TagEntry>();
         int i = 0;
 
-        // SÄKERHETSFIX 3: Kontrollera rekursionsdjup
         if (currentDepth > MAX_RECURSION_DEPTH)
         {
-            throw new InvalidDataException($"Maximalt kapslingsdjup ({MAX_RECURSION_DEPTH}) överskridet. Trolig skadlig fil.");
+            throw new InvalidDataException($"Maximalt kapslingsdjup ({MAX_RECURSION_DEPTH}) överskridet.");
         }
 
         while (i < buffer.Length)
         {
-            if (i + 2 > buffer.Length) break; // Behöver minst 1 tag + 1 längd-byte
+            if (i + 2 > buffer.Length) break;
 
-            int tag = buffer[i];
-            i += 1;
+            // Denna kod hanterar nu korrekt 1-bytes och 2-bytes taggar 
+            // (som 0x5F30), vilket är vanligt i DG-filer.
+            int tag = buffer[i++];
+            if ((tag & 0x1F) == 0x1F) // Multi-byte tag (första byten)
+            {
+                int nextByte = buffer[i++];
+                tag = (tag << 8) | nextByte;
+
+                // Fortsätt om det är en sällsynt 3+ bytes tagg
+                while ((nextByte & 0x80) == 0x80 && i < buffer.Length)
+                {
+                    nextByte = buffer[i++];
+                    tag = (tag << 8) | nextByte;
+                }
+            }
+            // --- KORRIGERAD TAGG-LÄSNING SLUT ---
 
             Length len = new();
             int length = len.ParseLength(buffer, ref i, false);
 
-            if (length == -1)
-            {
-                throw new InvalidDataException("Ogiltigt längdfält (antingen -1 eller overflow).");
-            }
-            
-            // SÄKERHETSFIX 1 & 2: Kontrollera längd mot buffertstorlek
-            // Detta förhindrar BÅDE DoS (OutOfMemoryException) och Buffer Over-read (ArgumentOutOfRangeException).
-            if (i + length > buffer.Length)
-            {
-                throw new InvalidDataException($"Tag 0x{tag:X2} angav en längd ({length}) som överskrider buffertens slut.");
-            }
+            if (length == -1) throw new InvalidDataException("Ogiltigt längdfält.");
+            if (i + length > buffer.Length) throw new InvalidDataException($"Tag 0x{tag:X} angav en längd ({length}) som överskrider buffertens slut.");
 
             byte[] data = new byte[length];
             Array.Copy(buffer, i, data, 0, length);
@@ -116,17 +120,21 @@ public static class TagReader
 
             var entry = new TagEntry { Tag = tag, Data = data, _length = len };
 
-            if (sequenceTags != null && sequenceTags.Contains(tag))
+            // Uppdatera sequenceTags för att inkludera multi-byte taggar om det behövs
+            bool isSequence = sequenceTags != null &&
+                              (sequenceTags.Contains(tag) ||
+                               (tag >= 0x60 && (tag & 0x20) == 0x20)); // Generell regel: 'constructed' bit
+
+            if (isSequence && tag != 0x00) // Undvik oändlig loop på 0x00-padding
             {
-                // Skicka med det ökade djupet i det rekursiva anropet
                 entry.Children = ReadTagData(entry.Data, sequenceTags, currentDepth + 1);
             }
             list.Add(entry);
         }
-
         return list;
     }
 }
+
 
 // --- (Dina övriga klasser förblir oförändrade) ---
 public static class TagReaderExtensions

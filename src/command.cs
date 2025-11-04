@@ -86,8 +86,6 @@ public abstract record MessageType
                     Log.Info("ExtraData: " + BitConverter.ToString(extraData));
                     throw new Exception("Test");
                 }
-                Log.Info("sw1: " + sw1.ToHex());
-                Log.Info("resp: " + BitConverter.ToString(response));
 
                 var respIv = command.GetIV();
                 var encryptedData = dataTag[0].Data[1..];
@@ -109,7 +107,6 @@ public abstract record MessageType
                 {
                     
                     byte[] combData = fullData;
-                    Log.Info("i: " + i);
 
 
                     while (DataPacketLen >= combData.Length)
@@ -146,18 +143,14 @@ public abstract record MessageType
 
                     }
 
-                    Log.Info("DataPacketLen: " + DataPacketLen);
-                    Log.Info("Our Length: " + combData.Length);
 
 
                     ResponseCommand respRet = new(0x90, 0x00, combData);
 
                     command.sequenceCounter += BigInteger.One;
-                    Log.Info("SSC: " + command.sequenceCounter);
                     return TResult.Success(respRet);
                 }
 
-                Log.Info("Length of data " + fullData.Length);
 
                 if (!DecryptCheck(fullData))
                     throw new Exception("DecryptFailed: " + fullData);
