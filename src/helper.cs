@@ -93,11 +93,11 @@ public static class MrzUtils
         return (sum % 10).ToString();
     }
 
-    public static void PrintByteArray(byte[] bytes)
-    {
-        string hexString = BitConverter.ToString(bytes).Replace("-", " ");
-        Console.WriteLine(hexString);
-    }
+    // public static void PrintByteArray(byte[] bytes)
+    // {
+    //     string hexString = BitConverter.ToString(bytes).Replace("-", " ");
+    //     Console.WriteLine(hexString);
+    // }
 
     public static string DecodeOid(byte[] bytes)
     {

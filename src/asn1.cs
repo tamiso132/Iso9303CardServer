@@ -153,59 +153,23 @@ public class AsnNode(Asn1Tag id, byte[]? value = null, List<AsnNode>? children =
     }
 
 
-
-    // Can only be used when all the tags are defined in tagids, otherwise error
-    // public void PrintTree(int indent = 0)
-    // {
-    //     string prefix = new(' ', indent * 2);
-    //     TagID Tag = TagID.FromInt(Id);
-    //     if (Children.Count > 0)
-    //     {
-    //         Console.WriteLine($"{prefix}{Tag} (constructed)");
-    //         foreach (var child in Children)
-    //             child.PrintTree(indent + 1);
-    //     }
-    //     else if (Value != null)
-    //     {
-    //         string n = Tag.Id switch
-    //         {
-    //             TagType.Integer => GetValueAsInt().ToString(),
-    //             TagType.OctetString => BitConverter.ToString(Value),
-    //             TagType.ObjectIdentifier => BitConverter.ToString(Value), // or OidDecoder
-    //             TagType.Boolean => (Value[0] != 0).ToString(),
-    //             TagType.Sequence => throw new NotImplementedException(),
-    //             TagType.Set => throw new NotImplementedException(),
-    //             _ => throw new NotImplementedException(),
-    //         };
-
-
-
-    //         Console.WriteLine($"{prefix}{Tag}: {n}");
-    //     }
-    //     else
-    //     {
-    //         Console.WriteLine($"{prefix}{Tag}: <empty>");
-    //     }
-
-    // }
-
     public void PrintBare(int indent = 0)
     {
         string prefix = new string(' ', indent * 2);
 
         if (Children.Count > 0)
         {
-            Console.WriteLine($"{prefix}{Id:X2} (constructed)");
+           // Console.WriteLine($"{prefix}{Id:X2} (constructed)");
             foreach (var child in Children)
                 child.PrintBare(indent + 1);
         }
         else if (Value != null && Value.Length > 0)
         {
-            Console.WriteLine($"{prefix}{Id:X2}: {BitConverter.ToString(Value)}");
+           // Console.WriteLine($"{prefix}{Id:X2}: {BitConverter.ToString(Value)}");
         }
         else
         {
-            Console.WriteLine($"{prefix}{Id:X2}: <empty>");
+            //Console.WriteLine($"{prefix}{Id:X2}: <empty>");
         }
     }
     public byte[]? Value { get; } = value;

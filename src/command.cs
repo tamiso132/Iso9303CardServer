@@ -183,7 +183,7 @@ public abstract record MessageType
             }
             // make ready for next command
             command.sequenceCounter += BigInteger.One;
-            Log.Info("SSC: " + command.sequenceCounter);
+//            Log.Info("SSC: " + command.sequenceCounter);
             return TResult.Success(respCommand);
         }
 

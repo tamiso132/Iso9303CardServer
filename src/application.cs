@@ -204,15 +204,16 @@ public class ClientSession(ICommunicator comm)
             Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
 
             Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
+       //     Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
 
             var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
-            tags.PrintAll();
+         //   tags.PrintAll();
 
 
             var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
 
             var cmsTags = TagReader.ReadTagData(data, [0x30]);
-            cmsTags.PrintAll();
+          //  cmsTags.PrintAll();
 
             // Skriver in all data i filer, First step of passive authentication
             File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
@@ -255,16 +256,10 @@ public class ClientSession(ICommunicator comm)
                     //NEED EAC TO READ THOSE DG
                     continue;
                 }
+                Log.Info($"Verifierar DG {dg.DataGroupNumber}...");
 
-                // if (dg.DataGroupNumber != 14)
-                //     continue;
-
-                // Log.Info("dg " + dg.DataGroupNumber);
-                // Log.Info("hash: " + BitConverter.ToString(dg.Hash));
 
                 EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
-
-
                 result = await _cmd.ReadBinary(MessageType.SecureMessage, dgID);
 
                 if (!result.IsSuccess)
@@ -275,27 +270,22 @@ public class ClientSession(ICommunicator comm)
 
 
                 byte[] dgData = result.Value.data;
-                // if (dgData[0] == 0x6E)
-                // {
-                //     dgData = dgData[4..];
-                // }
-
-
                 byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
 
+                Log.Info($"Chip hash says: {BitConverter.ToString(dg.Hash)}");
+                Log.Info($"Calculated Hash: {BitConverter.ToString(calculatedHashData)}");
 
                 if (!calculatedHashData.SequenceEqual(dg.Hash))
                 {
+                    Log.Error($"Hash wrong for {dg.DataGroupNumber}, PA failed");
                     TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                     return;
                 }
-
+                Log.Info($"Hash ok for DG {dg.DataGroupNumber}");
             }
+            Log.Info("Full Passive Authentication Complete!");
             
         }
-
-        
-
 
         Log.Info("All commands completed without a problem");
 
