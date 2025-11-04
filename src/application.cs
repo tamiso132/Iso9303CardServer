@@ -246,6 +246,8 @@ public class ClientSession(ICommunicator comm)
                 Log.Error("Pa failed in step 2");
             }
 
+            Log.Info("PA step 3 start...");
+
             foreach (var dg in sodFile.DataGroupHashes)
             {
                 if (dg.DataGroupNumber == 3 || dg.DataGroupNumber == 4)
@@ -289,7 +291,10 @@ public class ClientSession(ICommunicator comm)
                 }
 
             }
+            
         }
+
+        
 
 
         Log.Info("All commands completed without a problem");
