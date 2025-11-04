@@ -243,12 +243,9 @@ public class ClientSession(ICommunicator comm)
 
             }
 
-<<<<<<< HEAD
             Log.Info("Very Ok");
             return;
-=======
            // return;
->>>>>>> 82f96850ced59e43069d27b60a19fac3f178fc21
 
             var tags = TagReader.ReadTagData(result.Value.data, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
             tags.PrintAll();
