@@ -64,7 +64,7 @@ public class ClientSession(ICommunicator comm)
 
 
 
-            byte[] key = TestClass.DerivePaceKey(info);
+            byte[] key = PassHelper.DerivePaceKey(info);
 
 
 
@@ -80,7 +80,7 @@ public class ClientSession(ICommunicator comm)
 
 
 
-            var r = await TestClass.ComputeDecryptedNounce(_cmd, info, key, TestClass.PasswordType.MRZ);
+            var r = await PassHelper.ComputeDecryptedNounce(_cmd, info, key, PassHelper.PasswordType.MRZ);
 
 
 
@@ -140,7 +140,7 @@ public class ClientSession(ICommunicator comm)
                 ecdh.CalculateSharedSecret(icPublicKey);
             }
 
-            var tuple = TestClass.DeriveSessionKeys(info, ecdh.SharedSecret);
+            var tuple = PassHelper.DeriveSessionKeys(info, ecdh.SharedSecret);
 
             byte[] macKey = tuple.Item1;
             byte[] encKey = tuple.Item2;
@@ -204,12 +204,6 @@ public class ClientSession(ICommunicator comm)
             Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
 
             Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
-
-
-
-
-
-
 
             var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
             tags.PrintAll();
@@ -299,8 +293,6 @@ public class ClientSession(ICommunicator comm)
 
 
         Log.Info("All commands completed without a problem");
-
-
 
     }
 
