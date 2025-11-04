@@ -191,7 +191,8 @@ public class ClientSession(ICommunicator comm)
             //Log.Info("Found EF.SOD");
 
             response = result.Value;
-            Log.Info("EfSod: " + BitConverter.ToString(response.data));
+            byte[] sodrawBytes = response.data;
+            //  Log.Info("EfSod: " + BitConverter.ToString(response.data));
 
             SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
 
@@ -213,8 +214,8 @@ public class ClientSession(ICommunicator comm)
                 // if (dg.DataGroupNumber != 14)
                 //     continue;
 
-                Log.Info("dg " + dg.DataGroupNumber);
-                Log.Info("hash: " + BitConverter.ToString(dg.Hash));
+                // Log.Info("dg " + dg.DataGroupNumber);
+                // Log.Info("hash: " + BitConverter.ToString(dg.Hash));
 
                 EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
 
@@ -233,7 +234,6 @@ public class ClientSession(ICommunicator comm)
                 // {
                 //     dgData = dgData[4..];
                 // }
-                Log.Info("Data to Hash: " + BitConverter.ToString(dgData));
 
 
                 byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
@@ -247,10 +247,8 @@ public class ClientSession(ICommunicator comm)
 
             }
 
-            Log.Info("Very Ok");
-            return;
 
-            var tags = TagReader.ReadTagData(result.Value.data, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
+            var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
             tags.PrintAll();
 
 
