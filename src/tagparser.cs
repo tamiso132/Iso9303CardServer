@@ -149,7 +149,7 @@ public static class TagReaderExtensions
         string indentStr = new string(' ', indent * 2);
         foreach (var tag in tags)
         {
-            Console.Write($"{indentStr}Tag: 0x{tag.Tag:X2} ");
+            //Console.Write($"{indentStr}Tag: 0x{tag.Tag:X2} ");
             if (tag.Children != null && tag.Children.Count > 0)
             {
                 Console.WriteLine($" (Children: {tag.Children.Count})");
@@ -159,13 +159,13 @@ public static class TagReaderExtensions
             {
                 string hex = BitConverter.ToString(tag.Data);
                 int maxLineLength = 64;
-                Console.Write($" (Length: {tag.Data.Length})\n{indentStr} Data:\n");
+                //Console.Write($" (Length: {tag.Data.Length})\n{indentStr} Data:\n");
                 for (int j = 0; j < hex.Length; j += maxLineLength)
                 {
                     if (j > 0) Console.WriteLine();
-                    Console.Write($"{indentStr}      {hex.Substring(j, Math.Min(maxLineLength, hex.Length - j))}");
+                    //Console.Write($"{indentStr}      {hex.Substring(j, Math.Min(maxLineLength, hex.Length - j))}");
                 }
-                Console.WriteLine();
+               
             }
         }
     }
