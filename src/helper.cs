@@ -172,7 +172,7 @@ public class ByteReader(byte[] data)
         if (first < 0x80) return first;
 
         int numBytes = first & 0x7F;
-        
+
         return ReadInt(numBytes);
     }
 
