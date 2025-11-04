@@ -233,7 +233,7 @@ public class ClientSession(ICommunicator comm)
                 // {
                 //     dgData = dgData[4..];
                 // }
-                Log.Info("Data to Hash: " + BitConverter.ToString(dgData));
+//                Log.Info("Data to Hash: " + BitConverter.ToString(dgData));
 
 
                 byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
@@ -248,7 +248,7 @@ public class ClientSession(ICommunicator comm)
             }
 
             Log.Info("Very Ok");
-            return;
+            
            // return;
 
             var tags = TagReader.ReadTagData(result.Value.data, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
