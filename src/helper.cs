@@ -531,6 +531,52 @@ public static class SodHelper
     }
 
 
+    public static Dictionary<int, byte[]> ParseAndVerifySod(byte[] sodBytes)
+    {
+        // Försök att dekoda CMS/PKCS#7 med standardklassen. Detta är det korrekta sättet.
+        try
+        {
+            var signedCms = new SignedCms();
+            signedCms.Decode(sodBytes);
+
+            if (signedCms.Certificates.Count == 0)
+            {
+                Console.WriteLine("Varning: Hittade inget Document Signer Certificate (DSC) i SOD-filen.");
+            }
+
+            // Detta verifierar att SOD-signaturen är giltig mot det inbäddade DSC.
+            signedCms.CheckSignature(verifySignatureOnly: true);
+            Console.WriteLine("SOD Signatur verifierad framgångsrikt mot det inbäddade DSC.");
+
+            // 3. Extrahera det inre innehållet (ContentInfo).
+            // Detta innehåll är själva ICAO-strukturen som innehåller DG Hashes.
+            byte[] innerContent = signedCms.ContentInfo.Content;
+
+            // 4. Parsa Data Group Hashes
+            return ExtractHashesFromContent(innerContent);
+        }
+        catch (CryptographicException ex) when (ex.Message.Contains("ASN1 corrupted data"))
+        {
+            Console.WriteLine($"KRYPTOGRAFISKT FEL (ASN.1 corrupted data): Standard-dekodning misslyckades. Försöker manuell ICAO-parsing...");
+
+            // Åtgärd: Om standarddekodning misslyckas (p.g.a. icke-standard CMS-struktur), 
+            // försöker vi manuellt hitta det inre ICAO-innehållet för att komma åt DG-hasharna.
+
+            // EF.SOD (CMS) är en SEQUENCE av SEQUENCE. Det inre innehållet
+            // (som är ICAO LDS Security Object) är kapslat i ett OCTET STRING.
+            return ExtractHashesManually(sodBytes);
+        }
+        catch (CryptographicException ex)
+        {
+            Console.WriteLine($"Kryptografiskt fel vid verifiering: {ex.Message}");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Allmänt fel: {ex.Message}");
+            return null;
+        }
+    }
 
     /// <summary>
     /// Fallback-funktion: Försöker hitta det inre ICAO LDS Security Object-innehållet 

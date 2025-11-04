@@ -177,7 +177,15 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
+    // Step 2: Valideringskedja
+    // Use FindCSCACert??, verifyCertChain
 
+    // OSCP (Online Certificate Status Protocol)
+    // Check revokation list??, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
+    // Inget sätt för en privatperson att kolla revoked lists, om vi inte är trusted partner av interpool eller en säker källa för polisen att ta emot förfrågningar
+
+    // Step 3: Verify data-group hashes
+    // Use verifyDatagroupHashes
 
             // Time for EF.SOD
             result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
@@ -188,11 +196,9 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-            //Log.Info("Found EF.SOD");
 
             response = result.Value;
             byte[] sodrawBytes = response.data;
-            //  Log.Info("EfSod: " + BitConverter.ToString(response.data));
 
             SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
 
@@ -262,31 +268,7 @@ public class ClientSession(ICommunicator comm)
             byte[] binBytes = tags[0].Data;
 
 
-            // Felsökning
-            // byte[] binBytesTest = cmsTags[0].GetHeaderFormat();
-            // File.WriteAllBytes("EFSodDumpcmstag.bin", binBytesTest);
-
-            // var dgHashes = SodHelper.ParseAndVerifySod(response.data);
-
-            // if (dgHashes == null)
-            // {
-            //     Log.Error("Unable to parse dg hashes from sod");
-            //     return;
-            // }
-
-            // foreach (KeyValuePair<int, byte[]> entry in dgHashes)
-            // {
-            //     // entry.Key är DG ID (int)
-            //     // entry.Value är Hash-byterna (byte[])
-            //     string hashHex = BitConverter.ToString(entry.Value).Replace("-", "");
-            //     Log.Info($"DG{entry.Key}: {hashHex}");
-            // }
-
-
             Org.BouncyCastle.X509.X509Certificate? dscCertBouncyCastle = SodHelper.ReadSodData(binBytes); // Helper to find and print SOD information
-
-
-
 
 
             // Use passiveAuthTest.cs for step 2 and 3
@@ -320,23 +302,12 @@ public class ClientSession(ICommunicator comm)
 
 
     }
-    // Step 2: Valideringskedja
-    // Use FindCSCACert??, verifyCertChain
 
-    // OSCP (Online Certificate Status Protocol)
-    // Check revokation list??, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
-
-    // Step 3: Verify data-group hashes
-    // Use verifyDatagroupHashes
 
 
     private readonly ICommunicator _comm = comm;
     private readonly Command<ServerEncryption> _cmd = new(comm, new ServerEncryption());
 }
-
-// TODO Implement Secure messaging
-// Add SSC, Wrapper, unwrapper
-
 
 public class ServerEncryption : IServerFormat
 {
