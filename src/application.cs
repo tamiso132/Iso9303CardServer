@@ -220,7 +220,7 @@ public class ClientSession(ICommunicator comm)
                 }
             }
 
-           // return;
+           // return; i try
 
             var tags = TagReader.ReadTagData(result.Value.data, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
             tags.PrintAll();
