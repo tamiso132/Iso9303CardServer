@@ -103,9 +103,8 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-            // var asn1Result = AsnNode.Parse(new AsnReader(result.Value.data, AsnEncodingRules.BER, new AsnReaderOptions()), [new Asn1Tag(TagClass.ContextSpecific, 0x7C, true), new Asn1Tag(TagClass.ContextSpecific, 0x84, true)]);
-
-            //   Log.Info(asn1Result.GetAllNodes()[0].Id.TagValue.ToString());
+            //var asn1Result = AsnNode.Parse(new AsnReader(result.Value.data, AsnEncodingRules.BER, new AsnReaderOptions()), [new Asn1Tag(TagClass.ContextSpecific, 0x7C, true), new Asn1Tag(TagClass.ContextSpecific, 0x84, true)]);
+            //Log.Info(asn1Result.GetAllNodes()[0].Id.TagValue.ToString());
 
             using (var stream = new Asn1InputStream(result.Value.data))
             {
@@ -202,18 +201,16 @@ public class ClientSession(ICommunicator comm)
             SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
 
             Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
-
             Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
-       //     Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
 
             var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
-         //   tags.PrintAll();
+            // tags.PrintAll(); Felsökning
 
 
             var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
 
             var cmsTags = TagReader.ReadTagData(data, [0x30]);
-          //  cmsTags.PrintAll();
+            //cmsTags.PrintAll(); Felsökning
 
             // Skriver in all data i filer, First step of passive authentication
             File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
@@ -283,8 +280,9 @@ public class ClientSession(ICommunicator comm)
                 }
                 Log.Info($"Hash ok for DG {dg.DataGroupNumber}");
             }
+            Log.Info("Step 3 PA OK");
             Log.Info("Full Passive Authentication Complete!");
-            
+
         }
 
         Log.Info("All commands completed without a problem");
