@@ -65,7 +65,7 @@ public class ClientSession(ICommunicator comm)
             byte[] icPublicKey = ecdh.ParseCalculateSharedSecret(response.data);
             var tuple = PassHelper.DeriveSessionKeys(info, ecdh.SharedSecret);
 
-            _cmd.SetEncryption(tuple.Item1, tuple.Item2);
+            _cmd.SetEncryption(tuple.Item2, tuple.Item1);
 
             if (!(await _cmd.GeneralAuthenticateMutual(icPublicKey[0..], ecdh.PublicKey, info.OrgOid)).UnwrapOrThrow())
             {
@@ -123,6 +123,7 @@ public class ClientSession(ICommunicator comm)
                 if (dg.DataGroupNumber == 3 || dg.DataGroupNumber == 4)
                 {
                     //NEED EAC TO READ THOSE DG
+                    Log.Info($"Found DG: {dg.DataGroupNumber}, Need EAC (Extended Acess Controll) to verify this datagroup");
                     continue;
                 }
                 Log.Info($"Verifierar DG {dg.DataGroupNumber}...");
@@ -135,8 +136,8 @@ public class ClientSession(ICommunicator comm)
                 byte[] dgData = response.data;
                 byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
 
-                Log.Info($"Chip hash says: {BitConverter.ToString(dg.Hash)}");
-                Log.Info($"Calculated Hash: {BitConverter.ToString(calculatedHashData)}");
+                Log.Info($"Chip Hash says: {BitConverter.ToString(dg.Hash)}");
+                Log.Info($"Calculated Hashvalue: {BitConverter.ToString(calculatedHashData)}");
 
                 if (!calculatedHashData.SequenceEqual(dg.Hash))
                 {
@@ -144,7 +145,7 @@ public class ClientSession(ICommunicator comm)
                     TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                     return;
                 }
-                Log.Info($"Hash ok for DG {dg.DataGroupNumber}");
+                Log.Info($"Hashvalue ok for DG {dg.DataGroupNumber}");
             }
             Log.Info("Step 3 PA OK");
             Log.Info("Full Passive Authentication Complete!");

@@ -93,36 +93,7 @@ public static class MrzUtils
         return (sum % 10).ToString();
     }
 
-    // public static void PrintByteArray(byte[] bytes)
-    // {
-    //     string hexString = BitConverter.ToString(bytes).Replace("-", " ");
-    //     Console.WriteLine(hexString);
-    // }
-
-    public static string DecodeOid(byte[] bytes)
-    {
-        if (bytes.Length == 0) return string.Empty;
-
-        StringBuilder buffer = new();
-        int first = bytes[0] / 40;
-        int second = bytes[0] % 40;
-        buffer.Append($"{first}.{second}");
-
-        int value = 0;
-        for (int i = 1; i < bytes.Length; i++)
-        {
-            int b = bytes[i];
-            value = (value << 7) | (b & 0x7F);
-            if ((b & 0x80) == 0) // end of subidentifier
-            {
-                buffer.Append($".{value}");
-                value = 0;
-            }
-        }
-
-        return buffer.ToString();
-    }
-}
+ }
 
 public class AsnInfo(byte tag, byte[] data)
 {
@@ -271,18 +242,6 @@ public class RandomNumberProvider
     }
 }
 
-public class ParameterUtil
-{
-    public static DomainParameter getParameterById(int id)
-    {
-        return id switch
-        {
-            16 => DomainParameter.BrainpoolP384r1,
-            _ => throw new NotImplementedException("Parameter ID not implemented"),
-        };
-
-    }
-}
 
 public static class Util
 {
