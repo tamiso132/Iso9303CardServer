@@ -140,7 +140,7 @@ public class ClientSession(ICommunicator comm)
 
                 if (!calculatedHashData.SequenceEqual(dg.Hash))
                 {
-                    Log.Error($"Hash wrong for {dg.DataGroupNumber}, PA failed");
+                    Log.Error($"Hash wrong for DG{dg.DataGroupNumber}, PA failed");
                     TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                     return;
                 }
