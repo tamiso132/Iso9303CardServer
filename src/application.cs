@@ -181,7 +181,7 @@ public class ClientSession(ICommunicator comm)
     // Use FindCSCACert??, verifyCertChain
 
     // OSCP (Online Certificate Status Protocol)
-    // Check revokation list??, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
+    // Check revokation list, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
     // Inget sätt för en privatperson att kolla revoked lists, om vi inte är trusted partner av interpool eller en säker källa för polisen att ta emot förfrågningar
 
     // Step 3: Verify data-group hashes
@@ -202,9 +202,9 @@ public class ClientSession(ICommunicator comm)
 
             SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
 
-            Log.Info(sodFile.DataGroupHashes.Count.ToString());
+            Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
 
-            Log.Info(sodFile.HashAlgorithmOid.GetAlgorithmName());
+            Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
 
 
 

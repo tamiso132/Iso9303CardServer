@@ -1,5 +1,3 @@
-// --- 2. Dataklasser (Från min tidigare kod) ---
-
 using Helper;
 
 public class DataGroupHash
