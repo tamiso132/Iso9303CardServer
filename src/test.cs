@@ -232,7 +232,7 @@ public class TestClass
         ];
 
         ECDH ecdh = new ECDH(DomainParameter.BrainpoolP256r1, privateKey);
-        ecdh.CalculateSharedSecret(chipPublicKey);
+        ecdh.ParseCalculateSharedSecret(chipPublicKey);
         var secretCalculated = ecdh._secret.Normalize().GetEncoded();
 
         if (!IsEqual(sharedSecret, secretCalculated))

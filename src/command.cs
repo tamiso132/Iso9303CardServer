@@ -105,7 +105,7 @@ public abstract record MessageType
 
                 if (fullData.Length < DataPacketLen)
                 {
-                    
+
                     byte[] combData = fullData;
 
 
@@ -183,7 +183,7 @@ public abstract record MessageType
             }
             // make ready for next command
             command.sequenceCounter += BigInteger.One;
-//            Log.Info("SSC: " + command.sequenceCounter);
+            //            Log.Info("SSC: " + command.sequenceCounter);
             return TResult.Success(respCommand);
         }
 
@@ -483,7 +483,8 @@ public class Command<T>(ICommunicator communicator, T encryption)
         this.mac = mac;
     }
 
-    public async Task<TResultBool> GeneralAuthenticateMutual(byte[] icPubKey, byte[] terminalKey, byte[] oid, byte[] macKey)
+
+    public async Task<TResultBool> GeneralAuthenticateMutual(byte[] icPubKey, byte[] terminalKey, byte[] oid)
     {
         var type = MessageType.NonSecureMessage;
         byte[] innerSequence = [0x06, (byte)oid.Length, .. oid];

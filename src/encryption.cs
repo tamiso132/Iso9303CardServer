@@ -9,6 +9,7 @@ using Command;
 using ErrorHandling;
 using Helper;
 using Interfaces;
+using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Crypto.Engines;
 using Org.BouncyCastle.Crypto.Macs;
@@ -261,9 +262,10 @@ public sealed record DomainParameter(X9ECParameters param)
 public sealed record ECDH
 {
 
-    public ECDH(DomainParameter param, byte[] privateKey, byte[]? generator = null)
+    public ECDH(DomainParameter param, byte[]? generator = null)
     {
-        PrivateKey = new Org.BouncyCastle.Math.BigInteger(1, privateKey);
+        var rnd = new RandomNumberProvider();
+        PrivateKey = new Org.BouncyCastle.Math.BigInteger(1, rnd.GetNextBytes(32));
         this.param = param;
         _secret = this.param.param.G;
         if (generator == null)
@@ -282,11 +284,18 @@ public sealed record ECDH
 
     }
 
-    public void CalculateSharedSecret(byte[] encodedChipPublic)
+    public byte[] ParseCalculateSharedSecret(byte[] responseData)
     {
         Log.Info("Calculate Shared Secret");
+        using var stream = new Asn1InputStream(responseData);
+        Asn1Object obj = stream.ReadObject();  // top-level object
+        byte[] encodedChipPublic = obj.GetDerEncoded()[4..];
+
         var publicKeyIC = param.param.Curve.DecodePoint(encodedChipPublic).Normalize();
         _secret = publicKeyIC.Multiply(PrivateKey).Normalize();
+
+        return encodedChipPublic;
+
     }
 
     // Update Private key

@@ -2,6 +2,12 @@ using Type;
 
 namespace ErrorHandling;
 
+public class CommandFailedException : Exception
+{
+    public CommandFailedException(string message) : base(message) { }
+}
+
+
 public class Result<T>
 {
     public T Value { get; }
@@ -85,5 +91,34 @@ public abstract record Error(ErrorSeverity Severity)
        : Error(Severity)
     {
         public override string ErrorMessage() => Message;
+    }
+}
+
+
+
+// --- Extension Methods för kortfattad hantering ---
+public static class ResultExtensions
+{
+    // För Result<T> - returnerar värdet T eller kastar CommandFailedException
+    public static T UnwrapOrThrow<T>(this Result<T> result)
+    {
+        if (!result.IsSuccess)
+        {
+            // Loggar felet innan undantaget kastas, som i din ursprungliga kod.
+            // Log-klassen antas finnas tillgänglig.
+            // Log.Error(result.Error.ErrorMessage()); 
+            throw new CommandFailedException(result.Error.ErrorMessage());
+        }
+        return result.Value;
+    }
+
+    // För Result<RVoid> - kastar CommandFailedException vid fel, men returnerar inget värde.
+    public static void ThrowOnFailure(this Result<RVoid> result)
+    {
+        if (!result.IsSuccess)
+        {
+            // Log.Error(result.Error.ErrorMessage());
+            throw new CommandFailedException(result.Error.ErrorMessage());
+        }
     }
 }

@@ -28,93 +28,29 @@ public class ClientSession(ICommunicator comm)
     public async Task Start()
     {
 
-
         byte[] buffer = await _comm.ReadAsync();
         var packet = ServerPacket.TryFromBytes(buffer);
         if (packet.Type == CommandType.NewNFCScan)
         {
-            var result = await _cmd.SelectDefaultMF(MessageType.NonSecureMessage);
+            (await _cmd.SelectDefaultMF(MessageType.NonSecureMessage)).UnwrapOrThrow();
 
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
-
-
-            result = await _cmd.ReadBinary(MessageType.NonSecureMessage, EfIdGlobal.CardAccess);
-
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
-
-
-
-            var response = result.Value;
-
-
-
+            var response = (await _cmd.ReadBinary(MessageType.NonSecureMessage, EfIdGlobal.CardAccess)).UnwrapOrThrow();
 
             var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
             info.PrintInfo();
 
-
-
-
-
             byte[] key = PassHelper.DerivePaceKey(info);
 
 
+            (await _cmd.MseSetAT(MessageType.NonSecureMessage, info.OrgOid, info.OrgParameterID)).UnwrapOrThrow();
 
-            result = await _cmd.MseSetAT(MessageType.NonSecureMessage, info.OrgOid, info.OrgParameterID);
-
-
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
+            var decryptedNounce = (await PassHelper.ComputeDecryptedNounce(_cmd, info, key, PassHelper.PasswordType.MRZ)).UnwrapOrThrow();
 
 
+            var ecdh = new ECDH(DomainParameter.BrainpoolP384r1);
 
-
-            var r = await PassHelper.ComputeDecryptedNounce(_cmd, info, key, PassHelper.PasswordType.MRZ);
-
-
-
-
-            if (!r.IsSuccess)
-            {
-                Log.Error(r.Error.ErrorMessage());
-                return;
-            }
-
-            var decryptedNounce = r.Value;
-            var rnd = new RandomNumberProvider();
-            var ecdh = new ECDH(DomainParameter.BrainpoolP384r1, rnd.GetNextBytes(32));
-
-            result = await _cmd.GeneralAuthenticateMapping(0x81, ecdh.PublicKey);
-
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
-
-            // var asn1Result = AsnNode.Parse(new AsnReader(result.Value.data, AsnEncodingRules.BER, new AsnReaderOptions()), [new Asn1Tag(TagClass.ContextSpecific, 0x7C, true), new Asn1Tag(TagClass.ContextSpecific, 0x84, true)]);
-
-            //   Log.Info(asn1Result.GetAllNodes()[0].Id.TagValue.ToString());
-
-            using (var stream = new Asn1InputStream(result.Value.data))
-            {
-                Asn1Object obj = stream.ReadObject();  // top-level object
-                byte[] data2 = obj.GetDerEncoded()[4..];
-
-                ecdh.CalculateSharedSecret(data2);
-
-            }
+            response = (await _cmd.GeneralAuthenticateMapping(0x81, ecdh.PublicKey)).UnwrapOrThrow();
+            ecdh.ParseCalculateSharedSecret(response.data);
 
 
             // update generator with new shared secret
@@ -123,128 +59,61 @@ public class ClientSession(ICommunicator comm)
 
 
             // send new public key and do same
-            result = await _cmd.GeneralAuthenticateMapping(0x83, ecdh.PublicKey);
+            response = (await _cmd.GeneralAuthenticateMapping(0x83, ecdh.PublicKey)).UnwrapOrThrow();
 
 
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
-            byte[] icPublicKey = [];
-            using (var stream = new Asn1InputStream(result.Value.data))
-            {
-                Asn1Object obj = stream.ReadObject();  // top-level object
-                icPublicKey = obj.GetDerEncoded()[4..]; // ic publickey
-
-                ecdh.CalculateSharedSecret(icPublicKey);
-            }
-
+            byte[] icPublicKey = ecdh.ParseCalculateSharedSecret(response.data);
             var tuple = PassHelper.DeriveSessionKeys(info, ecdh.SharedSecret);
 
-            byte[] macKey = tuple.Item1;
-            byte[] encKey = tuple.Item2;
-            _cmd.SetEncryption(encKey, macKey);
+            _cmd.SetEncryption(tuple.Item1, tuple.Item2);
 
-            var authResult = await _cmd.GeneralAuthenticateMutual(icPublicKey[0..], ecdh.PublicKey, info.OrgOid, macKey);
-
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
-
-            bool isAuth = authResult.Value;
-
-            if (!isAuth)
+            if (!(await _cmd.GeneralAuthenticateMutual(icPublicKey[0..], ecdh.PublicKey, info.OrgOid)).UnwrapOrThrow())
             {
                 Log.Error("AuthenticationToken was not correctly calculated");
                 return;
             }
 
-
-
             Log.Info("Secure Messaging Established using: PACE, Session started.");
 
             // Change to LDS1 MUST be secure
-            result = await _cmd.SelectApplication(MessageType.SecureMessage, AppID.IdLDS1);
+            (await _cmd.SelectApplication(MessageType.SecureMessage, AppID.IdLDS1)).UnwrapOrThrow();
+
+            response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod)).UnwrapOrThrow();
 
 
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
-
-            // Step 2: Valideringskedja
-            // Use FindCSCACert??, verifyCertChain
-
-            // OSCP (Online Certificate Status Protocol)
-            // Check revokation list, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
-            // Inget sätt för en privatperson att kolla revoked lists, om vi inte är trusted partner av interpool eller en säker källa för polisen att ta emot förfrågningar
-
-            // Step 3: Verify data-group hashes
-            // Use verifyDatagroupHashes
-
-            // Time for EF.SOD
-            result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
-
-            if (!result.IsSuccess)
-            {
-                Log.Error(result.Error.ErrorMessage());
-                return;
-            }
-
-
-            response = result.Value;
             byte[] sodrawBytes = response.data;
 
             SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
 
             Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
-
             Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
-       //     Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
+            //     Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
 
             var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
-         //   tags.PrintAll();
+            //   tags.PrintAll();
 
 
             var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
 
             var cmsTags = TagReader.ReadTagData(data, [0x30]);
-          //  cmsTags.PrintAll();
+            //  cmsTags.PrintAll();
 
             // Skriver in all data i filer, First step of passive authentication
             File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
             byte[] binBytes = tags[0].Data;
 
 
-            Org.BouncyCastle.X509.X509Certificate? dscCertBouncyCastle = SodHelper.ReadSodData(binBytes); // Helper to find and print SOD information
+            Org.BouncyCastle.X509.X509Certificate dscCertBouncyCastle = SodHelper.ReadSodData(binBytes)!; // Helper to find and print SOD information
 
 
             // Use passiveAuthTest.cs for step 2 and 3
             Log.Info("Starting Passive authentication...");
 
             string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
-            bool step2Success = SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath);
-
-            if (dscCertBouncyCastle == null)
+            if (!SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath))
             {
-                Log.Error("dscCertBouncy is null");
-            }
-            else
-            {
-                Log.Info("dscCert is not null");
-            }
-
-            if (step2Success)
-            {
-                Log.Info("STEP 2 DONE");
-            }
-            else
-            {
-                Log.Error("Pa failed in step 2");
+                Log.Error("STEP 2 Failed for passive authentication");
+                return;
             }
 
             Log.Info("PA step 3 start...");
@@ -260,16 +129,10 @@ public class ClientSession(ICommunicator comm)
 
 
                 EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
-                result = await _cmd.ReadBinary(MessageType.SecureMessage, dgID);
-
-                if (!result.IsSuccess)
-                {
-                    Log.Error(result.Error.ErrorMessage());
-                    return;
-                }
+                response = (await _cmd.ReadBinary(MessageType.SecureMessage, dgID)).UnwrapOrThrow();
 
 
-                byte[] dgData = result.Value.data;
+                byte[] dgData = response.data;
                 byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
 
                 Log.Info($"Chip hash says: {BitConverter.ToString(dg.Hash)}");
@@ -284,7 +147,7 @@ public class ClientSession(ICommunicator comm)
                 Log.Info($"Hash ok for DG {dg.DataGroupNumber}");
             }
             Log.Info("Full Passive Authentication Complete!");
-            
+
         }
 
         Log.Info("All commands completed without a problem");
