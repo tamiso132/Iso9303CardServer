@@ -176,15 +176,15 @@ public class ClientSession(ICommunicator comm)
                 return;
             }
 
-    // Step 2: Valideringskedja
-    // Use FindCSCACert??, verifyCertChain
+            // Step 2: Valideringskedja
+            // Use FindCSCACert??, verifyCertChain
 
-    // OSCP (Online Certificate Status Protocol)
-    // Check revokation list, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
-    // Inget sätt för en privatperson att kolla revoked lists, om vi inte är trusted partner av interpool eller en säker källa för polisen att ta emot förfrågningar
+            // OSCP (Online Certificate Status Protocol)
+            // Check revokation list, this requires us to send the certificate to a revokation server which responds if the certificate is valid or not
+            // Inget sätt för en privatperson att kolla revoked lists, om vi inte är trusted partner av interpool eller en säker källa för polisen att ta emot förfrågningar
 
-    // Step 3: Verify data-group hashes
-    // Use verifyDatagroupHashes
+            // Step 3: Verify data-group hashes
+            // Use verifyDatagroupHashes
 
             // Time for EF.SOD
             result = await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod);
@@ -207,6 +207,50 @@ public class ClientSession(ICommunicator comm)
 
 
 
+
+
+
+
+            var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
+            tags.PrintAll();
+
+
+            var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
+
+            var cmsTags = TagReader.ReadTagData(data, [0x30]);
+            cmsTags.PrintAll();
+
+            // Skriver in all data i filer, First step of passive authentication
+            File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
+            byte[] binBytes = tags[0].Data;
+
+
+            Org.BouncyCastle.X509.X509Certificate? dscCertBouncyCastle = SodHelper.ReadSodData(binBytes); // Helper to find and print SOD information
+
+
+            // Use passiveAuthTest.cs for step 2 and 3
+            Log.Info("Starting Passive authentication...");
+
+            string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
+            bool step2Success = SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath);
+
+            if (dscCertBouncyCastle == null)
+            {
+                Log.Error("dscCertBouncy is null");
+            }
+            else
+            {
+                Log.Info("dscCert is not null");
+            }
+
+            if (step2Success)
+            {
+                Log.Info("STEP 2 DONE");
+            }
+            else
+            {
+                Log.Error("Pa failed in step 2");
+            }
 
             foreach (var dg in sodFile.DataGroupHashes)
             {
@@ -250,48 +294,6 @@ public class ClientSession(ICommunicator comm)
                     return;
                 }
 
-            }
-
-
-            var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
-            tags.PrintAll();
-
-
-            var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
-
-            var cmsTags = TagReader.ReadTagData(data, [0x30]);
-            cmsTags.PrintAll();
-
-            // Skriver in all data i filer, First step of passive authentication
-            File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
-            byte[] binBytes = tags[0].Data;
-
-
-            Org.BouncyCastle.X509.X509Certificate? dscCertBouncyCastle = SodHelper.ReadSodData(binBytes); // Helper to find and print SOD information
-
-
-            // Use passiveAuthTest.cs for step 2 and 3
-            Log.Info("Starting Passive authentication...");
-
-            string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
-            bool step2Success = SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath);
-
-            if (dscCertBouncyCastle == null)
-            {
-                Log.Error("dscCertBouncy is null");
-            }
-            else
-            {
-                Log.Info("dscCert is not null");
-            }
-
-            if (step2Success)
-            {
-                Log.Info("STEP 2 DONE");
-            }
-            else
-            {
-                Log.Error("Pa failed in step 2");
             }
         }
 

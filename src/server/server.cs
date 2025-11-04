@@ -47,21 +47,6 @@ public class ServerPacket
         return new ServerPacket((CommandType)bytes[0], BitConverter.ToUInt32(bytes.AsSpan()[1..5]), bytes[5..]);
     }
 
-    public byte[] ToBytes()
-    {
-        byte[] bytes = new byte[1 + 4 + (Data?.Length ?? 0)];
-        bytes[0] = (byte)Type;
-
-        byte[] lengthBytes = BitConverter.GetBytes(Length);
-
-        Array.Copy(lengthBytes, 0, bytes, 1, 4);
-
-        if (Data != null)
-            Array.Copy(Data, 0, bytes, 5, Data.Length);
-
-        return bytes;
-    }
-
     public readonly CommandType Type;
     public readonly byte[] Data = [];
     public readonly uint Length;
