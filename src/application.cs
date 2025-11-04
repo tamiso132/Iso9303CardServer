@@ -146,6 +146,7 @@ public class ClientSession(ICommunicator comm)
                 }
                 Log.Info($"Hash ok for DG {dg.DataGroupNumber}");
             }
+            Log.Info("Step 3 PA OK");
             Log.Info("Full Passive Authentication Complete!");
 
         }
