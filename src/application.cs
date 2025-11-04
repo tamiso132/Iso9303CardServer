@@ -199,6 +199,9 @@ public class ClientSession(ICommunicator comm)
 
             Log.Info(sodFile.HashAlgorithmOid.GetAlgorithmName());
 
+
+
+
             foreach (var dg in sodFile.DataGroupHashes)
             {
                 if (dg.DataGroupNumber == 3 || dg.DataGroupNumber == 4)
@@ -232,7 +235,8 @@ public class ClientSession(ICommunicator comm)
                 // }
                 Log.Info("Data to Hash: " + BitConverter.ToString(dgData));
 
-                byte[] calculatedHashData = System.Security.Cryptography.SHA256.HashData(dgData);
+
+                byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
 
 
                 if (!calculatedHashData.SequenceEqual(dg.Hash))
@@ -243,12 +247,8 @@ public class ClientSession(ICommunicator comm)
 
             }
 
-<<<<<<< HEAD
             Log.Info("Very Ok");
             return;
-=======
-           // return;
->>>>>>> 82f96850ced59e43069d27b60a19fac3f178fc21
 
             var tags = TagReader.ReadTagData(result.Value.data, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
             tags.PrintAll();
@@ -297,7 +297,7 @@ public class ClientSession(ICommunicator comm)
             string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
             bool step2Success = SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath);
 
-            if(dscCertBouncyCastle == null)
+            if (dscCertBouncyCastle == null)
             {
                 Log.Error("dscCertBouncy is null");
             }

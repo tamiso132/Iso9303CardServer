@@ -435,6 +435,35 @@ public static class StringExtension
     }
 }
 
+
+public static class HashCalculator
+{
+    /// <summary>
+    /// Computes the hash of the input data using the specified algorithm name.
+    /// </summary>
+    /// <param name="algorithmName">The .NET name of the hash algorithm (e.g., "SHA256", "SHA512", "MD5").</param>
+    /// <param name="inputData">The data to be hashed (as a byte array).</param>
+    /// <returns>The computed hash as a byte array.</returns>
+    /// <exception cref="NotSupportedException">Thrown if the algorithm name is not supported by .NET.</exception>
+    public static byte[] CalculateSHAHash(string algorithmName, byte[] inputData)
+    {
+        // 1. Create the HashAlgorithm instance dynamically
+        // The .NET framework can create the correct class (e.g., SHA256, MD5) 
+        // using the string name returned from your OID switch/dictionary.
+        switch (algorithmName)
+        {
+            case "SHA256":
+                return SHA256.HashData(inputData);
+
+            case "SHA512":
+                return SHA512.HashData(inputData);
+        }
+
+        throw new Exception("NOT IMPLEMENTED HASH");
+    }
+
+}
+
 public static class SodHelper
 {
     public static Org.BouncyCastle.X509.X509Certificate? ReadSodData(byte[] sodBytes)
