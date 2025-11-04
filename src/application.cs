@@ -242,6 +242,7 @@ public class ClientSession(ICommunicator comm)
             else
             {
                 Log.Error("Pa failed in step 2");
+                return;
             }
 
             Log.Info("PA step 3 start...");
@@ -274,7 +275,7 @@ public class ClientSession(ICommunicator comm)
 
                 if (!calculatedHashData.SequenceEqual(dg.Hash))
                 {
-                    Log.Error($"Hash wrong for {dg.DataGroupNumber}, PA failed");
+                    Log.Error($"Hash wrong for DG{dg.DataGroupNumber}, PA failed");
                     TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                     return;
                 }
