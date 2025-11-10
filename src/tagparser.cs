@@ -136,7 +136,7 @@ public static class TagReader
 }
 
 
-// --- (Dina övriga klasser förblir oförändrade) ---
+
 public static class TagReaderExtensions
 {
     public static List<TagReader.TagEntry> FilterByTag(this List<TagReader.TagEntry> entries, byte tag)
