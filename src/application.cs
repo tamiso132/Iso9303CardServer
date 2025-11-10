@@ -21,6 +21,8 @@ using Org.BouncyCastle.Cms;
 using System.Text;
 using Microsoft.Extensions.ObjectPool;
 using Org.BouncyCastle.Utilities;
+using Org.BouncyCastle.Asn1.X9;
+using Org.BouncyCastle.Math;
 namespace App;
 
 
@@ -176,8 +178,8 @@ public class ClientSession(ICommunicator comm)
 
 
         var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
+        Log.Info(root.ToStringFormat());
 
-        Log.Info(publicKeyInfo.ToStringFormat());
 
         var keyAgreement = publicKeyInfo.FindChild(0x06)!.Data.ToOidStr();
 
@@ -206,6 +208,68 @@ public class ClientSession(ICommunicator comm)
         Log.Info($"Cofactor (h):   {BitConverter.ToString(h)}");
         Log.Info($"Public Key (Y): {BitConverter.ToString(publicKey)}");
         Log.Info("--------------------------------------------------");
+
+
+
+
+
+
+        var version = new DerInteger(1);
+
+        var fieldTypeOid = new DerObjectIdentifier("1.2.840.10045.1.1"); // OID för prime-field
+        var pAsn1 = new DerInteger(new BigInteger(1, p));
+        var fieldId = new DerSequence(fieldTypeOid, pAsn1);
+
+        var aAsn1 = new DerOctetString(a);
+        var bAsn1 = new DerOctetString(b);
+        var curve = new DerSequence(aAsn1, bAsn1);
+
+        var gAsn1 = new DerOctetString(g);
+        var nAsn1 = new DerInteger(new BigInteger(1, n));
+        var hAsn1 = new DerInteger(new BigInteger(1, h));
+
+        // TODO, can be simplified
+        var explicitParametersDer = new DerSequence(
+            version,  // Children[0]
+            fieldId,  // Children[1]
+            curve,    // Children[2]
+            gAsn1,    // Children[3]
+            nAsn1,    // Children[4]
+            hAsn1     // Children[5]
+        ).GetDerEncoded()!;
+
+
+        var protocols = root.FindChild(0x31)!.Children[1..];
+
+        foreach (var protocol in protocols)
+        {
+            var protocolVer = protocol.FindChild(0x02)!.Data[0]; // version, 1 for chipauth
+
+            if (protocolVer == 1)
+            {
+                var chipAuthOid = protocol.FindChild(0x06)!.Data.ToOidStr().Split(".");
+                var tag = chipAuthOid[8];
+
+                if (tag != "3")
+                    continue;
+                //TODO, get the protocol and stuff
+                //  var prot = Encryption
+            }
+
+        }
+
+
+        //   Log.Info(BitConverter.ToString(explicitParametersDer));
+
+
+        ECDH ecdh = new ECDH(explicitParametersDer);
+        Log.Info(BitConverter.ToString(publicKey));
+        ecdh.CalculateSharedSecret(publicKey);
+        ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
+
+
+
+
 
 
 

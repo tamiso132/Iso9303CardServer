@@ -68,6 +68,7 @@ public static class TagReader
     {
         public int Tag { get; set; }
         public byte[] Data { get; set; } = [];
+
         public Length _length = new();
         public List<TagEntry> Children { get; set; } = [];
 
@@ -76,6 +77,7 @@ public static class TagReader
             byte[] tagBytes = Tag > 0xFF ? new[] { (byte)(Tag >> 8), (byte)Tag } : new[] { (byte)Tag };
             return [.. tagBytes, .. _length.GetHeaderFormat(), .. Data];
         }
+
     }
 
     // Uppdaterad signatur för att hantera rekursionsdjup

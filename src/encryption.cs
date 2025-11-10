@@ -278,6 +278,10 @@ public sealed record DomainParameter(X9ECParameters param)
     internal static DomainParameter NistP384r1 = new(ECNamedCurveTable.GetByName("secp384r1"));
     internal static DomainParameter NistP521r1 = new(ECNamedCurveTable.GetByName("secp521r1"));
 
+    public static DomainParameter GetFromDerEncoded(byte[] derEncodedExplicit)
+    {
+        return new DomainParameter(X9ECParameters.GetInstance(derEncodedExplicit));
+    }
     public static DomainParameter GetFromId(int parameterId)
     {
         // --- Replaced with a switch statement ---
@@ -310,9 +314,23 @@ public sealed record ECDH
 
     public ECDH(DomainParameter param, byte[]? generator = null)
     {
+
         var rnd = new RandomNumberProvider();
         PrivateKey = new Org.BouncyCastle.Math.BigInteger(1, rnd.GetNextBytes(32));
         this.param = param;
+        _secret = this.param.param.G;
+        if (generator == null)
+            _generator = this.param.param.G;
+        else
+            _generator = this.param.param.Curve.DecodePoint(generator).Normalize();
+
+    }
+
+    public ECDH(byte[] derEncodedParam, byte[]? generator = null)
+    {
+        var rnd = new RandomNumberProvider();
+        PrivateKey = new Org.BouncyCastle.Math.BigInteger(1, rnd.GetNextBytes(32));
+        this.param = DomainParameter.GetFromDerEncoded(derEncodedParam);
         _secret = this.param.param.G;
         if (generator == null)
             _generator = this.param.param.G;
@@ -332,7 +350,6 @@ public sealed record ECDH
 
     public byte[] ParseCalculateSharedSecret(byte[] responseData)
     {
-        Log.Info("Calculate Shared Secret");
         using var stream = new Asn1InputStream(responseData);
         Asn1Object obj = stream.ReadObject();  // top-level object
         byte[] encodedChipPublic = obj.GetDerEncoded()[4..];
@@ -342,6 +359,17 @@ public sealed record ECDH
 
         return encodedChipPublic;
 
+    }
+
+    public byte[] CalculateSharedSecret(byte[] icPub)
+    {
+        Log.Info("Calculate Shared Secret");
+        byte[] encodedChipPublic = icPub[1..]; // skip the 00
+
+        var publicKeyIC = param.param.Curve.DecodePoint(encodedChipPublic).Normalize();
+        _secret = publicKeyIC.Multiply(PrivateKey).Normalize();
+
+        return encodedChipPublic;
     }
 
     // Update Private key
