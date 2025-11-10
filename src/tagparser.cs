@@ -145,10 +145,27 @@ public static class TagReaderExtensions
         return entries.Where(e => e.Tag == tag).ToList();
     }
 
-    public static string ToString(this List<TagReader.TagEntry> tags)
+    public static List<TagReader.TagEntry> FilterByTag(this TagReader.TagEntry entry, byte tag)
+    {
+        return entry.Children.FilterByTag(tag);
+    }
+
+    public static List<TagReader.TagEntry> GetChildren(this List<TagReader.TagEntry> entries)
+    {
+        return entries[0].Children;
+    }
+
+    public static string ToStringFormat(this List<TagReader.TagEntry> tags)
     {
         StringBuilder sb = new();
         ToStringBuilder(tags, sb, 0);
+        return sb.ToString();
+    }
+
+    public static string ToStringFormat(this TagReader.TagEntry tag)
+    {
+        StringBuilder sb = new();
+        ToStringBuilder([tag], sb, 0);
         return sb.ToString();
     }
     private static void ToStringBuilder(List<TagReader.TagEntry> tags, StringBuilder sb, int indent)
@@ -166,9 +183,9 @@ public static class TagReaderExtensions
             else
             {
                 string hex = BitConverter.ToString(tag.Data);
-                if(tag.Tag == 0x06) // object identifier
+                if (tag.Tag == 0x06) // object identifier
                 {
-                    
+
                 }
                 int maxLineLength = 64;
                 sb.Append($" (Length: {tag.Data.Length})\n{indentStr} Data:\n");
@@ -176,7 +193,7 @@ public static class TagReaderExtensions
                 {
                     if (j > 0) sb.AppendLine();
 
-                    
+
                     sb.Append($"{indentStr}      {hex.Substring(j, Math.Min(maxLineLength, hex.Length - j))}");
                 }
                 sb.AppendLine();

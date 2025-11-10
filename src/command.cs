@@ -192,7 +192,7 @@ public abstract record MessageType
             //return command.ParseEncryptedReponse(response, iv);
             using var aes = System.Security.Cryptography.Aes.Create();
             List<TagReader.TagEntry> tags = TagReader.ReadTagData(response[0..(response.Length - 2)]);
-            TagReaderExtensions.ToString(tags);
+            TagReaderExtensions.ToStringFormat(tags);
             byte dataTagID = 0x87;
             byte swTagID = 0x99;
             byte macTagID = 0x8E;

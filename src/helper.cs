@@ -93,7 +93,7 @@ public static class MrzUtils
         return (sum % 10).ToString();
     }
 
- }
+}
 
 public class AsnInfo(byte tag, byte[] data)
 {
@@ -294,6 +294,34 @@ public static class ByteArrayExtension
             Console.Write($"{cVal:X2} ");
         }
         Console.WriteLine();
+    }
+
+    public static string ToOidStr(this byte[] oid)
+    {
+        StringBuilder retVal = new StringBuilder();
+
+        for (int i = 0; i < oid.Length; i++)
+        {
+            if (i == 0)
+            {
+                int b = oid[0] % 40;
+                int a = (oid[0] - b) / 40;
+                retVal.AppendFormat("{0}.{1}", a, b);
+            }
+            else
+            {
+                if (oid[i] < 128)
+                    retVal.AppendFormat(".{0}", oid[i]);
+                else
+                {
+                    retVal.AppendFormat(".{0}",
+                       ((oid[i] - 128) * 128) + oid[i + 1]);
+                    i++;
+                }
+            }
+        }
+
+        return retVal.ToString();
     }
 }
 public static class IntExtensions

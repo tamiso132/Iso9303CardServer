@@ -20,6 +20,7 @@ using Microsoft.AspNetCore.Components.Forms;
 using Org.BouncyCastle.Cms;
 using System.Text;
 using Microsoft.Extensions.ObjectPool;
+using Org.BouncyCastle.Utilities;
 namespace App;
 
 
@@ -169,8 +170,27 @@ public class ClientSession(ICommunicator comm)
     {
         var dg14Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg14)).UnwrapOrThrow();
         byte[] dg14Bytes = dg14Response.data;
-        var tags = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]);
-        Log.Info(TagReaderExtensions.ToString(tags));
+        var tags = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E).GetChildren().FilterByTag(0x31).GetChildren();
+        Log.Info(tags.Count.ToString());
+        foreach (var tag in tags)
+        {
+            Log.Info(tag.ToStringFormat());
+        }
+
+        foreach (var tag in tags[1..])
+        {
+            var oid = tag.FilterByTag(0x06)[0].Data;
+            var version = tag.FilterByTag(0x02)[0].Data[0];
+
+            // version 2 is for chip authentication
+            if (version != 2)
+                continue;
+
+            var parameterID = tag.FilterByTag(0x02)[1].Data[0];
+
+
+            Log.Info("oid: " + oid.ToOidStr() + ", version: " + version.ToString() + ", parameterID: " + parameterID);
+        }
     }
 
 

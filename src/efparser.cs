@@ -36,7 +36,7 @@ public class ImplEfCom : IEfParser<ImplEfCom.Info>
         var sequenceTags = new HashSet<int> { 0x60 };
         Log.Info("bytesCom: " + BitConverter.ToString(bytes));
         var sequenceTagss = TagReader.ReadTagData(bytes, sequenceTags);
-        TagReaderExtensions.ToString(sequenceTagss);
+        TagReaderExtensions.ToStringFormat(sequenceTagss);
         var sequenceTag = sequenceTagss[0];
 
 
