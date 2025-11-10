@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Helper;
 
 // --- 1. Säkrad TagReader (Dina Klasser + Säkerhetsfixar) ---
 
@@ -145,15 +146,25 @@ public static class TagReaderExtensions
         return entries.Where(e => e.Tag == tag).ToList();
     }
 
-    public static List<TagReader.TagEntry> FilterByTag(this TagReader.TagEntry entry, byte tag)
+    /// <summary>
+    /// Hittar den första noden i en lista som matchar den angivna taggen.
+    /// Returnerar null om den inte hittas, för att undvika krascher.
+    /// </summary>
+    public static TagReader.TagEntry? Find(this List<TagReader.TagEntry> entries, int tag)
     {
-        return entry.Children.FilterByTag(tag);
+        return entries.FirstOrDefault(e => e.Tag == tag);
     }
 
-    public static List<TagReader.TagEntry> GetChildren(this List<TagReader.TagEntry> entries)
+    /// <summary>
+    /// Hittar det första barnet till en nod som matchar den angivna taggen.
+    /// Returnerar null om noden är null eller om barnet inte hittas.
+    /// </summary>
+    public static TagReader.TagEntry? FindChild(this TagReader.TagEntry? entry, int tag)
     {
-        return entries[0].Children;
+        if (entry == null) return null;
+        return entry.Children.FirstOrDefault(c => c.Tag == tag);
     }
+
 
     public static string ToStringFormat(this List<TagReader.TagEntry> tags)
     {
@@ -185,7 +196,7 @@ public static class TagReaderExtensions
                 string hex = BitConverter.ToString(tag.Data);
                 if (tag.Tag == 0x06) // object identifier
                 {
-
+                    hex = tag.Data.ToOidStr();
                 }
                 int maxLineLength = 64;
                 sb.Append($" (Length: {tag.Data.Length})\n{indentStr} Data:\n");

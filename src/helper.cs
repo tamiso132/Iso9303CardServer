@@ -30,6 +30,8 @@ namespace Helper;
 
 
 
+
+
 public static class MrzUtils
 {
 
@@ -95,66 +97,6 @@ public static class MrzUtils
 
 }
 
-public class AsnInfo(byte tag, byte[] data)
-{
-    public byte Tag { get; } = tag;
-    public byte[] Data { get; } = data;
-}
-
-public class ByteReader(byte[] data)
-{
-    private readonly byte[] _data = data;
-    private int _position = 0;
-
-    public int Offset => _position;
-
-    public byte[] ReadBytes(int len)
-    {
-        var sub = _data[_position..(_position + len)];
-        _position += len;
-        return sub;
-    }
-
-    public int ReadInt(int len)
-    {
-        byte[] list = ReadBytes(len);
-        int ret = 0;
-        for (int i = 0; i < list.Length; i++)
-        {
-            ret |= list[i] << ((list.Length - i - 1) * 8);
-        }
-        return ret;
-    }
-
-    public string ReadString(int len)
-    {
-        string s = Encoding.ASCII.GetString(_data, _position, len);
-        _position += len;
-        return s;
-    }
-
-    public void PaddingNext(int len) => _position += len;
-
-    public bool HasRemaining() => _position < _data.Length;
-
-    public int ReadLength()
-    {
-        int first = ReadInt(1);
-        if (first < 0x80) return first;
-
-        int numBytes = first & 0x7F;
-
-        return ReadInt(numBytes);
-    }
-
-    public AsnInfo ReadASN1()
-    {
-        byte tag = (byte)ReadInt(1);
-        int len = ReadLength();
-        byte[] data = ReadBytes(len);
-        return new AsnInfo(tag, data);
-    }
-}
 
 public static class HexUtils
 {
@@ -323,6 +265,7 @@ public static class ByteArrayExtension
 
         return retVal.ToString();
     }
+   
 }
 public static class IntExtensions
 {

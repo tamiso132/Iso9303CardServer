@@ -143,6 +143,21 @@ public static class PassHelper
 
 }
 
+public class OidInfo
+{
+    Mapping? mapping;
+    KeyAgreement agreement;
+    CipherEncryption cipher;
+}
+
+public static class ParseOid
+{
+    public static OidInfo FromChipAuth(byte[] oid)
+    {
+        throw new Exception("TODO");
+    }
+}
+
 public class AlgorithmIdentifier(AlgorithmType type, int bitLength, int? modPrimeOrder = null)
 {
     public AlgorithmType Type { get; } = type;
@@ -258,6 +273,36 @@ public sealed record DomainParameter(X9ECParameters param)
 
     internal static DomainParameter BrainpoolP384r1 = new(ECNamedCurveTable.GetByName("BRAINPOOLP384R1"));
     internal static DomainParameter BrainpoolP256r1 = new(ECNamedCurveTable.GetByName("BRAINPOOLP256R1"));
+    internal static DomainParameter NistP192r1 = new(ECNamedCurveTable.GetByName("secp192r1"));
+    internal static DomainParameter NistP256r1 = new(ECNamedCurveTable.GetByName("secp256r1"));
+    internal static DomainParameter NistP384r1 = new(ECNamedCurveTable.GetByName("secp384r1"));
+    internal static DomainParameter NistP521r1 = new(ECNamedCurveTable.GetByName("secp521r1"));
+
+    public static DomainParameter GetFromId(int parameterId)
+    {
+        // --- Replaced with a switch statement ---
+        switch (parameterId)
+        {
+            // NIST Curves
+            case 8:
+                return NistP192r1;
+            case 12:
+                return NistP256r1;
+            case 15:
+                return NistP384r1;
+            case 18:
+                return NistP521r1;
+
+            // Brainpool Curves
+            case 13:
+                return BrainpoolP256r1;
+            case 16:
+                return BrainpoolP384r1;
+
+            default:
+                throw new NotSupportedException($"Unknown Domain Parameter ID: {parameterId}");
+        }
+    }
 }
 
 public sealed record ECDH

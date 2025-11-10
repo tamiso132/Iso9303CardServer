@@ -37,6 +37,7 @@ public class ClientSession(ICommunicator comm)
 
             await SetupSecureMessaging();
             //            await SetupPassiveAuthentication();
+
             await SetupChipAuthentication();
 
         }
@@ -60,7 +61,7 @@ public class ClientSession(ICommunicator comm)
         var decryptedNounce = (await PassHelper.ComputeDecryptedNounce(_cmd, info, key, PassHelper.PasswordType.MRZ)).UnwrapOrThrow();
 
 
-        _ecdh = new ECDH(DomainParameter.BrainpoolP384r1);
+        var _ecdh = new ECDH(DomainParameter.GetFromId(info.OrgParameterID));
 
         response = (await _cmd.GeneralAuthenticateMapping(0x81, _ecdh.PublicKey)).UnwrapOrThrow();
         _ecdh.ParseCalculateSharedSecret(response.data);
@@ -170,31 +171,64 @@ public class ClientSession(ICommunicator comm)
     {
         var dg14Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg14)).UnwrapOrThrow();
         byte[] dg14Bytes = dg14Response.data;
-        var tags = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E).GetChildren().FilterByTag(0x31).GetChildren();
-        Log.Info(tags.Count.ToString());
-        foreach (var tag in tags)
-        {
-            Log.Info(tag.ToStringFormat());
-        }
 
-        foreach (var tag in tags[1..])
-        {
-            var oid = tag.FilterByTag(0x06)[0].Data;
-            var version = tag.FilterByTag(0x02)[0].Data[0];
-
-            // version 2 is for chip authentication
-            if (version != 2)
-                continue;
-
-            var parameterID = tag.FilterByTag(0x02)[1].Data[0];
+        var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0];
 
 
-            Log.Info("oid: " + oid.ToOidStr() + ", version: " + version.ToString() + ", parameterID: " + parameterID);
-        }
+        var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
+
+        Log.Info(publicKeyInfo.ToStringFormat());
+
+        var keyAgreement = publicKeyInfo.FindChild(0x06)!.Data.ToOidStr();
+
+        var keyID = keyAgreement[^1]; // if  2 = ECDH, if 1 = DH
+
+        var subjectPublicKeyInfo = publicKeyInfo.FindChild(0x30);
+        var algoritmIdentifier = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x06); // only used when SUBJECT PUBLIC KEY INFO, is MISSING
+        var explicitParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!;
+
+
+        var p = explicitParameters.Children[1].FindChild(0x02)!.Data;
+        var a = explicitParameters.Children[2].Children[0].Data;
+        var b = explicitParameters.Children[2].Children[1].Data;
+        var g = explicitParameters.Children[3].Data;
+        var n = explicitParameters.Children[4].Data;
+        var h = explicitParameters.Children[5].Data;
+
+        var publicKey = subjectPublicKeyInfo.FindChild(0x03)!.Data;
+        Log.Info("KeyAgreementID: " + keyID);
+        Log.Info("--- Explicit Curve Parameters (från Container) ---");
+        Log.Info($"Prime (p):      {BitConverter.ToString(p)}");
+        Log.Info($"Coeff (a):      {BitConverter.ToString(a)}");
+        Log.Info($"Coeff (b):      {BitConverter.ToString(b)}");
+        Log.Info($"Base (G):       {BitConverter.ToString(g)}");
+        Log.Info($"Order (n):      {BitConverter.ToString(n)}");
+        Log.Info($"Cofactor (h):   {BitConverter.ToString(h)}");
+        Log.Info($"Public Key (Y): {BitConverter.ToString(publicKey)}");
+        Log.Info("--------------------------------------------------");
+
+
+
+
+
+
+        // foreach (var tag in tags[1..])
+        // {
+        //     var oid = tag.FilterByTag(0x06)[0].Data;
+        //     var version = tag.FilterByTag(0x02)[0].Data[0];
+
+        //     // version 2 is for chip authentication
+        //     if (version != 2)
+        //         continue;
+
+        //     var parameterID = tag.FilterByTag(0x02)[1].Data[0];
+
+
+        //     Log.Info("oid: " + oid.ToOidStr() + ", version: " + version.ToString() + ", parameterID: " + parameterID);
+        // }
     }
 
 
-    ECDH _ecdh;
     private readonly ICommunicator _comm = comm;
     private readonly Command<ServerEncryption> _cmd = new(comm, new ServerEncryption());
 }
