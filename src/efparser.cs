@@ -36,7 +36,7 @@ public class ImplEfCom : IEfParser<ImplEfCom.Info>
         var sequenceTags = new HashSet<int> { 0x60 };
         Log.Info("bytesCom: " + BitConverter.ToString(bytes));
         var sequenceTagss = TagReader.ReadTagData(bytes, sequenceTags);
-        sequenceTagss.PrintAll();
+        TagReaderExtensions.ToString(sequenceTagss);
         var sequenceTag = sequenceTagss[0];
 
 
@@ -142,7 +142,7 @@ public class EFSodInfo
         AsnReader outerSeq;
 
         var peekTag = reader.PeekTag();
-      
+
 
         // Be able to switch tags depending on old/new passport
         // new -> app tag 23
@@ -219,7 +219,7 @@ public class EFSodInfo
     }
 
 
-  
+
 }
 
 
@@ -280,6 +280,6 @@ public static class TLVParser
     }
 
 
- 
-  
+
+
 }

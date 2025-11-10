@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 // --- 1. Säkrad TagReader (Dina Klasser + Säkerhetsfixar) ---
 
@@ -144,28 +145,41 @@ public static class TagReaderExtensions
         return entries.Where(e => e.Tag == tag).ToList();
     }
 
-    public static void PrintAll(this List<TagReader.TagEntry> tags, int indent = 0)
+    public static string ToString(this List<TagReader.TagEntry> tags)
     {
-        string indentStr = new string(' ', indent * 2);
+        StringBuilder sb = new();
+        ToStringBuilder(tags, sb, 0);
+        return sb.ToString();
+    }
+    private static void ToStringBuilder(List<TagReader.TagEntry> tags, StringBuilder sb, int indent)
+    {
+        string indentStr = new(' ', indent * 2);
         foreach (var tag in tags)
         {
-            //Console.Write($"{indentStr}Tag: 0x{tag.Tag:X2} "); Felsökning
+            sb.Append($"{indentStr}Tag: 0x{tag.Tag:X2} ");
             if (tag.Children != null && tag.Children.Count > 0)
             {
-                Console.WriteLine($" (Children: {tag.Children.Count})");
-                tag.Children.PrintAll(indent + 1);
+                sb.AppendLine($" (Children: {tag.Children.Count})");
+                // Recursive call
+                ToStringBuilder(tag.Children, sb, indent + 1);
             }
             else
             {
                 string hex = BitConverter.ToString(tag.Data);
+                if(tag.Tag == 0x06) // object identifier
+                {
+                    
+                }
                 int maxLineLength = 64;
-                //Console.Write($" (Length: {tag.Data.Length})\n{indentStr} Data:\n"); Felsökning
+                sb.Append($" (Length: {tag.Data.Length})\n{indentStr} Data:\n");
                 for (int j = 0; j < hex.Length; j += maxLineLength)
                 {
-                    if (j > 0) Console.WriteLine();
-                    //Console.Write($"{indentStr}      {hex.Substring(j, Math.Min(maxLineLength, hex.Length - j))}"); Felsökning
+                    if (j > 0) sb.AppendLine();
+
+                    
+                    sb.Append($"{indentStr}      {hex.Substring(j, Math.Min(maxLineLength, hex.Length - j))}");
                 }
-               
+                sb.AppendLine();
             }
         }
     }

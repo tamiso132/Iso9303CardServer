@@ -189,6 +189,7 @@ public class EncryptionInfo
         this.MacType = crypto.Item2;
         this._keybits = crypto.Item3;
 
+
         if (this.AgreementType == KeyAgreement.Unknown) throw new Exception("Invalid KeyAgreement");
         if (this.EncryptType == CipherEncryption.Unknown) throw new Exception("Invalid CipherEncryption");
         if (this.MappingType == Mapping.Unknown) throw new Exception("Invalid Mapping");
