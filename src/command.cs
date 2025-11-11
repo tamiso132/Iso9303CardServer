@@ -25,7 +25,7 @@ using TResultBool = Result<bool>;
 public abstract record MessageType
 {
 
-    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00) where T : IServerFormat;
+    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00, byte? cla = null) where T : IServerFormat;
     public abstract Task<TResult> ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
 
     public static Secure SecureMessage => new();
@@ -34,13 +34,14 @@ public abstract record MessageType
     {
         const int NonDataLen = 2 + 4;
         internal Secure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00, byte? cla = null)
         {
             _ins = ins;
             _p1 = p1;
             _p2 = p2;
             _data = data;
             _le = le;
+
 
             iv = command.GetIV();
             var bytes = command.FormatEncryptedCommand(data, ins, p1, p2, iv, le: le);
@@ -274,7 +275,7 @@ public abstract record MessageType
     public sealed record NonSecure : MessageType
     {
         internal NonSecure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00, byte? cla = null)
         {
             return Command<T>.FormatCommand(0x00, ins, p1, p2, data, le: le);
         }
@@ -383,17 +384,16 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return await SendPackageDecodeResponse(type, cmd);
     }
 
-    // Different MseSetAT commands for CA
-    public async Task<TResult> MseSetAT_ChipAuthentication(MessageType type, byte[] chipAuthOid, byte[] publicKey)
+    // Implementation using MSE:Set AT and GENERAL AUTHENTICATE
+    public async Task<TResult> MseSetAT_ChipAuthentication(MessageType type, byte[] chipAuthOid)
     {
         Log.Info("Sending MseSetAT Command Chip Authentication");
 
         byte[] data = new AsnBuilder()
         .AddCustomTag(0x80, chipAuthOid) // object identifier
-        .AddCustomTag(0x83, publicKey)
         .Build();
 
-        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0x41, 0xA6, data);
+        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0x41, 0xA4, data);
         return await SendPackageDecodeResponse(type, cmd);
 
 
@@ -448,6 +448,29 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x00);
         cmdFormat[0] = 0x10;
 
+
+        //Log.Info("Write: " + BitConverter.ToString(raw));
+
+        var result = await SendPackageDecodeResponse(type, cmdFormat);
+
+        if (result.IsSuccess)
+            if (result.Value.data.Length == 0)
+                return TResult.Fail(new Error.Other("General Authentication not sending the encrypted nounce!"));
+
+
+        return result;
+    }
+
+    public async Task<TResult> GeneralAuthenticateChipMapping(MessageType type, byte innerTag, byte[] publicKey)
+    {
+        Log.Info("General Authentication Mapping");
+        // TODO, check if length is bigger then 128
+        byte[] innerSequence = [innerTag, (byte)publicKey.Length, .. publicKey];
+        byte[] data = [0x7C, (byte)innerSequence.Length, .. innerSequence];
+
+        byte[] nonSecureDebug = type.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x00);
+        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x00);
+        Log.Info("ChipAuthGeneral: " + BitConverter.ToString(nonSecureDebug));
 
         //Log.Info("Write: " + BitConverter.ToString(raw));
 
@@ -687,13 +710,16 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     //An extended Lc field consists of three bytes: one byte set to '00' followed by two bytes not set to
     //'0000'. From '0001' to 'FFFF', the two bytes encode Nc from one to 65 535
-    internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, int le = 0x00, byte lc = 0x00)
+    internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, int le = 0x00, byte lc = 0x00, byte? cla = null)
     {
 
         //        Log.Info($"data: {BitConverter.ToString(data)}, ins: 0x{ins:X2}, p1: 0x{p1:X2}, p2: 0x{p2:X2}, iv: {BitConverter.ToString(iv)}, lc: 0x{lc:X2}, le: 0x{le:X2}");
 
 
         byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
+        
+        if (cla != null)
+            cmdHeader[0] = (byte)cla;
 
         byte dataTag = (ins % 2) == 0 ? (byte)0x87 : (byte)0x85;
         //byte dataTag = 0x87;

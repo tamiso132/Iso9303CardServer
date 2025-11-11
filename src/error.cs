@@ -1,3 +1,4 @@
+using Helper;
 using Type;
 
 namespace ErrorHandling;
@@ -107,6 +108,7 @@ public static class ResultExtensions
             // Loggar felet innan undantaget kastas, som i din ursprungliga kod.
             // Log-klassen antas finnas tillgänglig.
             // Log.Error(result.Error.ErrorMessage()); 
+            Log.Error(result.Error.ErrorMessage());
             throw new CommandFailedException(result.Error.ErrorMessage());
         }
         return result.Value;

@@ -326,17 +326,31 @@ public sealed record ECDH
 
     }
 
-    public ECDH(byte[] derEncodedParam, byte[]? generator = null)
+    public void PrintECParameters()
     {
-        var rnd = new RandomNumberProvider();
-        PrivateKey = new Org.BouncyCastle.Math.BigInteger(1, rnd.GetNextBytes(32));
-        this.param = DomainParameter.GetFromDerEncoded(derEncodedParam);
-        _secret = this.param.param.G;
-        if (generator == null)
-            _generator = this.param.param.G;
-        else
-            _generator = this.param.param.Curve.DecodePoint(generator).Normalize();
+        StringBuilder sb = new StringBuilder();
+        sb.AppendLine("--- Elliptic Curve Parameters (Bouncy Castle) ---");
 
+        // 1. Prime (p)
+        sb.Append("Prime (p):   ").AppendLine(BitConverter.ToString(param.param.Curve.Field.Characteristic.ToByteArrayUnsigned()));
+
+        // 2. Coeff (a)
+        sb.Append("Coeff (a):   ").AppendLine(BitConverter.ToString(param.param.Curve.A.ToBigInteger().ToByteArrayUnsigned()));
+
+        // 3. Coeff (b)
+        sb.Append("Coeff (b):   ").AppendLine(BitConverter.ToString(param.param.Curve.B.ToBigInteger().ToByteArrayUnsigned()));
+
+        // 4. Base (G)
+        // GetEncoded() or GetEncoded(false) returns the uncompressed point
+        sb.Append("Base (G):    ").AppendLine(BitConverter.ToString(param.param.G.GetEncoded()));
+
+        // 5. Order (n)
+        sb.Append("Order (n):   ").AppendLine(BitConverter.ToString(param.param.N.ToByteArrayUnsigned()));
+
+        // 6. Cofactor (h)
+        sb.Append("Cofactor (h):").AppendLine(BitConverter.ToString(param.param.H.ToByteArrayUnsigned()));
+
+        Log.Info(sb.ToString());
     }
 
     // Using nounce, create new generator

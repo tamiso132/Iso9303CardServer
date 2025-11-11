@@ -38,7 +38,7 @@ public class ClientSession(ICommunicator comm)
             (await _cmd.SelectDefaultMF(MessageType.NonSecureMessage)).UnwrapOrThrow();
 
             await SetupSecureMessaging();
-            //            await SetupPassiveAuthentication();
+            //await SetupPassiveAuthentication();
 
             await SetupChipAuthentication();
 
@@ -144,7 +144,6 @@ public class ClientSession(ICommunicator comm)
                 Log.Info($"Found DG: {dg.DataGroupNumber}, Need EAC (Extended Acess Controll) to verify this datagroup");
                 continue;
             }
-            Log.Info($"Verifierar DG {dg.DataGroupNumber}...");
 
 
             EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
@@ -154,8 +153,8 @@ public class ClientSession(ICommunicator comm)
             byte[] dgData = response.data;
             byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
 
-            Log.Info($"Chip Hash says: {BitConverter.ToString(dg.Hash)}");
-            Log.Info($"Calculated Hashvalue: {BitConverter.ToString(calculatedHashData)}");
+            // Log.Info($"Chip Hash says: {BitConverter.ToString(dg.Hash)}");
+            // Log.Info($"Calculated Hashvalue: {BitConverter.ToString(calculatedHashData)}");
 
             if (!calculatedHashData.SequenceEqual(dg.Hash))
             {
@@ -163,7 +162,7 @@ public class ClientSession(ICommunicator comm)
                 TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                 return;
             }
-            Log.Info($"Hashvalue ok for DG {dg.DataGroupNumber}");
+            //   Log.Info($"Hashvalue ok for DG {dg.DataGroupNumber}");
         }
         Log.Info("Step 3 PA OK");
         Log.Info("Full Passive Authentication Complete!");
@@ -173,7 +172,7 @@ public class ClientSession(ICommunicator comm)
     {
         // Read and store DG14
         var dg14Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg14)).UnwrapOrThrow();
-        byte[] dg14Bytes = dg14Response.data; 
+        byte[] dg14Bytes = dg14Response.data;
 
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
 
@@ -191,11 +190,11 @@ public class ClientSession(ICommunicator comm)
         var explicitParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!;
 
         // ECDH Curve parameters
-        var p = explicitParameters.Children[1].FindChild(0x02)!.Data;
+        var p = explicitParameters.Children[1].FindChild(0x02)!.Data[1..]; // remove 00
         var a = explicitParameters.Children[2].Children[0].Data;
         var b = explicitParameters.Children[2].Children[1].Data;
         var g = explicitParameters.Children[3].Data;
-        var n = explicitParameters.Children[4].Data;
+        var n = explicitParameters.Children[4].Data[1..];// remove 0x00
         var h = explicitParameters.Children[5].Data;
 
         var publicKey = subjectPublicKeyInfo.FindChild(0x03)!.Data; //Chips public CA-Key
@@ -239,62 +238,65 @@ public class ClientSession(ICommunicator comm)
             hAsn1     // Children[5]
         ).GetDerEncoded()!;
 
-
         var protocols = root.FindChild(0x31)!.Children[1..];
-     //   byte[]? chipAuthOid = null;
+        //   byte[]? chipAuthOid = null;
 
+        var chipAuthOidBytes = Array.Empty<byte>();
         foreach (var protocol in protocols)
         {
             var protocolVer = protocol.FindChild(0x02)!.Data[0]; // version, 1 for chipauth
 
             if (protocolVer == 1)
             {
-                var chipAuthOid = protocol.FindChild(0x06)!.Data.ToOidStr().Split(".");
-                var tag = chipAuthOid[8];
+                var tempchipAuthOid = protocol.FindChild(0x06)!.Data;
+                var oidSplits = tempchipAuthOid.ToOidStr().Split('.');
+
+                var tag = oidSplits[8];
+
 
                 if (tag != "3")
                     continue;
+
+                var id = oidSplits[^1];
+                Log.Info("Chose Chip Authentication OID: " + tempchipAuthOid.ToOidStr());
+                chipAuthOidBytes = tempchipAuthOid;
+
+                break;
+                // id 
+                // 1 -> 3des
+                // 2 -> CMAC_AES 128
+                // 3 -> CMAC_AES 192
+                // 4 -> CMAC_AES 256
                 //TODO, get the protocol and stuff
                 //  var prot = Encryption
             }
 
         }
 
-
-        //   Log.Info(BitConverter.ToString(explicitParametersDer));
-
-
-        (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOid, publicKey)).UnwrapOrThrow();
-
-
-        ECDH ecdh = new ECDH(explicitParametersDer); //Create curve using parameters taken from DG14
-        Log.Info(BitConverter.ToString(publicKey));
-        ecdh.CalculateSharedSecret(publicKey);
-        ecdh.GenerateEphemeralKeys(new RandomNumberProvider()); // Generate temporary keys
+        if (chipAuthOidBytes.Length == 0)
+            throw new Exception("Could Not Find Any Chip Authentication Protocols");
 
 
 
 
+        (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOidBytes)).UnwrapOrThrow();
+
+
+
+
+        ECDH ecdh = new(DomainParameter.GetFromDerEncoded(explicitParametersDer)); //Create curve using parameters taken from DG14
+                                                                                   //ecdh.PrintECParameters(); ec parameters seem correct
+                                                                                   // ecdh.GenerateEphemeralKeys(new RandomNumberProvider()); // Generate temporary keys
+                                                                                   //  ecdh.CalculateSharedSecret(publicKey);
+
+        (await _cmd.GeneralAuthenticateChipMapping(MessageType.SecureMessage, 0x80, ecdh.PublicKey)).UnwrapOrThrow();
 
 
 
 
 
 
-        // foreach (var tag in tags[1..])
-        // {
-        //     var oid = tag.FilterByTag(0x06)[0].Data;
-        //     var version = tag.FilterByTag(0x02)[0].Data[0];
 
-        //     // version 2 is for chip authentication
-        //     if (version != 2)
-        //         continue;
-
-        //     var parameterID = tag.FilterByTag(0x02)[1].Data[0];
-
-
-        //     Log.Info("oid: " + oid.ToOidStr() + ", version: " + version.ToString() + ", parameterID: " + parameterID);
-        // }
     }
 
 
