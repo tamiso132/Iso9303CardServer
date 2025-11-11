@@ -173,7 +173,7 @@ public class ClientSession(ICommunicator comm)
     {
         // Read and store DG14
         var dg14Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg14)).UnwrapOrThrow();
-        byte[] dg14Bytes = dg14Response.data; 
+        byte[] dg14Bytes = dg14Response.data;
 
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
 
@@ -258,7 +258,7 @@ public class ClientSession(ICommunicator comm)
                 }
             }
         }
-        if(chipAuthOid == null)
+        if (chipAuthOid == null)
         {
             Log.Error($"No found OID for CA-protocol");
             return;
@@ -288,8 +288,10 @@ public class ClientSession(ICommunicator comm)
 
         byte[] terminalEphemeralPublicKey = ecdh.PublicKey; // K_pub_T 
 
-        // Send general authenticate
+        Log.Info("Send general authenticate CA");
 
+        // Send general authenticate
+        var caResponse = (await _cmd.GeneralAuthenticateMapping(0x81, terminalEphemeralPublicKey)).UnwrapOrThrow();
 
 
 
