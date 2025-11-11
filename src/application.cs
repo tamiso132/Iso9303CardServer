@@ -171,17 +171,18 @@ public class ClientSession(ICommunicator comm)
 
     public async Task SetupChipAuthentication()
     {
+        // Read and store DG14
         var dg14Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg14)).UnwrapOrThrow();
-        byte[] dg14Bytes = dg14Response.data;
+        byte[] dg14Bytes = dg14Response.data; 
 
-        var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0];
+        var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
 
 
         var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
         Log.Info(root.ToStringFormat());
 
 
-        var keyAgreement = publicKeyInfo.FindChild(0x06)!.Data.ToOidStr();
+        var keyAgreement = publicKeyInfo.FindChild(0x06)!.Data.ToOidStr(); //OID tag, find algorithm
 
         var keyID = keyAgreement[^1]; // if  2 = ECDH, if 1 = DH
 
@@ -189,7 +190,7 @@ public class ClientSession(ICommunicator comm)
         var algoritmIdentifier = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x06); // only used when SUBJECT PUBLIC KEY INFO, is MISSING
         var explicitParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!;
 
-
+        // ECDH Curve parameters
         var p = explicitParameters.Children[1].FindChild(0x02)!.Data;
         var a = explicitParameters.Children[2].Children[0].Data;
         var b = explicitParameters.Children[2].Children[1].Data;
@@ -197,7 +198,7 @@ public class ClientSession(ICommunicator comm)
         var n = explicitParameters.Children[4].Data;
         var h = explicitParameters.Children[5].Data;
 
-        var publicKey = subjectPublicKeyInfo.FindChild(0x03)!.Data;
+        var publicKey = subjectPublicKeyInfo.FindChild(0x03)!.Data; //Chips public CA-Key
         Log.Info("KeyAgreementID: " + keyID);
         Log.Info("--- Explicit Curve Parameters (från Container) ---");
         Log.Info($"Prime (p):      {BitConverter.ToString(p)}");
@@ -240,6 +241,7 @@ public class ClientSession(ICommunicator comm)
 
 
         var protocols = root.FindChild(0x31)!.Children[1..];
+     //   byte[]? chipAuthOid = null;
 
         foreach (var protocol in protocols)
         {
@@ -262,10 +264,13 @@ public class ClientSession(ICommunicator comm)
         //   Log.Info(BitConverter.ToString(explicitParametersDer));
 
 
-        ECDH ecdh = new ECDH(explicitParametersDer);
+        (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOid, publicKey)).UnwrapOrThrow();
+
+
+        ECDH ecdh = new ECDH(explicitParametersDer); //Create curve using parameters taken from DG14
         Log.Info(BitConverter.ToString(publicKey));
         ecdh.CalculateSharedSecret(publicKey);
-        ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
+        ecdh.GenerateEphemeralKeys(new RandomNumberProvider()); // Generate temporary keys
 
 
 

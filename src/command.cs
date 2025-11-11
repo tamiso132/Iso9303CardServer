@@ -383,6 +383,22 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return await SendPackageDecodeResponse(type, cmd);
     }
 
+    // Different MseSetAT commands for CA
+    public async Task<TResult> MseSetAT_ChipAuthentication(MessageType type, byte[] chipAuthOid, byte[] publicKey)
+    {
+        Log.Info("Sending MseSetAT Command Chip Authentication");
+
+        byte[] data = new AsnBuilder()
+        .AddCustomTag(0x80, chipAuthOid) // object identifier
+        .AddCustomTag(0x83, publicKey)
+        .Build();
+
+        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0x41, 0xA6, data);
+        return await SendPackageDecodeResponse(type, cmd);
+
+
+    }
+
     public async Task<TResult> GeneralAuthenticate(GenAuthType type, byte cla = 0x10)
     {
         Log.Info("Sending General Authenticate Command");
