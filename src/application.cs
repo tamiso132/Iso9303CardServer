@@ -241,7 +241,7 @@ public class ClientSession(ICommunicator comm)
 
 
         var protocols = root.FindChild(0x31)!.Children[1..];
-     //   byte[]? chipAuthOid = null;
+        byte[]? chipAuthOid = null;
 
         foreach (var protocol in protocols)
         {
@@ -249,16 +249,30 @@ public class ClientSession(ICommunicator comm)
 
             if (protocolVer == 1)
             {
-                var chipAuthOid = protocol.FindChild(0x06)!.Data.ToOidStr().Split(".");
-                var tag = chipAuthOid[8];
-
-                if (tag != "3")
-                    continue;
-                //TODO, get the protocol and stuff
-                //  var prot = Encryption
+                var oidTag = protocol.FindChild(0x06);
+                if (oidTag != null)
+                {
+                    chipAuthOid = oidTag.Data;
+                    Log.Info($"Found oid for protocol: {chipAuthOid.ToString}");
+                    break;
+                }
             }
-
         }
+        if(chipAuthOid == null)
+        {
+            Log.Error($"No found OID for CA-protocol");
+            return;
+        }
+        //         var chipAuthOid = protocol.FindChild(0x06)!.Data.ToOidStr().Split(".");
+        //         var tag = chipAuthOid[8];
+
+        //         if (tag != "3")
+        //             continue;
+        //         //TODO, get the protocol and stuff
+        //         //  var prot = Encryption
+        //     }
+
+        // }
 
 
         //   Log.Info(BitConverter.ToString(explicitParametersDer));
@@ -269,8 +283,12 @@ public class ClientSession(ICommunicator comm)
 
         ECDH ecdh = new ECDH(explicitParametersDer); //Create curve using parameters taken from DG14
         Log.Info(BitConverter.ToString(publicKey));
-        ecdh.CalculateSharedSecret(publicKey);
+        ecdh.CalculateSharedSecret(publicKey); // Remove??
         ecdh.GenerateEphemeralKeys(new RandomNumberProvider()); // Generate temporary keys
+
+        byte[] terminalEphemeralPublicKey = ecdh.PublicKey; // K_pub_T 
+
+        // Send general authenticate
 
 
 
