@@ -38,8 +38,7 @@ public static class PassHelper
         //    string mrzString = documentNumber + dateOfBirth + dateOfExpiry;
 
         // Compute SHA-1 hash to derive Kπ
-        using var sha1 = SHA1.Create();
-        byte[] kMrz = sha1.ComputeHash(mrzBytes);
+        byte[] kMrz = SHA1.HashData(mrzBytes);
 
         byte[] PACEMODE = [0x00, 0x00, 0x00, 0x03];
 
@@ -214,7 +213,7 @@ public class EncryptionInfo
 
     public void PrintInfo()
     {
-        Log.Info($"{AgreementType} {EncryptType}{_keybits} {MappingType} {MacType}, {OrgParameterID}");
+        Log.Info(OrgOid.ToOidStr() + "\n" + $"{AgreementType} {EncryptType}{_keybits} {MappingType} {MacType}, {OrgParameterID}");
     }
 
     public KeyAgreement AgreementType { get; set; } = KeyAgreement.Unknown;
@@ -370,7 +369,7 @@ public sealed record ECDH
 
         var publicKeyIC = param.param.Curve.DecodePoint(encodedChipPublic).Normalize();
         _secret = publicKeyIC.Multiply(PrivateKey).Normalize();
-
+        Log.Info("Chip key: " + BitConverter.ToString(encodedChipPublic));
         return encodedChipPublic;
 
     }

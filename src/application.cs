@@ -57,8 +57,18 @@ public class ClientSession(ICommunicator comm)
     {
         var response = (await _cmd.ReadBinary(MessageType.NonSecureMessage, EfIdGlobal.CardAccess)).UnwrapOrThrow();
 
-        var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
+        var infos = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos;
+        var info = infos[0];
+        foreach (var i in infos)
+        {
+            if (i.OrgOid[^2] == 6) // CAM
+            {
+                info = i;
+            }
+        }
+
         info.PrintInfo();
+
 
         byte[] key = PassHelper.DerivePaceKey(info);
 
@@ -88,7 +98,9 @@ public class ClientSession(ICommunicator comm)
 
         _cmd.SetEncryption(tuple.Item2, tuple.Item1);
 
-        if (!(await _cmd.GeneralAuthenticateMutual(icPublicKey[0..], _ecdh.PublicKey, info.OrgOid)).UnwrapOrThrow())
+        Log.Info("hello: " + BitConverter.ToString(info.OrgOid));
+
+        if (!(await _cmd.GeneralAuthenticateMutual(icPublicKey, _ecdh.PublicKey, info.OrgOid)).UnwrapOrThrow())
         {
             Log.Error("AuthenticationToken was not correctly calculated");
             return;
@@ -127,7 +139,7 @@ public class ClientSession(ICommunicator comm)
         Org.BouncyCastle.X509.X509Certificate dscCertBouncyCastle = SodHelper.ReadSodData(binBytes)!; // Helper to find and print SOD information
 
 
-        
+
         Log.Info("Starting Passive authentication...");
 
         string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
@@ -271,7 +283,7 @@ public class ClientSession(ICommunicator comm)
                 //  var prot = Encryption
             }
         }
-       
+
         if (chipAuthOidBytes.Length == 0)
             throw new Exception("Could Not Find Any Chip Authentication Protocols");
 

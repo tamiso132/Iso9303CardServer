@@ -7,7 +7,13 @@ using System.Collections;
 using System.Security.Cryptography.X509Certificates;
 using Helper;
 using Encryption;
-
+using System.Text;
+using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Macs;
+using Org.BouncyCastle.Crypto.Engines;
+using Org.BouncyCastle.Crypto.Parameters;
+using System.Security.Cryptography;
+using System.Numerics;
 
 // Load the ML file (DER encoded)
 // byte[] mlBytes = [File.ReadAllBytes("masterlist-cscas/C=AT,O=GV,OU=BMI,CN=CSCA-AUSTRIA56.pem")];
@@ -110,24 +116,4 @@ public class WsSession : WebSocketBehavior
 
 
 
-//testNonceDecrypt.testings();
 
-// Användning av Data groups ex:
-// byte[] dg11Bytes = ReadFileFromChip(0x6B);
-// DG11 dg11 = DG11.Parse(dg11Bytes);
-
-// byte[] dg14Bytes = ReadFileFromChip(0x6E);
-// DG14 dg14 = DG14.Parse(dg14Bytes);
-
-// byte[] dg16Bytes = ReadFileFromChip(0x70);
-// DG16 dg16 = DG16.Parse(dg16Bytes);
-
-// Deciding Certificate from dg12:
-
-// byte[] dg12Bytes = ReadFileFromChip(0x??);
-// DG12 dg12 = DG12.Parse(dg12Bytes);
-
-// var masterlist = CertificateFinder.LoadCscaCertsFromFolder(@"C:\Users\foffe\Iso9303CardServer\masterlist-cscas"); //Load masterlist from folder
-// var relevantCerts = CertificateFinder.FindRelevantCertificates(dg12Info, masterlist); // Find the relevant certificate
-// var cscaCert = relevantCerts.FirstOrDefault(); 
-// if (cscaCert == null) throw new Exception("Ingen relevant CSCA hittades för detta pass");
