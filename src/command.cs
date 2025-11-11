@@ -16,6 +16,7 @@ using Org.BouncyCastle.Security;
 using System;
 using Encryption;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.ObjectPool;
 
 namespace Command;
 
@@ -555,20 +556,19 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         byte[] innerPacketIC = [0x7f, 0x49, (byte)(innerSequenceIC.Length + innerSequence2IC.Length), .. innerSequenceIC, .. innerSequence2IC];
 
+        var tags = TagReader.ReadTagData(result.Value.data, [0x7f, 0x30, 0x31]);
+        var chipToken = tags.Find(0x7C).FindChild(0x86)!.Data;
+        Log.Info(tags.ToStringFormat());
 
-        using (var stream = new Asn1InputStream(result.Value.data))
+        // Asn1Object obj = stream.ReadObject();  // top-level object
+        // var chipToken = obj.GetDerEncoded()[4..]; // ic publickey
+        bool valid = CMacCheck(chipToken!, innerPacketIC); // failar här
+        if (valid)
         {
-
-            Asn1Object obj = stream.ReadObject();  // top-level object
-            var chipToken = obj.GetDerEncoded()[4..]; // ic publickey
-            bool valid = CMacCheck(chipToken!, innerPacketIC); // failar här
-            if (valid)
-            {
-                Log.Info("Mutual Authentication Success!");
-                return Result<bool>.Success(valid);
-            }
-            return Result<bool>.Fail(new Error.AuthenticationToken("Failed to verify authentication token"));
+            Log.Info("Mutual Authentication Success!");
+            return Result<bool>.Success(valid);
         }
+        return Result<bool>.Fail(new Error.AuthenticationToken("Failed to verify authentication token"));
 
     }
 
@@ -698,7 +698,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         engine.DoFinal(calculatedToken);
 
 
-        return true;
+        //return true;
 
         return chipToken.SequenceEqual(calculatedToken);
 
