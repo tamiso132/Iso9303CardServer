@@ -6,6 +6,8 @@ using Interfaces;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Security;
 
+
+//TODO Remove entire file?
 public class TestClass
 {
     static bool IsEqual(byte[] a, byte[] b)

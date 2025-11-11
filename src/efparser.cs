@@ -134,6 +134,7 @@ public class EFSodInfo
         public byte[] HashValue { get; set; } //SHA256 Hash
     }
 
+    // TODO Remove?
     public static EFSodInfo ParseEFSodLdsV18(byte[] bytes)
     {
         var ef = new EFSodInfo();
@@ -235,6 +236,7 @@ public class TLV
 
 // Data Groups parsing 
 // Data Groups: DG1, DG11, DG12, DG14, DG16
+// TODO Remove?
 public static class TLVParser
 {
     public static List<TLV> Parse(byte[] data)

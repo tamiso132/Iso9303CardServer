@@ -14,6 +14,7 @@ public enum CommandType : byte
     Package, // regular package
 }
 
+//TODO Remove?
 public static class MyErrorExtensions
 {
     public static string GetMessage(this CommandType error)

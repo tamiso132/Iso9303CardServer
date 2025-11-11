@@ -40,6 +40,11 @@ public class ClientSession(ICommunicator comm)
             await SetupSecureMessaging();
             //            await SetupPassiveAuthentication();
 
+            // Chose CA or AA here
+            // if DG15 only -> AA
+            // if DG14 only -> CA
+            // if DG15 AND DG 14 -> CA (Must)
+
             await SetupChipAuthentication();
 
         }
@@ -208,10 +213,6 @@ public class ClientSession(ICommunicator comm)
         Log.Info($"Cofactor (h):   {BitConverter.ToString(h)}");
         Log.Info($"Public Key (Y): {BitConverter.ToString(publicKey)}");
         Log.Info("--------------------------------------------------");
-
-
-
-
 
 
         var version = new DerInteger(1);

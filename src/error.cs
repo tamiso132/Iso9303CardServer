@@ -97,6 +97,8 @@ public abstract record Error(ErrorSeverity Severity)
 
 
 // --- Extension Methods för kortfattad hantering ---
+
+//TODO Remove?
 public static class ResultExtensions
 {
     // För Result<T> - returnerar värdet T eller kastar CommandFailedException
@@ -112,7 +114,8 @@ public static class ResultExtensions
         return result.Value;
     }
 
-    // För Result<RVoid> - kastar CommandFailedException vid fel, men returnerar inget värde.
+    // För Result<RVoid> - kastar CommandFailedException vid fel, men returnerar inget värde. 
+    // TODO Remove?
     public static void ThrowOnFailure(this Result<RVoid> result)
     {
         if (!result.IsSuccess)

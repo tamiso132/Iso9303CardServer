@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using Helper;
 
-// --- 1. Säkrad TagReader (Dina Klasser + Säkerhetsfixar) ---
 
 public static class TagReader
 {
