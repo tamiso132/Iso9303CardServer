@@ -822,7 +822,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
 
-
+//TODO Remove??
 
 enum MSEType // p1 p2
 {
@@ -853,6 +853,7 @@ public abstract record GenAuthType
             return writer.Encode()[1..];
         }
 
+//TODO Remove??
         private byte[] _mappingData = mappingData;
 
     }

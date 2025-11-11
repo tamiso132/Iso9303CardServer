@@ -25,7 +25,7 @@ public struct AsnBuilder()
     }
 
 
-
+//TODO Remove?
     public AsnBuilder AddTag(int tag, byte[] packetData)
     {
         return AddCustomTag((byte)tag, packetData);

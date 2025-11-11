@@ -1,5 +1,6 @@
 using Helper;
 
+// TODO remove entire file?
 public class DataGroupHash
 {
     public int DataGroupNumber { get; set; }

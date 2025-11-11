@@ -196,6 +196,7 @@ public static class Util
     }
 }
 
+//TODO Remove??
 public static class BIgIntegerExtension
 {
     public static byte[] ToPaddedLength(this BigInteger value, int length)
@@ -209,7 +210,7 @@ public static class BIgIntegerExtension
 
 
 
-
+// TODO Remove??
 public static class ByteArrayExtension
 {
     public static void PrintByteComparison(this byte[] correct, byte[] b)
@@ -267,6 +268,8 @@ public static class ByteArrayExtension
     }
    
 }
+
+//TODO Remove??
 public static class IntExtensions
 {
     public static string ToHex(this int value, int digits = 2)
@@ -321,6 +324,7 @@ public static class IntExtensions
     }
 }
 
+// TODO Remove??
 public static class BytesExtensions
 {
     public static byte[] TruncateData(this byte[] data)
@@ -438,8 +442,7 @@ public static class SodHelper
                         Log.Info($"Giltigt: {cert.NotBefore} - {cert.NotAfter}");
                         Log.Info($"Signature info: {cert.SigAlgName}");
 
-                        // Do we need Key info???
-
+                        // Manipulerade hash-lista och intern signatur går inte genom detta steg, manipulerad data går igenom men hanteras i steg 3.
                         bool verified = signer.Verify(cert.GetPublicKey());
                         Log.Info($"Internal signature in EF.SOD: {(verified ? "✅ OK" : "❌ FEL")}");
 
@@ -478,7 +481,7 @@ public static class SodHelper
         return verifiedDsc;
     }
 
-
+// TODO Remove?
     public static Dictionary<int, byte[]> ParseAndVerifySod(byte[] sodBytes)
     {
         // Försök att dekoda CMS/PKCS#7 med standardklassen. Detta är det korrekta sättet.
@@ -757,7 +760,9 @@ string masterListDirectoryPath)
                 // Big money check
                 chain.ChainPolicy.ExtraStore.Add(matchingCscaCertDotNet); // Trust Anchor
                 chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // No revocation for now
-                chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority; // Not in windows?
+                chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority; // Not in windows?, Maybe remove
+               // chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreNotTimeValid;
+                
 
                 if (!chain.Build(dscCertDotNet))
                 {

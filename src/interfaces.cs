@@ -38,6 +38,7 @@ public interface IEfID
 /// Interface representing a cryptographic algorithm.
 /// Defines methods for encrypting and decrypting data.
 /// </summary>
+/// TODO Remove?
 public interface ICryptoAlgorithm
 {
     /// <summary>Encrypt input bytes</summary>
