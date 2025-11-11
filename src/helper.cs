@@ -438,8 +438,7 @@ public static class SodHelper
                         Log.Info($"Giltigt: {cert.NotBefore} - {cert.NotAfter}");
                         Log.Info($"Signature info: {cert.SigAlgName}");
 
-                        // Do we need Key info???
-
+                        // Manipulerade hash-lista och intern signatur går inte genom detta steg, manipulerad data går igenom men hanteras i steg 3.
                         bool verified = signer.Verify(cert.GetPublicKey());
                         Log.Info($"Internal signature in EF.SOD: {(verified ? "✅ OK" : "❌ FEL")}");
 

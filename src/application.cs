@@ -98,25 +98,23 @@ public class ClientSession(ICommunicator comm)
     {
         var response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod)).UnwrapOrThrow();
 
-
         byte[] sodrawBytes = response.data;
 
         SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
 
         Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
         Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
-        //     Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
 
         var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
-        //   tags.PrintAll();
+        //   tags.PrintAll(); Felsök
 
 
         var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
 
         var cmsTags = TagReader.ReadTagData(data, [0x30]);
-        //  cmsTags.PrintAll();
+        //  cmsTags.PrintAll(); Felsök
 
-        // Skriver in all data i filer, First step of passive authentication
+        // Skriver in all data i filen EFSodDumpcmstag.bin, First step of passive authentication
         File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
         byte[] binBytes = tags[0].Data;
 
@@ -124,7 +122,7 @@ public class ClientSession(ICommunicator comm)
         Org.BouncyCastle.X509.X509Certificate dscCertBouncyCastle = SodHelper.ReadSodData(binBytes)!; // Helper to find and print SOD information
 
 
-        // Use passiveAuthTest.cs for step 2 and 3
+        
         Log.Info("Starting Passive authentication...");
 
         string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
@@ -157,6 +155,7 @@ public class ClientSession(ICommunicator comm)
             Log.Info($"Chip Hash says: {BitConverter.ToString(dg.Hash)}");
             Log.Info($"Calculated Hashvalue: {BitConverter.ToString(calculatedHashData)}");
 
+            // Manipulerad hash går inte genom detta steg
             if (!calculatedHashData.SequenceEqual(dg.Hash))
             {
                 Log.Error($"Hash wrong for DG{dg.DataGroupNumber}, PA failed");
