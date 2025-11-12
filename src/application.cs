@@ -59,13 +59,14 @@ public class ClientSession(ICommunicator comm)
 
         var infos = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos;
         var info = infos[0];
-        foreach (var i in infos)
-        {
-            if (i.OrgOid[^2] == 6) // CAM
-            {
-                info = i;
-            }
-        }
+        // foreach (var i in infos)
+        // {
+        //     i.PrintInfo();
+        //     if (i.OrgOid[^2] == 6) // CAM
+        //     {
+        //         info = i;
+        //     }
+        // }
 
         info.PrintInfo();
 
@@ -110,6 +111,8 @@ public class ClientSession(ICommunicator comm)
         }
 
         (await _cmd.SelectApplication(MessageType.SecureMessage, AppID.IdLDS1)).UnwrapOrThrow();
+
+        (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg1)).UnwrapOrThrow();
 
         Log.Info("Secure Messaging Established using: PACE, Session started.");
     }
@@ -195,7 +198,7 @@ public class ClientSession(ICommunicator comm)
 
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
 
-
+        Log.Info(root.ToStringFormat());
         //  var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
 
         var objects = root.FindChild(0x31);
@@ -235,22 +238,22 @@ public class ClientSession(ICommunicator comm)
 
         byte[] encodedParameters = [];
 
-        foreach (var objectP in objects!.Children)
+
+
+        foreach (var objectP in objects!.Children) // first find protocol
         {
             var oid = objectP.FindChild(0x06)!;
             if (oid.Data[^3] == 0x03 && chipAuthOidBytes.Length == 0) // chip protocol
             {
-                Log.Info("ChipAuthProtocolSequence: " + objectP.ToStringFormat());
-
-
-
-
                 // id 
                 // 1 -> 3des
                 // 2 -> CMAC_AES 128
                 // 3 -> CMAC_AES 192
                 // 4 -> CMAC_AES 256
                 var id = oid.Data[^1];
+
+                if (id == 1) // I do not support 3des
+                    continue;
 
                 // keyType 
                 // 1 -> DH
@@ -260,22 +263,41 @@ public class ClientSession(ICommunicator comm)
                 if (keyType == 1) // have not implemented DH
                     continue;
 
+                var integers = objectP.Children.FilterByTag(0x02);
+                if (integers.Count > 1) // there is keyID
+                {
+                    keyID = integers[1].Data[0];
+                }
 
 
-                Log.Info("Chose Chip Authentication OID: " + oid.Data.ToOidStr());
                 chipAuthOidBytes = oid.Data;
-
+                break;
             }
+        }
+
+        foreach (var objectP in objects!.Children)
+        {
+            var oid = objectP.FindChild(0x06)!;
+
             // TODO, sometimes there is only parameter id of a known curve instead of explicit parameters
-            else if (p.Length == 0 && oid.Data[^3] == 0x02 && oid.Data[^2] == 1) // public key
+            if (p.Length == 0 && oid.Data[^3] == 0x02 && oid.Data[^2] == 1) // public key
             {
+                if (keyID != null) // need to get linked public key
+                {
+                    bool isPubKeyProtocol = objectP.FindChild(0x02)!.Data[0] == keyID;
+
+                    if (!isPubKeyProtocol)
+                        continue;
+
+                    Log.Info("Choose KeyId: " + BitConverter.ToString(objectP.FindChild(0x02)!.Data));
+                }
                 // priority ecdh
                 byte keyType = oid.Data[^1];
 
                 if (keyType == 1) // have not implemented DH
                     continue;
 
-                Log.Info(objectP.ToStringFormat());
+                //  Log.Info(objectP.ToStringFormat());
 
                 var subjectPublicKeyInfo = objectP.FindChild(0x30)!;
 
@@ -290,7 +312,7 @@ public class ClientSession(ICommunicator comm)
                 var integers = domainParameters.Children.FilterByTag(0x02);
 
 
-                Log.Info(domainParameters.ToStringFormat());
+                // Log.Info(domainParameters.ToStringFormat());
 
                 p = sequences[0].FindChild(0x02)!.Data[1..]; // remove 00
                 a = sequences[1].Children[0]!.Data;
@@ -300,12 +322,6 @@ public class ClientSession(ICommunicator comm)
                 h = integers[2].Data;
                 // EXIST KEY ID
                 // Should only exist if there is multiple public keys
-                var keyIDTag = objectP.FindChild(0x02);
-                if (keyIDTag != null)
-                {
-                    keyID = keyIDTag.Data[0];
-                    Log.Info("keyidlen: " + keyIDTag.Data.Length);
-                }
             }
 
         }
@@ -328,6 +344,7 @@ public class ClientSession(ICommunicator comm)
         Log.Info($"Order (n):      {BitConverter.ToString(n!)}");
         Log.Info($"Cofactor (h):   {BitConverter.ToString(h!)}");
         Log.Info($"Public Key (Y): {BitConverter.ToString(publicKey)}");
+        Log.Info("Chose Chip Authentication OID: " + chipAuthOidBytes.ToOidStr());
         Log.Info("--------------------------------------------------");
 
         var version = new DerInteger(1);

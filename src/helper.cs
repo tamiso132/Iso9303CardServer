@@ -189,9 +189,9 @@ public static class Util
 {
     public static byte[] AlignData(byte[] input, int aligment)
     {
-        var diffLen = aligment - ((input.Length + 1) % aligment);
-        byte padTag = 0x80;
-        byte[] padding = [padTag, .. new byte[diffLen]];
+        int padLength = aligment - (input.Length % aligment);
+        byte[] padding = new byte[padLength];
+        padding[0] = 0x80;
         return [.. input, .. padding];
     }
 }
@@ -266,7 +266,7 @@ public static class ByteArrayExtension
 
         return retVal.ToString();
     }
-   
+
 }
 
 //TODO Remove??
@@ -481,7 +481,7 @@ public static class SodHelper
         return verifiedDsc;
     }
 
-// TODO Remove?
+    // TODO Remove?
     public static Dictionary<int, byte[]> ParseAndVerifySod(byte[] sodBytes)
     {
         // Försök att dekoda CMS/PKCS#7 med standardklassen. Detta är det korrekta sättet.
@@ -761,8 +761,8 @@ string masterListDirectoryPath)
                 chain.ChainPolicy.ExtraStore.Add(matchingCscaCertDotNet); // Trust Anchor
                 chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // No revocation for now
                 chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority; // Not in windows?, Maybe remove
-               // chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreNotTimeValid;
-                
+                                                                                                              // chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreNotTimeValid;
+
 
                 if (!chain.Build(dscCertDotNet))
                 {

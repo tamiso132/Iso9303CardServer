@@ -402,7 +402,9 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
 
 
-        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0x41, 0xA4, builder.Build());
+        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0x41, 0xA4, data);
+        byte[] unsecCmd = MessageType.NonSecureMessage.FormatCommand(this, 0x22, 0x41, 0xA4, data);
+        Log.Info("not encrypted cmd: " + BitConverter.ToString(unsecCmd));
         return await SendPackageDecodeResponse(type, cmd);
 
 
@@ -775,6 +777,10 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
 
+        Log.Info("data: " + BitConverter.ToString(data));
+
+
+
         if (cla != null)
             cmdHeader[0] = (byte)cla;
 
@@ -832,6 +838,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private byte[] EncryptDataFormatENC(byte[] decryptedData, byte[] iv)
     {
         var aligned = Util.AlignData(decryptedData, 16);
+        Log.Info("Aligned Data: " + BitConverter.ToString(aligned));
         Debug.Assert(aligned.Length % 16 == 0);
 
         //Log.Info("UnencryptedData: " + BitConverter.ToString(decryptedData));
