@@ -196,38 +196,139 @@ public class ClientSession(ICommunicator comm)
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
 
 
-        var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
-        Log.Info(root.ToStringFormat());
+        //  var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
+
+        var objects = root.FindChild(0x31);
+        // // Log.Info(root.ToStringFormat());
 
 
-        var keyAgreement = publicKeyInfo.FindChild(0x06)!.Data.ToOidStr(); //OID tag, find algorithm
+        // var keyAgreement = publicKeyInfo.FindChild(0x06)!.Data.ToOidStr(); //OID tag, find algorithm
 
-        var keyID = keyAgreement[^1]; // if  2 = ECDH, if 1 = DH
+        // var keyID = keyAgreement[^1]; // if  2 = ECDH, if 1 = DH
 
-        var subjectPublicKeyInfo = publicKeyInfo.FindChild(0x30);
-        var algoritmIdentifier = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x06); // only used when SUBJECT PUBLIC KEY INFO, is MISSING
-        var explicitParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!;
+        // var subjectPublicKeyInfo = publicKeyInfo.FindChild(0x30);
+        // var algoritmIdentifier = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x06); // only used when SUBJECT PUBLIC KEY INFO, is MISSING
+        // var explicitParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!;
 
-        // ECDH Curve parameters
-        var p = explicitParameters.Children[1].FindChild(0x02)!.Data[1..]; // remove 00
-        var a = explicitParameters.Children[2].Children[0].Data;
-        var b = explicitParameters.Children[2].Children[1].Data;
-        var g = explicitParameters.Children[3].Data;
-        var n = explicitParameters.Children[4].Data[1..];// remove 0x00
-        var h = explicitParameters.Children[5].Data;
 
-        var publicKey = subjectPublicKeyInfo.FindChild(0x03)!.Data; //Chips public CA-Key
-        Log.Info("KeyAgreementID: " + keyID);
+
+
+        // var p = explicitParameters.Children[1].FindChild(0x02)!.Data[1..]; // remove 00
+        // var a = explicitParameters.Children[2].Children[0].Data;
+        // var b = explicitParameters.Children[2].Children[1].Data;
+        // var g = explicitParameters.Children[3].Data;
+        // var n = explicitParameters.Children[4].Data[1..];// remove 0x00
+        // var h = explicitParameters.Children[5].Data;
+
+
+
+
+        var chipAuthOidBytes = Array.Empty<byte>();
+        byte[] pubKey = [];
+        byte[] p = [];
+        byte[] a = [];
+        byte[] b = [];
+        byte[] g = [];
+        byte[] n = [];
+        byte[] h = [];
+        byte? keyID = null;
+
+        byte[] encodedParameters = [];
+
+        foreach (var objectP in objects!.Children)
+        {
+            var oid = objectP.FindChild(0x06)!;
+            if (oid.Data[^3] == 0x03 && chipAuthOidBytes.Length == 0) // chip protocol
+            {
+                Log.Info("ChipAuthProtocolSequence: " + objectP.ToStringFormat());
+
+
+
+
+                // id 
+                // 1 -> 3des
+                // 2 -> CMAC_AES 128
+                // 3 -> CMAC_AES 192
+                // 4 -> CMAC_AES 256
+                var id = oid.Data[^1];
+
+                // keyType 
+                // 1 -> DH
+                // 2 -> ECDH
+                var keyType = oid.Data[^2];
+
+                if (keyType == 1) // have not implemented DH
+                    continue;
+
+
+
+                Log.Info("Chose Chip Authentication OID: " + oid.Data.ToOidStr());
+                chipAuthOidBytes = oid.Data;
+
+            }
+            // TODO, sometimes there is only parameter id of a known curve instead of explicit parameters
+            else if (p.Length == 0 && oid.Data[^3] == 0x02 && oid.Data[^2] == 1) // public key
+            {
+                // priority ecdh
+                byte keyType = oid.Data[^1];
+
+                if (keyType == 1) // have not implemented DH
+                    continue;
+
+                Log.Info(objectP.ToStringFormat());
+
+                var subjectPublicKeyInfo = objectP.FindChild(0x30)!;
+
+                pubKey = subjectPublicKeyInfo.FindChild(0x03)!.Data;
+
+                var domainParameters = subjectPublicKeyInfo.FindChild(0x30)!.FindChild(0x30);
+
+                encodedParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!.Data;
+
+
+                var sequences = domainParameters!.Children.FilterByTag(0x30);
+                var integers = domainParameters.Children.FilterByTag(0x02);
+
+
+                Log.Info(domainParameters.ToStringFormat());
+
+                p = sequences[0].FindChild(0x02)!.Data[1..]; // remove 00
+                a = sequences[1].Children[0]!.Data;
+                b = sequences[1].Children[1]!.Data;
+                g = domainParameters.FindChild(0x04)!.Data;
+                n = integers[1].Data[1..];// remove 0x00
+                h = integers[2].Data;
+                // EXIST KEY ID
+                // Should only exist if there is multiple public keys
+                var keyIDTag = objectP.FindChild(0x02);
+                if (keyIDTag != null)
+                {
+                    keyID = keyIDTag.Data[0];
+                    Log.Info("keyidlen: " + keyIDTag.Data.Length);
+                }
+            }
+
+        }
+
+        if (chipAuthOidBytes.Length == 0 || p.Length == 0)
+        {
+            throw new Exception("Chip Auth is not supported");
+        }
+
+
+        var publicKey = pubKey!;
+        if (keyID != null)
+            Log.Info("KeyIDRef: " + keyID);
+
         Log.Info("--- Explicit Curve Parameters (från Container) ---");
-        Log.Info($"Prime (p):      {BitConverter.ToString(p)}");
-        Log.Info($"Coeff (a):      {BitConverter.ToString(a)}");
-        Log.Info($"Coeff (b):      {BitConverter.ToString(b)}");
-        Log.Info($"Base (G):       {BitConverter.ToString(g)}");
-        Log.Info($"Order (n):      {BitConverter.ToString(n)}");
-        Log.Info($"Cofactor (h):   {BitConverter.ToString(h)}");
+        Log.Info($"Prime (p):      {BitConverter.ToString(p!)}");
+        Log.Info($"Coeff (a):      {BitConverter.ToString(a!)}");
+        Log.Info($"Coeff (b):      {BitConverter.ToString(b!)}");
+        Log.Info($"Base (G):       {BitConverter.ToString(g!)}");
+        Log.Info($"Order (n):      {BitConverter.ToString(n!)}");
+        Log.Info($"Cofactor (h):   {BitConverter.ToString(h!)}");
         Log.Info($"Public Key (Y): {BitConverter.ToString(publicKey)}");
         Log.Info("--------------------------------------------------");
-
 
         var version = new DerInteger(1);
 
@@ -253,48 +354,9 @@ public class ClientSession(ICommunicator comm)
             hAsn1     // Children[5]
         ).GetDerEncoded()!;
 
-        var protocols = root.FindChild(0x31)!.Children[1..];
-        //   byte[]? chipAuthOid = null;
+        //  TestClass.PrintByteComparison(explicitParametersDer, encodedParameters); 
 
-        var chipAuthOidBytes = Array.Empty<byte>();
-        foreach (var protocol in protocols)
-        {
-            var protocolVer = protocol.FindChild(0x02)!.Data[0]; // version, 1 for chipauth
-
-            if (protocolVer == 1)
-            {
-                var tempchipAuthOid = protocol.FindChild(0x06)!.Data;
-                var oidSplits = tempchipAuthOid.ToOidStr().Split('.');
-
-                var tag = oidSplits[8];
-
-
-                if (tag != "3")
-                    continue;
-
-                var id = oidSplits[^1];
-                Log.Info("Chose Chip Authentication OID: " + tempchipAuthOid.ToOidStr());
-                chipAuthOidBytes = tempchipAuthOid;
-
-                break;
-                // id 
-                // 1 -> 3des
-                // 2 -> CMAC_AES 128
-                // 3 -> CMAC_AES 192
-                // 4 -> CMAC_AES 256
-                //TODO, get the protocol and stuff
-                //  var prot = Encryption
-            }
-        }
-
-        if (chipAuthOidBytes.Length == 0)
-            throw new Exception("Could Not Find Any Chip Authentication Protocols");
-
-
-
-
-
-
+        //  Log.Info("DerEncodedStructure: " + BitConverter.ToString(explicitParametersDer));
 
 
         ECDH ecdh = new(DomainParameter.GetFromDerEncoded(explicitParametersDer)); //Create curve using parameters taken from DG14
@@ -306,7 +368,7 @@ public class ClientSession(ICommunicator comm)
 
         Log.Info(BitConverter.ToString(ecdh.PublicKey));
 
-        (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOidBytes)).UnwrapOrThrow();
+        (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOidBytes, keyID)).UnwrapOrThrow();
         (await _cmd.GeneralAuthenticateChipMapping(MessageType.SecureMessage, 0x80, ecdh.PublicKey)).UnwrapOrThrow(); // should return 0x7C00 -> empty dynamic auth data
 
         ecdh.CalculateSharedSecret(publicKey[1..]);

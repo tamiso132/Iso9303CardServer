@@ -166,6 +166,8 @@ public static class TagReaderExtensions
         return entry.Children.FirstOrDefault(c => c.Tag == tag);
     }
 
+    
+
 
     public static string ToStringFormat(this List<TagReader.TagEntry> tags)
     {

@@ -60,6 +60,7 @@ public class TestClass
             Console.ResetColor();
         }
         Console.WriteLine();
+        Console.WriteLine();
 
         // Second line: correct array
         for (int i = 0; i < length; i++)

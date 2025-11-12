@@ -17,6 +17,7 @@ using System;
 using Encryption;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.ObjectPool;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Command;
 
@@ -384,15 +385,24 @@ public class Command<T>(ICommunicator communicator, T encryption)
     }
 
     // Implementation using MSE:Set AT and GENERAL AUTHENTICATE
-    public async Task<TResult> MseSetAT_ChipAuthentication(MessageType type, byte[] chipAuthOid)
+    public async Task<TResult> MseSetAT_ChipAuthentication(MessageType type, byte[] chipAuthOid, byte? keyID)
     {
         Log.Info("Sending MseSetAT Command Chip Authentication");
 
-        byte[] data = new AsnBuilder()
-        .AddCustomTag(0x80, chipAuthOid) // object identifier
-        .Build();
+        var builder = new AsnBuilder()
+        .AddCustomTag(0x80, chipAuthOid); // object identifier
+        if (keyID != null)
+            builder.AddCustomTag(0x84, [(byte)keyID]);
 
-        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0x41, 0xA4, data);
+
+        var data = builder.Build();
+
+        Log.Info(BitConverter.ToString(data));
+
+
+
+
+        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0x41, 0xA4, builder.Build());
         return await SendPackageDecodeResponse(type, cmd);
 
 
@@ -629,7 +639,21 @@ public class Command<T>(ICommunicator communicator, T encryption)
         var parseResult = await messageType.ParseCommand(this, result.Value);
 
         if (!parseResult.IsSuccess)
-            return parseResult;
+        {
+            switch (parseResult.Error)
+            {
+                case Error.NFCLost nfcLostError:
+                case Error.ClientErrorFormat clientError:
+                    Log.Error(parseResult.Error.ErrorMessage() + ", gonna retry packet");
+
+                    return await SendPackageDecodeResponse(messageType, cmd);
+
+
+                default:
+                    // Handle all other errors
+                    return parseResult;
+            }
+        }
 
         var response = parseResult.Value;
 
