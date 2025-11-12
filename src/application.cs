@@ -79,6 +79,7 @@ public class ClientSession(ICommunicator comm)
 
 
         var _ecdh = new ECDH(DomainParameter.GetFromId(info.OrgParameterID));
+        _ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
 
         response = (await _cmd.GeneralAuthenticateMapping(0x81, _ecdh.PublicKey)).UnwrapOrThrow();
         _ecdh.ParseCalculateSharedSecret(response.data);
@@ -87,6 +88,8 @@ public class ClientSession(ICommunicator comm)
         // update generator with new shared secret
         _ecdh.MapGenerator(decryptedNounce);
 
+        _ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
+
 
 
         // send new public key and do same
@@ -94,7 +97,7 @@ public class ClientSession(ICommunicator comm)
 
 
         byte[] icPublicKey = _ecdh.ParseCalculateSharedSecret(response.data);
-        var tuple = PassHelper.DeriveSessionKeys(info, _ecdh.SharedSecret);
+        var tuple = PassHelper.DeriveSessionKeys(_ecdh.SharedSecret);
 
         _cmd.SetEncryption(tuple.Item2, tuple.Item1);
 
@@ -290,7 +293,6 @@ public class ClientSession(ICommunicator comm)
 
 
 
-        (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOidBytes)).UnwrapOrThrow();
 
 
 
@@ -300,14 +302,31 @@ public class ClientSession(ICommunicator comm)
                                                                                    // ecdh.GenerateEphemeralKeys(new RandomNumberProvider()); // Generate temporary keys
                                                                                    //  ecdh.CalculateSharedSecret(publicKey);
 
-        (await _cmd.GeneralAuthenticateChipMapping(MessageType.SecureMessage, 0x80, ecdh.PublicKey)).UnwrapOrThrow();
+        ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
+
+        Log.Info(BitConverter.ToString(ecdh.PublicKey));
+
+        (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOidBytes)).UnwrapOrThrow();
+        (await _cmd.GeneralAuthenticateChipMapping(MessageType.SecureMessage, 0x80, ecdh.PublicKey)).UnwrapOrThrow(); // should return 0x7C00 -> empty dynamic auth data
+
+        ecdh.CalculateSharedSecret(publicKey[1..]);
+        var tuple = PassHelper.DeriveSessionKeys(ecdh.SharedSecret);
+
+        // Restarting secure messaging
+        _cmd.SetEncryption(tuple.Item2, tuple.Item1);
+
 
         byte[] terminalEphemeralPublicKey = ecdh.PublicKey; // K_pub_T 
 
         Log.Info("Send general authenticate CA");
 
-        // Send general authenticate
-        var caResponse = (await _cmd.GeneralAuthenticateMapping(0x81, terminalEphemeralPublicKey)).UnwrapOrThrow();
+
+        // if error, it means different shared secret, aka ENC and MAC should fail as they are derived from shared secret
+        // so chip is cloned
+        (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg1)).UnwrapOrThrow();
+
+        // // Send general authenticate
+        // var caResponse = (await _cmd.GeneralAuthenticateMapping(0x81, terminalEphemeralPublicKey)).UnwrapOrThrow();
 
 
 

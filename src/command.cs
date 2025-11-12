@@ -154,8 +154,6 @@ public abstract record MessageType
                 }
 
 
-                if (!DecryptCheck(fullData))
-                    throw new Exception("DecryptFailed: " + fullData);
 
 
                 respCommand.data = fullData[0.._le];
@@ -470,8 +468,9 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] data = [0x7C, (byte)innerSequence.Length, .. innerSequence];
 
         byte[] nonSecureDebug = MessageType.NonSecureMessage.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x00);
-        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x00);
-        Log.Info("ChipAuthGeneral: " + BitConverter.ToString(nonSecureDebug));
+        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x02);
+
+        Log.Info("unencrypted format: " + BitConverter.ToString(nonSecureDebug));
 
         //Log.Info("Write: " + BitConverter.ToString(raw));
 
@@ -521,6 +520,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         Log.Info("macKey: " + BitConverter.ToString(mac));
         this.encKey = enc;
         this.mac = mac;
+        this.sequenceCounter = 0x01;
     }
 
 

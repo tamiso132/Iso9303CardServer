@@ -60,7 +60,8 @@ public static class PassHelper
 
     }
 
-    public static Tuple<byte[], byte[]> DeriveSessionKeys(EncryptionInfo info, byte[] sharedSecretX)
+    // HARD CODED SHA 256
+    public static Tuple<byte[], byte[]> DeriveSessionKeys(byte[] sharedSecretX)
     {
         byte[] concatenatedMac = [.. sharedSecretX, .. new byte[3], 2];
         byte[] concatenatedEnc = [.. sharedSecretX, .. new byte[3], 1];
@@ -314,8 +315,6 @@ public sealed record ECDH
     public ECDH(DomainParameter param, byte[]? generator = null)
     {
 
-        var rnd = new RandomNumberProvider();
-        PrivateKey = new Org.BouncyCastle.Math.BigInteger(1, rnd.GetNextBytes(32));
         this.param = param;
         _secret = this.param.param.G;
         if (generator == null)
@@ -368,34 +367,36 @@ public sealed record ECDH
         byte[] encodedChipPublic = obj.GetDerEncoded()[4..];
 
         var publicKeyIC = param.param.Curve.DecodePoint(encodedChipPublic).Normalize();
-        _secret = publicKeyIC.Multiply(PrivateKey).Normalize();
+        _secret = publicKeyIC.Multiply(_privateKey).Normalize();
         Log.Info("Chip key: " + BitConverter.ToString(encodedChipPublic));
+
+
         return encodedChipPublic;
 
     }
 
-    public byte[] CalculateSharedSecret(byte[] icPub)
+    public void CalculateSharedSecret(byte[] icPub)
     {
         Log.Info("Calculate Shared Secret");
-        byte[] encodedChipPublic = icPub[1..]; // skip the 00
+        byte[] encodedChipPublic = icPub; // skip the 00
 
         var publicKeyIC = param.param.Curve.DecodePoint(encodedChipPublic).Normalize();
-        _secret = publicKeyIC.Multiply(PrivateKey).Normalize();
+        _secret = publicKeyIC.Multiply(_privateKey).Normalize();
 
-        return encodedChipPublic;
     }
 
     // Update Private key
     public void GenerateEphemeralKeys(RandomNumberProvider RandomNumberProvider)
     {
-        PrivateKey = new Org.BouncyCastle.Math.BigInteger(1, RandomNumberProvider.GetNextBytes(32));
+        _privateKey = new Org.BouncyCastle.Math.BigInteger(1, RandomNumberProvider.GetNextBytes(32));
+        _publicKeyEncoded = _generator.Multiply(_privateKey).Normalize().GetEncoded();
     }
 
     public byte[] PublicKey
     {
         get
         {
-            return _generator.Multiply(PrivateKey).Normalize().GetEncoded();
+            return _publicKeyEncoded;
         }
     }
 
@@ -411,7 +412,9 @@ public sealed record ECDH
     public Org.BouncyCastle.Math.EC.ECPoint _generator;
     public Org.BouncyCastle.Math.EC.ECPoint _secret;
 
-    Org.BouncyCastle.Math.BigInteger PrivateKey;
+    public byte[] _publicKeyEncoded = [];
+
+    Org.BouncyCastle.Math.BigInteger _privateKey;
 }
 
 
