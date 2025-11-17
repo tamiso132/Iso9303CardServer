@@ -266,7 +266,7 @@ public static class ByteArrayExtension
 
         return retVal.ToString();
     }
-   
+
 }
 
 //TODO Remove??
@@ -418,6 +418,7 @@ public static class HashCalculator
 
 public static class SodHelper
 {
+    // Verifierar EF.SOD interna signatur
     public static Org.BouncyCastle.X509.X509Certificate? ReadSodData(byte[] sodBytes)
     {
         Org.BouncyCastle.X509.X509Certificate? verifiedDsc = null; // För att spara det verifierade DSC
@@ -481,7 +482,7 @@ public static class SodHelper
         return verifiedDsc;
     }
 
-// TODO Remove?
+    // TODO Remove?
     public static Dictionary<int, byte[]> ParseAndVerifySod(byte[] sodBytes)
     {
         // Försök att dekoda CMS/PKCS#7 med standardklassen. Detta är det korrekta sättet.
@@ -655,6 +656,7 @@ public static class SodHelper
         return hashes;
     }
 
+    // Function that creates chain between chip (DSC) and master list CSCA
     private static bool VerifyDscTrustChainWithPem(
 Org.BouncyCastle.X509.X509Certificate dscCertBC,
 string masterListDirectoryPath)
@@ -761,8 +763,8 @@ string masterListDirectoryPath)
                 chain.ChainPolicy.ExtraStore.Add(matchingCscaCertDotNet); // Trust Anchor
                 chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // No revocation for now
                 chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority; // Not in windows?, Maybe remove
-               // chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreNotTimeValid;
-                
+                                                                                                              // chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreNotTimeValid;
+
 
                 if (!chain.Build(dscCertDotNet))
                 {

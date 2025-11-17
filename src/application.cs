@@ -38,14 +38,14 @@ public class ClientSession(ICommunicator comm)
             (await _cmd.SelectDefaultMF(MessageType.NonSecureMessage)).UnwrapOrThrow();
 
             await SetupSecureMessaging();
-            //            await SetupPassiveAuthentication();
+                        await SetupPassiveAuthentication();
 
             // Chose CA or AA here
             // if DG15 only -> AA
             // if DG14 only -> CA
             // if DG15 AND DG 14 -> CA (Must)
 
-            await SetupChipAuthentication();
+            //await SetupChipAuthentication();
 
         }
 
@@ -112,10 +112,7 @@ public class ClientSession(ICommunicator comm)
 
         var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
         //   tags.PrintAll(); Felsök
-
-
         var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
-
         var cmsTags = TagReader.ReadTagData(data, [0x30]);
         //  cmsTags.PrintAll(); Felsök
 
@@ -123,10 +120,7 @@ public class ClientSession(ICommunicator comm)
         File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
         byte[] binBytes = tags[0].Data;
 
-
         Org.BouncyCastle.X509.X509Certificate dscCertBouncyCastle = SodHelper.ReadSodData(binBytes)!; // Helper to find and print SOD information
-
-
         
         Log.Info("Starting Passive authentication...");
 
@@ -147,7 +141,7 @@ public class ClientSession(ICommunicator comm)
                 Log.Info($"Found DG: {dg.DataGroupNumber}, Need EAC (Extended Acess Controll) to verify this datagroup");
                 continue;
             }
-            Log.Info($"Verifierar DG {dg.DataGroupNumber}...");
+            Log.Info($"Verifierar DG{dg.DataGroupNumber} ...");
 
 
             EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
@@ -167,7 +161,7 @@ public class ClientSession(ICommunicator comm)
                 TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                 return;
             }
-            Log.Info($"Hashvalue ok for DG {dg.DataGroupNumber}");
+            Log.Info($"Hashvalue ok for DG{dg.DataGroupNumber}");
         }
         Log.Info("Step 3 PA OK");
         Log.Info("Full Passive Authentication Complete!");
