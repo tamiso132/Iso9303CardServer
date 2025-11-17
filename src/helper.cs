@@ -189,9 +189,9 @@ public static class Util
 {
     public static byte[] AlignData(byte[] input, int aligment)
     {
-        var diffLen = aligment - ((input.Length + 1) % aligment);
-        byte padTag = 0x80;
-        byte[] padding = [padTag, .. new byte[diffLen]];
+        int padLength = aligment - (input.Length % aligment);
+        byte[] padding = new byte[padLength];
+        padding[0] = 0x80;
         return [.. input, .. padding];
     }
 }

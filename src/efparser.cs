@@ -67,22 +67,35 @@ public struct ImplCardAccess : IEfParser<ImplCardAccess.Info>
         var ef = new Info();
         var allNodes = AsnNode.Parse(new AsnReader(bytes, AsnEncodingRules.DER));
 
+        var root = TagReader.ReadTagData(bytes, [0x30, 0x31]); //Parse
 
-
-        foreach (var set in allNodes.Filter(Asn1Tag.SetOf))
+        foreach (var protocol in root[0].Children)
         {
-            foreach (var paceInfo in set.Filter(Asn1Tag.Sequence))
+            byte[] oid = [];
+            var ver = 2;
+            var paramID = 0;
+
+            var number = protocol.Children.FilterByTag(0x02);
+
+            ver = number[0].Data[0];
+            paramID = number[1].Data[0];
+            oid = protocol.Children.FilterByTag(0x06)[0].Data;
+
+            var info = new EncryptionInfo(oid, paramID);
+            ef.EncryptInfos.Add(info);
+
+
+            if (ver != 2)
             {
-                byte[] oid = paceInfo.GetChildNode(0).GetValueAsOID();
-                var ver = paceInfo.GetChildNode(1).GetValueAsInt();
-                var paramID = paceInfo.GetChildNode(2).GetValueAsInt();
-
-                var info = new EncryptionInfo(oid, paramID);
-                ef.EncryptInfos.Add(info);
+                Log.Error("Version is not 2??");
+                throw new NotImplementedException();
             }
-        }
 
+            Log.Info(BitConverter.ToString(oid));
+
+        }
         return ef;
+
     }
     public class Info
     {

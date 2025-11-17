@@ -16,6 +16,8 @@ using Org.BouncyCastle.Security;
 using System;
 using Encryption;
 using System.Runtime.CompilerServices;
+using Microsoft.Extensions.ObjectPool;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Command;
 
@@ -25,7 +27,7 @@ using TResultBool = Result<bool>;
 public abstract record MessageType
 {
 
-    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00) where T : IServerFormat;
+    public abstract byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00, byte? cla = null) where T : IServerFormat;
     public abstract Task<TResult> ParseCommand<T>(Command<T> command, byte[] response) where T : IServerFormat;
 
     public static Secure SecureMessage => new();
@@ -34,13 +36,14 @@ public abstract record MessageType
     {
         const int NonDataLen = 2 + 4;
         internal Secure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00, byte? cla = null)
         {
             _ins = ins;
             _p1 = p1;
             _p2 = p2;
             _data = data;
             _le = le;
+
 
             iv = command.GetIV();
             var bytes = command.FormatEncryptedCommand(data, ins, p1, p2, iv, le: le);
@@ -152,14 +155,11 @@ public abstract record MessageType
                 }
 
 
-                if (!DecryptCheck(fullData))
-                    throw new Exception("DecryptFailed: " + fullData);
 
 
                 respCommand.data = fullData[0.._le];
 
 
-                Log.Info("le: " + _le + ", dataLen: " + DataPacketLen);
 
 
                 // must get the rest of the bytes
@@ -274,7 +274,7 @@ public abstract record MessageType
     public sealed record NonSecure : MessageType
     {
         internal NonSecure() { }
-        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00)
+        public override byte[] FormatCommand<T>(Command<T> command, byte ins, byte p1, byte p2, byte[] data, int le = 0x00, byte? cla = null)
         {
             return Command<T>.FormatCommand(0x00, ins, p1, p2, data, le: le);
         }
@@ -383,17 +383,20 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return await SendPackageDecodeResponse(type, cmd);
     }
 
-    // Different MseSetAT commands for CA
-    public async Task<TResult> MseSetAT_ChipAuthentication(MessageType type, byte[] chipAuthOid, byte[] publicKey)
+    // Implementation using MSE:Set AT and GENERAL AUTHENTICATE
+    public async Task<TResult> MseSetAT_ChipAuthentication(MessageType type, byte[] chipAuthOid, byte? keyID)
     {
         Log.Info("Sending MseSetAT Command Chip Authentication");
 
-        byte[] data = new AsnBuilder()
-        .AddCustomTag(0x80, chipAuthOid) // object identifier
-        .AddCustomTag(0x83, publicKey)
-        .Build();
+        var builder = new AsnBuilder()
+        .AddCustomTag(0x80, chipAuthOid); // object identifier
+        if (keyID != null)
+            builder.AddCustomTag(0x84, [(byte)keyID]);
 
-        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0x41, 0xA6, data);
+
+        var data = builder.Build();
+
+        byte[] cmd = type.FormatCommand<T>(this, 0x22, 0x41, 0xA4, data);
         return await SendPackageDecodeResponse(type, cmd);
 
 
@@ -461,6 +464,30 @@ public class Command<T>(ICommunicator communicator, T encryption)
         return result;
     }
 
+    public async Task<TResult> GeneralAuthenticateChipMapping(MessageType type, byte innerTag, byte[] publicKey)
+    {
+        Log.Info("General Authentication Mapping");
+        // TODO, check if length is bigger then 128
+        byte[] innerSequence = [innerTag, (byte)publicKey.Length, .. publicKey];
+        byte[] data = [0x7C, (byte)innerSequence.Length, .. innerSequence];
+
+        byte[] nonSecureDebug = MessageType.NonSecureMessage.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x00);
+        byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x02);
+
+        Log.Info("unencrypted format: " + BitConverter.ToString(nonSecureDebug));
+
+        //Log.Info("Write: " + BitConverter.ToString(raw));
+
+        var result = await SendPackageDecodeResponse(type, cmdFormat);
+
+        if (result.IsSuccess)
+            if (result.Value.data.Length == 0)
+                return TResult.Fail(new Error.Other("General Authentication not sending the encrypted nounce!"));
+
+
+        return result;
+    }
+
     // public async Task<Result<byte[]>> ReadSecureEf(IEfID efId)
     // {
     //     var result = await ReadBinary(MessageType.SecureMessage, efId);
@@ -497,6 +524,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         Log.Info("macKey: " + BitConverter.ToString(mac));
         this.encKey = enc;
         this.mac = mac;
+        this.sequenceCounter = 0x01;
     }
 
 
@@ -526,25 +554,25 @@ public class Command<T>(ICommunicator communicator, T encryption)
         if (!result.IsSuccess)
             return Result<bool>.Fail(result.Error);
 
+
         byte[] innerSequenceIC = [0x06, (byte)oid.Length, .. oid];
         byte[] innerSequence2IC = [0x86, (byte)terminalKey.Length, .. terminalKey];
 
         byte[] innerPacketIC = [0x7f, 0x49, (byte)(innerSequenceIC.Length + innerSequence2IC.Length), .. innerSequenceIC, .. innerSequence2IC];
 
+        var tags = TagReader.ReadTagData(result.Value.data, [0x7f, 0x30, 0x31]);
+        var chipToken = tags.Find(0x7C).FindChild(0x86)!.Data;
+        Log.Info(tags.ToStringFormat());
 
-        using (var stream = new Asn1InputStream(result.Value.data))
+        // Asn1Object obj = stream.ReadObject();  // top-level object
+        // var chipToken = obj.GetDerEncoded()[4..]; // ic publickey
+        bool valid = CMacCheck(chipToken!, innerPacketIC); // failar här
+        if (valid)
         {
-
-            Asn1Object obj = stream.ReadObject();  // top-level object
-            var chipToken = obj.GetDerEncoded()[4..]; // ic publickey
-            bool valid = CMacCheck(chipToken!, innerPacketIC); // failar här
-            if (valid)
-            {
-                Log.Info("Mutual Authentication Success!");
-                return Result<bool>.Success(valid);
-            }
-            return Result<bool>.Fail(new Error.AuthenticationToken("Failed to verify authentication token"));
+            Log.Info("Mutual Authentication Success!");
+            return Result<bool>.Success(valid);
         }
+        return Result<bool>.Fail(new Error.AuthenticationToken("Failed to verify authentication token"));
 
     }
 
@@ -605,7 +633,21 @@ public class Command<T>(ICommunicator communicator, T encryption)
         var parseResult = await messageType.ParseCommand(this, result.Value);
 
         if (!parseResult.IsSuccess)
-            return parseResult;
+        {
+            switch (parseResult.Error)
+            {
+                case Error.NFCLost nfcLostError:
+                case Error.ClientErrorFormat clientError:
+                    Log.Error(parseResult.Error.ErrorMessage() + ", gonna retry packet");
+
+                    return await SendPackageDecodeResponse(messageType, cmd);
+
+
+                default:
+                    // Handle all other errors
+                    return parseResult;
+            }
+        }
 
         var response = parseResult.Value;
 
@@ -665,15 +707,47 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     private bool CMacCheck(byte[] chipToken, byte[] data)
     {
+        Log.Info(BitConverter.ToString(data));
         var engine = new CMac(new AesEngine(), 64);
         var calculatedToken = new byte[8];
+
         engine.Init(new KeyParameter(mac));
         engine.BlockUpdate(data, 0, data.Length);
         engine.DoFinal(calculatedToken);
 
+
+        //return true;
+
         return chipToken.SequenceEqual(calculatedToken);
 
+
+        //    // 1. Initialize the AES-CMAC algorithm
+        // IBlockCipher aes = new AesEngine();
+        // IMac cmac = new CMac(aes, 128); // 128-bit CMAC
+        // KeyParameter keyParams = new KeyParameter(key);
+        // cmac.Init(keyParams);
+
+        // // 2. Process the data
+        // cmac.BlockUpdate(data, 0, data.Length);
+
+        // // 3. Get the full 16-byte MAC
+        // byte[] fullMac = new byte[cmac.GetMacSize()];
+        // cmac.DoFinal(fullMac, 0);
+
+        // // 4. Truncate to the 8 bytes required by the standard
+        // byte[] truncatedMac = new byte[8];
+        // Array.Copy(fullMac, 0, truncatedMac, 0, 8);
+
+
+        // Log.Info("Data: " + BitConverter.ToString(data));
+        // return truncatedMac;
+
     }
+
+    // 04-00-7F-00-07-02-02-04-06-04
+    //04-00-7F-00-07-02-02-04-02-04
+
+
     // SID 91 part 11
     // SSC -> HEADER  -> PADDING -> DO87
     // Add padding to it then calculate MAC over it
@@ -687,13 +761,19 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     //An extended Lc field consists of three bytes: one byte set to '00' followed by two bytes not set to
     //'0000'. From '0001' to 'FFFF', the two bytes encode Nc from one to 65 535
-    internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, int le = 0x00, byte lc = 0x00)
+    internal byte[] FormatEncryptedCommand(byte[] data, byte ins, byte p1, byte p2, byte[] iv, int le = 0x00, byte lc = 0x00, byte? cla = null)
     {
 
         //        Log.Info($"data: {BitConverter.ToString(data)}, ins: 0x{ins:X2}, p1: 0x{p1:X2}, p2: 0x{p2:X2}, iv: {BitConverter.ToString(iv)}, lc: 0x{lc:X2}, le: 0x{le:X2}");
 
 
         byte[] cmdHeader = Util.AlignData([0x0C, ins, p1, p2], 16);
+
+
+
+
+        if (cla != null)
+            cmdHeader[0] = (byte)cla;
 
         byte dataTag = (ins % 2) == 0 ? (byte)0x87 : (byte)0x85;
         //byte dataTag = 0x87;
@@ -749,7 +829,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private byte[] EncryptDataFormatENC(byte[] decryptedData, byte[] iv)
     {
         var aligned = Util.AlignData(decryptedData, 16);
-        Debug.Assert(aligned.Length % 16 == 0);
+        Log.Info("Aligned Data: " + BitConverter.ToString(aligned));
 
         //Log.Info("UnencryptedData: " + BitConverter.ToString(decryptedData));
         //Log.Info("UnencryptedPaddedData: " + BitConverter.ToString(aligned));
@@ -827,7 +907,7 @@ public abstract record GenAuthType
             return writer.Encode()[1..];
         }
 
-//TODO Remove??
+        //TODO Remove??
         private byte[] _mappingData = mappingData;
 
     }

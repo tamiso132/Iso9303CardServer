@@ -38,7 +38,7 @@ public class ClientSession(ICommunicator comm)
             (await _cmd.SelectDefaultMF(MessageType.NonSecureMessage)).UnwrapOrThrow();
 
             await SetupSecureMessaging();
-                        await SetupPassiveAuthentication();
+            //await SetupPassiveAuthentication();
 
             // Chose CA or AA here
             // if DG15 only -> AA
@@ -57,8 +57,19 @@ public class ClientSession(ICommunicator comm)
     {
         var response = (await _cmd.ReadBinary(MessageType.NonSecureMessage, EfIdGlobal.CardAccess)).UnwrapOrThrow();
 
-        var info = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos[0];
+        var infos = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos;
+        var info = infos[0];
+        // foreach (var i in infos)
+        // {
+        //     i.PrintInfo();
+        //     if (i.OrgOid[^2] == 6) // CAM
+        //     {
+        //         info = i;
+        //     }
+        // }
+
         info.PrintInfo();
+
 
         byte[] key = PassHelper.DerivePaceKey(info);
 
@@ -69,6 +80,7 @@ public class ClientSession(ICommunicator comm)
 
 
         var _ecdh = new ECDH(DomainParameter.GetFromId(info.OrgParameterID));
+        _ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
 
         response = (await _cmd.GeneralAuthenticateMapping(0x81, _ecdh.PublicKey)).UnwrapOrThrow();
         _ecdh.ParseCalculateSharedSecret(response.data);
@@ -77,6 +89,8 @@ public class ClientSession(ICommunicator comm)
         // update generator with new shared secret
         _ecdh.MapGenerator(decryptedNounce);
 
+        _ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
+
 
 
         // send new public key and do same
@@ -84,17 +98,21 @@ public class ClientSession(ICommunicator comm)
 
 
         byte[] icPublicKey = _ecdh.ParseCalculateSharedSecret(response.data);
-        var tuple = PassHelper.DeriveSessionKeys(info, _ecdh.SharedSecret);
+        var tuple = PassHelper.DeriveSessionKeys(_ecdh.SharedSecret);
 
         _cmd.SetEncryption(tuple.Item2, tuple.Item1);
 
-        if (!(await _cmd.GeneralAuthenticateMutual(icPublicKey[0..], _ecdh.PublicKey, info.OrgOid)).UnwrapOrThrow())
+        Log.Info("hello: " + BitConverter.ToString(info.OrgOid));
+
+        if (!(await _cmd.GeneralAuthenticateMutual(icPublicKey, _ecdh.PublicKey, info.OrgOid)).UnwrapOrThrow())
         {
             Log.Error("AuthenticationToken was not correctly calculated");
             return;
         }
 
         (await _cmd.SelectApplication(MessageType.SecureMessage, AppID.IdLDS1)).UnwrapOrThrow();
+
+        (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg1)).UnwrapOrThrow();
 
         Log.Info("Secure Messaging Established using: PACE, Session started.");
     }
@@ -121,7 +139,9 @@ public class ClientSession(ICommunicator comm)
         byte[] binBytes = tags[0].Data;
 
         Org.BouncyCastle.X509.X509Certificate dscCertBouncyCastle = SodHelper.ReadSodData(binBytes)!; // Helper to find and print SOD information
-        
+
+
+
         Log.Info("Starting Passive authentication...");
 
         string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
@@ -141,7 +161,6 @@ public class ClientSession(ICommunicator comm)
                 Log.Info($"Found DG: {dg.DataGroupNumber}, Need EAC (Extended Acess Controll) to verify this datagroup");
                 continue;
             }
-            Log.Info($"Verifierar DG{dg.DataGroupNumber} ...");
 
 
             EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
@@ -151,8 +170,8 @@ public class ClientSession(ICommunicator comm)
             byte[] dgData = response.data;
             byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
 
-            Log.Info($"Chip Hash says: {BitConverter.ToString(dg.Hash)}");
-            Log.Info($"Calculated Hashvalue: {BitConverter.ToString(calculatedHashData)}");
+            // Log.Info($"Chip Hash says: {BitConverter.ToString(dg.Hash)}");
+            // Log.Info($"Calculated Hashvalue: {BitConverter.ToString(calculatedHashData)}");
 
             // Manipulerad hash går inte genom detta steg
             if (!calculatedHashData.SequenceEqual(dg.Hash))
@@ -161,7 +180,7 @@ public class ClientSession(ICommunicator comm)
                 TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                 return;
             }
-            Log.Info($"Hashvalue ok for DG{dg.DataGroupNumber}");
+            //   Log.Info($"Hashvalue ok for DG {dg.DataGroupNumber}");
         }
         Log.Info("Step 3 PA OK");
         Log.Info("Full Passive Authentication Complete!");
@@ -175,39 +194,154 @@ public class ClientSession(ICommunicator comm)
 
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
 
-
-        var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
         Log.Info(root.ToStringFormat());
+        //  var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
+
+        var objects = root.FindChild(0x31);
+        // // Log.Info(root.ToStringFormat());
 
 
-        var keyAgreement = publicKeyInfo.FindChild(0x06)!.Data.ToOidStr(); //OID tag, find algorithm
+        // var keyAgreement = publicKeyInfo.FindChild(0x06)!.Data.ToOidStr(); //OID tag, find algorithm
 
-        var keyID = keyAgreement[^1]; // if  2 = ECDH, if 1 = DH
+        // var keyID = keyAgreement[^1]; // if  2 = ECDH, if 1 = DH
 
-        var subjectPublicKeyInfo = publicKeyInfo.FindChild(0x30);
-        var algoritmIdentifier = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x06); // only used when SUBJECT PUBLIC KEY INFO, is MISSING
-        var explicitParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!;
+        // var subjectPublicKeyInfo = publicKeyInfo.FindChild(0x30);
+        // var algoritmIdentifier = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x06); // only used when SUBJECT PUBLIC KEY INFO, is MISSING
+        // var explicitParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!;
 
-        // ECDH Curve parameters
-        var p = explicitParameters.Children[1].FindChild(0x02)!.Data;
-        var a = explicitParameters.Children[2].Children[0].Data;
-        var b = explicitParameters.Children[2].Children[1].Data;
-        var g = explicitParameters.Children[3].Data;
-        var n = explicitParameters.Children[4].Data;
-        var h = explicitParameters.Children[5].Data;
 
-        var publicKey = subjectPublicKeyInfo.FindChild(0x03)!.Data; //Chips public CA-Key
-        Log.Info("KeyAgreementID: " + keyID);
+
+
+        // var p = explicitParameters.Children[1].FindChild(0x02)!.Data[1..]; // remove 00
+        // var a = explicitParameters.Children[2].Children[0].Data;
+        // var b = explicitParameters.Children[2].Children[1].Data;
+        // var g = explicitParameters.Children[3].Data;
+        // var n = explicitParameters.Children[4].Data[1..];// remove 0x00
+        // var h = explicitParameters.Children[5].Data;
+
+
+
+
+        var chipAuthOidBytes = Array.Empty<byte>();
+        byte[] pubKey = [];
+        byte[] p = [];
+        byte[] a = [];
+        byte[] b = [];
+        byte[] g = [];
+        byte[] n = [];
+        byte[] h = [];
+        byte? keyID = null;
+
+        byte[] encodedParameters = [];
+
+
+
+        foreach (var objectP in objects!.Children) // first find protocol
+        {
+            var oid = objectP.FindChild(0x06)!;
+            if (oid.Data[^3] == 0x03 && chipAuthOidBytes.Length == 0) // chip protocol
+            {
+                // id 
+                // 1 -> 3des
+                // 2 -> CMAC_AES 128
+                // 3 -> CMAC_AES 192
+                // 4 -> CMAC_AES 256
+                var id = oid.Data[^1];
+
+                if (id == 1) // I do not support 3des
+                    continue;
+
+                // keyType 
+                // 1 -> DH
+                // 2 -> ECDH
+                var keyType = oid.Data[^2];
+
+                if (keyType == 1) // have not implemented DH
+                    continue;
+
+                var integers = objectP.Children.FilterByTag(0x02);
+                if (integers.Count > 1) // there is keyID
+                {
+                    keyID = integers[1].Data[0];
+                }
+
+
+                chipAuthOidBytes = oid.Data;
+                break;
+            }
+        }
+
+        foreach (var objectP in objects!.Children)
+        {
+            var oid = objectP.FindChild(0x06)!;
+
+            // TODO, sometimes there is only parameter id of a known curve instead of explicit parameters
+            if (p.Length == 0 && oid.Data[^3] == 0x02 && oid.Data[^2] == 1) // public key
+            {
+                if (keyID != null) // need to get linked public key
+                {
+                    bool isPubKeyProtocol = objectP.FindChild(0x02)!.Data[0] == keyID;
+
+                    if (!isPubKeyProtocol)
+                        continue;
+
+                    Log.Info("Choose KeyId: " + BitConverter.ToString(objectP.FindChild(0x02)!.Data));
+                }
+                // priority ecdh
+                byte keyType = oid.Data[^1];
+
+                if (keyType == 1) // have not implemented DH
+                    continue;
+
+                //  Log.Info(objectP.ToStringFormat());
+
+                var subjectPublicKeyInfo = objectP.FindChild(0x30)!;
+
+                pubKey = subjectPublicKeyInfo.FindChild(0x03)!.Data;
+
+                var domainParameters = subjectPublicKeyInfo.FindChild(0x30)!.FindChild(0x30);
+
+                encodedParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!.Data;
+
+
+                var sequences = domainParameters!.Children.FilterByTag(0x30);
+                var integers = domainParameters.Children.FilterByTag(0x02);
+
+
+                // Log.Info(domainParameters.ToStringFormat());
+
+                p = sequences[0].FindChild(0x02)!.Data[1..]; // remove 00
+                a = sequences[1].Children[0]!.Data;
+                b = sequences[1].Children[1]!.Data;
+                g = domainParameters.FindChild(0x04)!.Data;
+                n = integers[1].Data[1..];// remove 0x00
+                h = integers[2].Data;
+                // EXIST KEY ID
+                // Should only exist if there is multiple public keys
+            }
+
+        }
+
+        if (chipAuthOidBytes.Length == 0 || p.Length == 0)
+        {
+            throw new Exception("Chip Auth is not supported");
+        }
+
+
+        var publicKey = pubKey!;
+        if (keyID != null)
+            Log.Info("KeyIDRef: " + keyID);
+
         Log.Info("--- Explicit Curve Parameters (från Container) ---");
-        Log.Info($"Prime (p):      {BitConverter.ToString(p)}");
-        Log.Info($"Coeff (a):      {BitConverter.ToString(a)}");
-        Log.Info($"Coeff (b):      {BitConverter.ToString(b)}");
-        Log.Info($"Base (G):       {BitConverter.ToString(g)}");
-        Log.Info($"Order (n):      {BitConverter.ToString(n)}");
-        Log.Info($"Cofactor (h):   {BitConverter.ToString(h)}");
+        Log.Info($"Prime (p):      {BitConverter.ToString(p!)}");
+        Log.Info($"Coeff (a):      {BitConverter.ToString(a!)}");
+        Log.Info($"Coeff (b):      {BitConverter.ToString(b!)}");
+        Log.Info($"Base (G):       {BitConverter.ToString(g!)}");
+        Log.Info($"Order (n):      {BitConverter.ToString(n!)}");
+        Log.Info($"Cofactor (h):   {BitConverter.ToString(h!)}");
         Log.Info($"Public Key (Y): {BitConverter.ToString(publicKey)}");
+        Log.Info("Chose Chip Authentication OID: " + chipAuthOidBytes.ToOidStr());
         Log.Info("--------------------------------------------------");
-
 
         var version = new DerInteger(1);
 
@@ -233,82 +367,49 @@ public class ClientSession(ICommunicator comm)
             hAsn1     // Children[5]
         ).GetDerEncoded()!;
 
+        //  TestClass.PrintByteComparison(explicitParametersDer, encodedParameters); 
 
-        var protocols = root.FindChild(0x31)!.Children[1..];
-        byte[]? chipAuthOid = null;
-
-        foreach (var protocol in protocols)
-        {
-            var protocolVer = protocol.FindChild(0x02)!.Data[0]; // version, 1 for chipauth
-
-            if (protocolVer == 1)
-            {
-                var oidTag = protocol.FindChild(0x06);
-                if (oidTag != null)
-                {
-                    chipAuthOid = oidTag.Data;
-                    Log.Info($"Found oid for protocol: {chipAuthOid.ToString}");
-                    break;
-                }
-            }
-        }
-        if (chipAuthOid == null)
-        {
-            Log.Error($"No found OID for CA-protocol");
-            return;
-        }
-        //         var chipAuthOid = protocol.FindChild(0x06)!.Data.ToOidStr().Split(".");
-        //         var tag = chipAuthOid[8];
-
-        //         if (tag != "3")
-        //             continue;
-        //         //TODO, get the protocol and stuff
-        //         //  var prot = Encryption
-        //     }
-
-        // }
+        //  Log.Info("DerEncodedStructure: " + BitConverter.ToString(explicitParametersDer));
 
 
-        //   Log.Info(BitConverter.ToString(explicitParametersDer));
+        ECDH ecdh = new(DomainParameter.GetFromDerEncoded(explicitParametersDer)); //Create curve using parameters taken from DG14
+                                                                                   //ecdh.PrintECParameters(); ec parameters seem correct
+                                                                                   // ecdh.GenerateEphemeralKeys(new RandomNumberProvider()); // Generate temporary keys
+                                                                                   //  ecdh.CalculateSharedSecret(publicKey);
 
+        ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
 
-        (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOid, publicKey)).UnwrapOrThrow();
+        Log.Info(BitConverter.ToString(ecdh.PublicKey));
 
+        (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOidBytes, keyID)).UnwrapOrThrow();
+        (await _cmd.GeneralAuthenticateChipMapping(MessageType.SecureMessage, 0x80, ecdh.PublicKey)).UnwrapOrThrow(); // should return 0x7C00 -> empty dynamic auth data
 
-        ECDH ecdh = new ECDH(explicitParametersDer); //Create curve using parameters taken from DG14
-        Log.Info(BitConverter.ToString(publicKey));
-        ecdh.CalculateSharedSecret(publicKey); // Remove??
-        ecdh.GenerateEphemeralKeys(new RandomNumberProvider()); // Generate temporary keys
+        ecdh.CalculateSharedSecret(publicKey[1..]);
+        var tuple = PassHelper.DeriveSessionKeys(ecdh.SharedSecret);
+
+        // Restarting secure messaging
+        _cmd.SetEncryption(tuple.Item2, tuple.Item1);
+
 
         byte[] terminalEphemeralPublicKey = ecdh.PublicKey; // K_pub_T 
 
         Log.Info("Send general authenticate CA");
 
-        // Send general authenticate
-        var caResponse = (await _cmd.GeneralAuthenticateMapping(0x81, terminalEphemeralPublicKey)).UnwrapOrThrow();
+
+        // if error, it means different shared secret, aka ENC and MAC should fail as they are derived from shared secret
+        // so chip is cloned
+        (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg1)).UnwrapOrThrow();
+
+        Log.Info("Chip Authentication Completed");
+
+        // // Send general authenticate
+        // var caResponse = (await _cmd.GeneralAuthenticateMapping(0x81, terminalEphemeralPublicKey)).UnwrapOrThrow();
 
 
 
 
 
 
-
-
-
-        // foreach (var tag in tags[1..])
-        // {
-        //     var oid = tag.FilterByTag(0x06)[0].Data;
-        //     var version = tag.FilterByTag(0x02)[0].Data[0];
-
-        //     // version 2 is for chip authentication
-        //     if (version != 2)
-        //         continue;
-
-        //     var parameterID = tag.FilterByTag(0x02)[1].Data[0];
-
-
-        //     Log.Info("oid: " + oid.ToOidStr() + ", version: " + version.ToString() + ", parameterID: " + parameterID);
-        // }
     }
 
 
