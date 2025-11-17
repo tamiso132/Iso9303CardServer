@@ -31,13 +31,6 @@ public static class TagReader
                 int byteCount = length & ~0x80;
                 length = 0;
 
-                // SÄKERHETSFIX 4: Förhindra Integer Overflow
-                // En längd som beskrivs av mer än 4 bytes passar inte i en 32-bitars int.
-                if (byteCount > 4)
-                {
-                    return -1; // Ogiltig, för stor längd-av-längd
-                }
-
                 if ((byteCount + i) > data.Length)
                 {
                     return -1;
@@ -47,7 +40,7 @@ public static class TagReader
                 // Om 4 bytes används, får den första byten inte vara > 0x7F
                 if (byteCount == 4 && data[i] > 0x7F)
                 {
-                    return -1; // Längden kommer att överstiga int.MaxValue (2GB)
+                    throw new Exception("byte count for long form is too much: " + byteCount.ToString());
                 }
 
                 for (int ii = 0; ii < byteCount; ii++)
@@ -56,10 +49,45 @@ public static class TagReader
                     i++;
                 }
 
+
                 lengthHeader = data[oldI..i];
             }
 
             return length;
+        }
+
+        public static int GetFullLengthWithTag(byte[] buffer)
+        {
+
+            int i = 0;
+            int tag = buffer[i++];
+
+
+            // Handle multi-byte tags (Composite/Long Tag)
+            if ((tag & 0x1F) == 0x1F) // Multi-byte tag (första byten)
+            {
+                int nextByte = buffer[i++];
+                tag = (tag << 8) | nextByte;
+
+                // Fortsätt om det är en sällsynt 3+ bytes tagg
+                while ((nextByte & 0x80) == 0x80 && i < buffer.Length)
+                {
+                    nextByte = buffer[i++];
+                    tag = (tag << 8) | nextByte;
+                }
+            }
+
+            // --- 2. PARSE THE LENGTH FIELD ---
+            // 'i' is now pointing to the start of the length field.
+            Length lenParser = new();
+            int length = lenParser.ParseLength(buffer, ref i, false);
+
+            if (length == -1)
+            {
+                throw new InvalidDataException("Ogiltigt längdfält efter TAG-tolkning.");
+            }
+            return i + length;
+
         }
         byte[] lengthHeader = [];
     }
@@ -94,8 +122,6 @@ public static class TagReader
         {
             if (i + 2 > buffer.Length) break;
 
-            // Denna kod hanterar nu korrekt 1-bytes och 2-bytes taggar 
-            // (som 0x5F30), vilket är vanligt i DG-filer.
             int tag = buffer[i++];
             if ((tag & 0x1F) == 0x1F) // Multi-byte tag (första byten)
             {
@@ -109,13 +135,13 @@ public static class TagReader
                     tag = (tag << 8) | nextByte;
                 }
             }
-            // --- KORRIGERAD TAGG-LÄSNING SLUT ---
 
             Length len = new();
             int length = len.ParseLength(buffer, ref i, false);
 
             if (length == -1) throw new InvalidDataException("Ogiltigt längdfält.");
-            if (i + length > buffer.Length) throw new InvalidDataException($"Tag 0x{tag:X} angav en längd ({length}) som överskrider buffertens slut.");
+
+            if ((length + i) > buffer.Length) throw new InvalidDataException($"Tag 0x{tag:X} angav en längd ({length}) som överskrider buffertens slut. Startindex: {i}. Total buffertlängd: {buffer.Length}).");
 
             byte[] data = new byte[length];
             Array.Copy(buffer, i, data, 0, length);
@@ -166,7 +192,7 @@ public static class TagReaderExtensions
         return entry.Children.FirstOrDefault(c => c.Tag == tag);
     }
 
-    
+
 
 
     public static string ToStringFormat(this List<TagReader.TagEntry> tags)

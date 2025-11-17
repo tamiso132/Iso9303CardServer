@@ -102,17 +102,15 @@ public abstract record MessageType
                 cipher.Init(false, ivParameter);
                 byte[] fullData = cipher.DoFinal(aligned).TruncateData();
 
-                var lenParser = new TagReader.Length();
-                int i = 1;
-                int DataPacketLen = lenParser.ParseLength(fullData, ref i, true);
-
+                var DataPacketLen = TagReader.Length.GetFullLengthWithTag(fullData);
+                int i = 0;
                 if (fullData.Length < DataPacketLen)
                 {
 
                     byte[] combData = fullData;
 
 
-                    while (DataPacketLen >= combData.Length)
+                    while (DataPacketLen > combData.Length)
                     {
                         int nextOffset = combData.Length;
                         _p1 = (byte)((nextOffset >> 8) & 0xFF);
@@ -137,6 +135,7 @@ public abstract record MessageType
 
                         var encryptedData2 = dataTag2[0].Data[1..];
 
+
                         var respIv2 = command.GetIV();
                         var cipher2 = CipherUtilities.GetCipher($"AES/CBC/NOPADDING");
                         var ivParameter2 = new ParametersWithIV(new KeyParameter(command.encKey), respIv2);
@@ -144,8 +143,10 @@ public abstract record MessageType
                         combData = [.. combData, .. cipher2.DoFinal(encryptedData2).TruncateData()];
 
 
-                    }
 
+                    }
+                    // debug purpose only
+                    var checkTags = TagReader.ReadTagData(combData); // should crash if not correclty 
 
 
                     ResponseCommand respRet = new(0x90, 0x00, combData);
@@ -634,19 +635,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         if (!parseResult.IsSuccess)
         {
-            switch (parseResult.Error)
-            {
-                case Error.NFCLost nfcLostError:
-                case Error.ClientErrorFormat clientError:
-                    Log.Error(parseResult.Error.ErrorMessage() + ", gonna retry packet");
-
-                    return await SendPackageDecodeResponse(messageType, cmd);
-
-
-                default:
-                    // Handle all other errors
-                    return parseResult;
-            }
+            return parseResult;
         }
 
         var response = parseResult.Value;

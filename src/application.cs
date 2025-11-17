@@ -23,6 +23,7 @@ using Microsoft.Extensions.ObjectPool;
 using Org.BouncyCastle.Utilities;
 using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Math;
+using Org.BouncyCastle.Asn1.X509;
 namespace App;
 
 
@@ -46,6 +47,7 @@ public class ClientSession(ICommunicator comm)
             // if DG15 AND DG 14 -> CA (Must)
 
             await SetupChipAuthentication();
+            await SetupActiveAuthentication();
 
         }
 
@@ -124,7 +126,6 @@ public class ClientSession(ICommunicator comm)
         byte[] sodrawBytes = response.data;
 
         SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
-
         Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
         Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
 
@@ -190,11 +191,54 @@ public class ClientSession(ICommunicator comm)
         Log.Info("Full Passive Authentication Complete!");
     }
 
+    public async Task<RsaKeyParameters> SetupActiveAuthentication()
+    {
+        var dg15Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg15)).UnwrapOrThrow();
+        Log.Info(BitConverter.ToString(dg15Response.data));
+        var root = TagReader.ReadTagData(dg15Response.data, [0x30, 0x31, 0x6F, 0x03]); //Parse
+
+        Log.Info(root.ToStringFormat());
+
+        // 2.Parse the outer SEQUENCE(The SubjectPublicKeyInfo container: Tag 0x30)
+        var outerSequence = Asn1Sequence.GetInstance(root[0].Data);
+
+        // 3. Extract components: Algorithm Identifier and the Key Data
+        var algorithmIdentifier = Org.BouncyCastle.Asn1.X509.AlgorithmIdentifier.GetInstance(outerSequence[0]);
+        var subjectPublicKey = DerBitString.GetInstance(outerSequence[1]);
+
+        // 4. Identify and validate the OID (This is your key check)
+        string oid = algorithmIdentifier.Algorithm.Id;
+        if (oid != "1.2.840.1015.13.1.1.1" && oid != "1.2.840.113549.1.1.1")
+        {
+            throw new NotSupportedException($"Unsupported Signature OID for Active Authentication: {oid}");
+        }
+
+        // Log the successful identification
+        Log.Info($"AA Protocol Identified. OID: {oid}. Ready for RSA signature operation.");
+
+        // 5. Parse the inner key structure (The actual RSA key)
+        //    Skip the 0x00 unused bits byte at the start of the BIT STRING's data.
+        var rawKeyBytes = subjectPublicKey.GetBytes().Skip(1).ToArray();
+
+        // The rawKeyBytes now starts with the inner SEQUENCE (Tag 0x30) that holds Modulus and Exponent.
+        var innerKeySequence = Asn1Sequence.GetInstance(rawKeyBytes);
+
+        // 6. Extract Modulus (n) and Exponent (e)
+        var modulus = DerInteger.GetInstance(innerKeySequence[0]).PositiveValue;
+        var exponent = DerInteger.GetInstance(innerKeySequence[1]).PositiveValue;
+
+        // 7. Construct the usable RSA Public Key object for verification
+        return new RsaKeyParameters(false, modulus, exponent);
+
+    }
+
     public async Task SetupChipAuthentication()
     {
         // Read and store DG14
         var dg14Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg14)).UnwrapOrThrow();
         byte[] dg14Bytes = dg14Response.data;
+
+
 
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
 
