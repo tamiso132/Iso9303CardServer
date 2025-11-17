@@ -418,6 +418,7 @@ public static class HashCalculator
 
 public static class SodHelper
 {
+    // Verifierar EF.SOD interna signatur
     public static Org.BouncyCastle.X509.X509Certificate? ReadSodData(byte[] sodBytes)
     {
         Org.BouncyCastle.X509.X509Certificate? verifiedDsc = null; // För att spara det verifierade DSC
@@ -655,6 +656,7 @@ public static class SodHelper
         return hashes;
     }
 
+    // Function that creates chain between chip (DSC) and master list CSCA
     private static bool VerifyDscTrustChainWithPem(
 Org.BouncyCastle.X509.X509Certificate dscCertBC,
 string masterListDirectoryPath)

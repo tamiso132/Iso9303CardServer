@@ -46,8 +46,7 @@ public class ClientSession(ICommunicator comm)
             // if DG14 only -> CA
             // if DG15 AND DG 14 -> CA (Must)
 
-            await SetupChipAuthentication();
-            await SetupActiveAuthentication();
+            //await SetupChipAuthentication();
 
         }
 
@@ -131,17 +130,13 @@ public class ClientSession(ICommunicator comm)
 
         var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
         //   tags.PrintAll(); Felsök
-
-
         var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
-
         var cmsTags = TagReader.ReadTagData(data, [0x30]);
         //  cmsTags.PrintAll(); Felsök
 
         // Skriver in all data i filen EFSodDumpcmstag.bin, First step of passive authentication
         File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
         byte[] binBytes = tags[0].Data;
-
 
         Org.BouncyCastle.X509.X509Certificate dscCertBouncyCastle = SodHelper.ReadSodData(binBytes)!; // Helper to find and print SOD information
 
