@@ -171,9 +171,9 @@ public class ClientSession(ICommunicator comm)
             // Log.Info($"Calculated Hashvalue: {BitConverter.ToString(calculatedHashData)}");
 
             // Manipulerad hash går inte genom detta steg
-            TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
             if (!calculatedHashData.SequenceEqual(dg.Hash))
             {
+                TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                 Log.Error($"Hash wrong for DG{dg.DataGroupNumber}, PA failed");
                 return;
             }
