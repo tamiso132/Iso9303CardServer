@@ -521,8 +521,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     public void SetEncryption(byte[] enc, byte[] mac)
     {
-        Log.Info("EncKey: " + BitConverter.ToString(enc));
-        Log.Info("macKey: " + BitConverter.ToString(mac));
         this.encKey = enc;
         this.mac = mac;
         this.sequenceCounter = 0x01;
@@ -818,7 +816,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
     private byte[] EncryptDataFormatENC(byte[] decryptedData, byte[] iv)
     {
         var aligned = Util.AlignData(decryptedData, 16);
-        Log.Info("Aligned Data: " + BitConverter.ToString(aligned));
 
         //Log.Info("UnencryptedData: " + BitConverter.ToString(decryptedData));
         //Log.Info("UnencryptedPaddedData: " + BitConverter.ToString(aligned));

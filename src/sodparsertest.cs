@@ -97,7 +97,7 @@ public static class EfSodParser
         }
 
         // 5. Hämta Certifikat ([1] 0xA1)
-        var certsWrapper = signedDataChildren.FilterByTag(0xA1).FirstOrDefault();
+        var certsWrapper = signedDataChildren.FilterByTag(0xA0).FirstOrDefault();
         var dsCert = certsWrapper?.Children.FilterByTag(0x30).FirstOrDefault(); // Det första (och enda) certifikatet
         if (dsCert != null)
         {

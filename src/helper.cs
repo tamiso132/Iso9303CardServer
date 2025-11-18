@@ -4,8 +4,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
 using Org.BouncyCastle.Asn1.X509;
 using Org.BouncyCastle.Cms;
+using Org.BouncyCastle.Crypto;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.OpenSsl;
+using Org.BouncyCastle.Security;
 using Org.BouncyCastle.Utilities;
 using Org.BouncyCastle.X509.Extension;
 using Serilog;
@@ -657,143 +659,134 @@ public static class SodHelper
     }
 
     // Function that creates chain between chip (DSC) and master list CSCA
-    private static bool VerifyDscTrustChainWithPem(
-Org.BouncyCastle.X509.X509Certificate dscCertBC,
-string masterListDirectoryPath)
+    public static bool PerformPassiveAuthStep2(byte[] dscRawBytes, string masterListDirectoryPath)
     {
-        Log.Info("Step 2 Pa start");
-
-
-        string issuerDN = dscCertBC.IssuerDN.ToString();
-        Org.BouncyCastle.X509.X509Certificate? matchingCscaCertBC = null;
-        X509Certificate2? dscCertDotNet = null;
-        X509Certificate2? matchingCscaCertDotNet = null;
-        List<IDisposable> disposables = new List<IDisposable>();
+        Log.Info("Step 2 Pa start (Bouncy Castle Correct Usage)");
 
         try
         {
-            //Fetch AKI from DSC
-            var akidExtension = dscCertBC.GetExtensionValue(X509Extensions.AuthorityKeyIdentifier);
-            if (akidExtension == null)
+            // 1. PARSE: Use X509CertificateParser
+            // This returns 'Org.BouncyCastle.X509.X509Certificate' (The "Smart" object)
+            // NOT 'Org.BouncyCastle.Asn1.X509.Certificate' (The "Dumb" data structure)
+            var parser = new Org.BouncyCastle.X509.X509CertificateParser();
+            Org.BouncyCastle.X509.X509Certificate dscCert = parser.ReadCertificate(dscRawBytes);
+
+            // 2. FIND CSCA
+            var cscaCert = FindCscaCertificate(dscCert, masterListDirectoryPath);
+
+            if (cscaCert == null)
             {
-                Log.Warn("DSC saknar AKI, letar efter csca baserat på namn (less secure)");
+                Log.Error($"Step 2 FAILED: No CSCA found for issuer '{dscCert.IssuerDN}'.");
+                return false;
             }
-            AuthorityKeyIdentifier? authorityKeyIdentifier = null; //Parse AKI extension
-            if (akidExtension != null)
+
+            // 3. VERIFY
+            // The 'Smart' object has a .Verify() method that handles the OID/Name mapping 
+            // and Signer initialization internally.
+            try
             {
-                authorityKeyIdentifier = AuthorityKeyIdentifier.GetInstance(X509ExtensionUtilities.FromExtensionValue(akidExtension));
+                // Get the Public Key (AsymmetricKeyParameter implements ICipherParameters)
+                AsymmetricKeyParameter cscaPublicKey = cscaCert.GetPublicKey();
+
+                // Verify checks if dscCert was signed by cscaPublicKey
+                dscCert.Verify(cscaPublicKey);
+
+                Log.Info($"Step 2 Pa OK. Signature Verified against: {cscaCert.SubjectDN}");
             }
-            byte[]? keyIdToMatch = authorityKeyIdentifier?.GetKeyIdentifier();
-
-            if (!Directory.Exists(masterListDirectoryPath)) throw new DirectoryNotFoundException();
-
-            Log.Info($"Searching for CSCA for '{issuerDN}'{(keyIdToMatch != null ? "with keyID: " + HexUtils.HexEncode(keyIdToMatch) : "")} in: {masterListDirectoryPath}");
-
-            foreach (string pemFile in Directory.EnumerateFiles(masterListDirectoryPath, "*.pem", SearchOption.AllDirectories))
+            catch (InvalidKeyException)
             {
-                try
+                Log.Error("Step 2 FAILED: Signature verification failed (Invalid Key).");
+                return false;
+            }
+            catch (Exception sigEx)
+            {
+                // This catches signature mismatch errors
+                Log.Error($"Step 2 FAILED: Signature verification failed: {sigEx.Message}");
+                return false;
+            }
+
+            // 4. VALIDITY (Warning only for Passports)
+            try
+            {
+                dscCert.CheckValidity();
+            }
+            catch (Exception)
+            {
+                Log.Warn("DSC is expired or not yet valid (Standard for Passive Auth).");
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Step 2 Critical Error: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static Org.BouncyCastle.X509.X509Certificate? FindCscaCertificate(
+        Org.BouncyCastle.X509.X509Certificate dscCert,
+        string masterListPath)
+    {
+        // Use the Logic Class property 'IssuerDN'
+        var issuerDN = dscCert.IssuerDN;
+
+        byte[]? keyIdToMatch = null;
+
+        // Correct way to extract Extension Value using OID
+        var akidOid = X509Extensions.AuthorityKeyIdentifier; // This is the OID Object
+        var akidExt = dscCert.GetExtensionValue(akidOid);
+
+        if (akidExt != null)
+        {
+            // Parse the ASN.1 Octet String
+            var akidStruct = AuthorityKeyIdentifier.GetInstance(X509ExtensionUtilities.FromExtensionValue(akidExt));
+            keyIdToMatch = akidStruct.GetKeyIdentifier();
+        }
+
+        if (!Directory.Exists(masterListPath)) return null;
+
+        var files = Directory.EnumerateFiles(masterListPath, "*.*", SearchOption.AllDirectories)
+                             .Where(s => s.EndsWith(".pem") || s.EndsWith(".crt") || s.EndsWith(".cer"));
+
+        foreach (string pemFile in files)
+        {
+            try
+            {
+                using var reader = File.OpenText(pemFile);
+                var pemReader = new PemReader(reader);
+                object? pemObject;
+
+                while ((pemObject = pemReader.ReadObject()) != null)
                 {
-                    using (var reader = File.OpenText(pemFile))
+                    // Ensure we cast to the Logic Class
+                    if (pemObject is Org.BouncyCastle.X509.X509Certificate cscaCert)
                     {
-                        var pemReader = new PemReader(reader);
-                        object? pemObject;
-                        while ((pemObject = pemReader.ReadObject()) != null)
+                        if (!cscaCert.SubjectDN.Equivalent(issuerDN, true)) continue;
+
+                        if (keyIdToMatch == null)
                         {
-                            if (pemObject is Org.BouncyCastle.X509.X509Certificate cscaCertBC)
-                            { // Name check
-                                if (cscaCertBC.SubjectDN.Equivalent(dscCertBC.IssuerDN, true))
-                                { // Check AKI against SKI
-                                    bool keyIdMatches = false;
-                                    if (keyIdToMatch == null)
-                                    {
-                                        keyIdMatches = true;
-                                        Log.Warn($"Using CSCA '{cscaCertBC.SubjectDN}' only using name match");
-                                    }
-                                    else
-                                    { // Get SKI from CSCA and compare to AKI
-                                        var skidExtension = cscaCertBC.GetExtensionValue(X509Extensions.SubjectKeyIdentifier);
-                                        if (skidExtension != null)
-                                        {
-                                            var subjectKeyIdentifier = SubjectKeyIdentifier.GetInstance(X509ExtensionUtilities.FromExtensionValue(skidExtension));
-                                            byte[] cscaSki = subjectKeyIdentifier.GetKeyIdentifier();
-                                            if (keyIdToMatch.SequenceEqual(cscaSki))
-                                            {
-                                                keyIdMatches = true; // Name and KeyId matches :)))))))
-                                            }
-                                        }
-                                    } // if both matches
-                                    if (keyIdMatches)
-                                    {
-                                        if (matchingCscaCertBC != null)
-                                        {
-                                            Log.Error($"Found multiple valid CSCA (name and keyID) for {issuerDN}");
-                                        }
-                                        else
-                                        {
-                                            matchingCscaCertBC = cscaCertBC;
-                                            Log.Info($"Found correct CSCA PEM (matching name {(keyIdToMatch != null ? " & keyID" : "")}): {Path.GetFileName(pemFile)} ({matchingCscaCertBC.SubjectDN})");
-                                            goto FoundCorrectCsca;
-                                        }
-                                    }
-                                }
+                            // Weak match (Name only)
+                            return cscaCert;
+                        }
+
+                        // Extract SKI
+                        var skiOid = X509Extensions.SubjectKeyIdentifier;
+                        var skiExt = cscaCert.GetExtensionValue(skiOid);
+                        if (skiExt != null)
+                        {
+                            var skiStruct = SubjectKeyIdentifier.GetInstance(X509ExtensionUtilities.FromExtensionValue(skiExt));
+                            if (keyIdToMatch.SequenceEqual(skiStruct.GetKeyIdentifier()))
+                            {
+                                return cscaCert;
                             }
                         }
                     }
                 }
-                catch (Exception readEx) { Log.Warn($"Cant read/parse PEM {pemFile}: {readEx.Message}"); }
-            } // Foreach stop
-
-        FoundCorrectCsca:
-            if (matchingCscaCertBC == null)
-            {
-                throw new Exception($"No CSCA .pem cerificate found in '{masterListDirectoryPath}' that matches issuer: '{issuerDN}'{(keyIdToMatch != null ? "and keyId" : "")}");
             }
-            //Convert to .Net object
-            dscCertDotNet = new X509Certificate2(dscCertBC.GetEncoded());
-            matchingCscaCertDotNet = new X509Certificate2(matchingCscaCertBC.GetEncoded());
-            disposables.Add(dscCertDotNet);
-            disposables.Add(matchingCscaCertDotNet);
-
-            //Very chain
-            var chain = new X509Chain();
-            disposables.Add(chain);
-            try
-            {
-                // Big money check
-                chain.ChainPolicy.ExtraStore.Add(matchingCscaCertDotNet); // Trust Anchor
-                chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck; // No revocation for now
-                chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority; // Not in windows?, Maybe remove
-                                                                                                              // chain.ChainPolicy.VerificationFlags = X509VerificationFlags.IgnoreNotTimeValid;
-
-
-                if (!chain.Build(dscCertDotNet))
-                {
-                    Log.Error("DSC -> CSCA not validated Status:");
-                    foreach (var status in chain.ChainStatus)
-                    {
-                        Log.Error($"{status.Status}: {status.StatusInformation}");
-                    }
-                    throw new Exception("Cert chain DSC -> CSCA no valid");
-                }
-
-
-                Log.Info("Step 2 pa OK");
-                return true;
-            }
-            finally { }
+            catch { }
         }
-
-        catch (Exception ex)
-        {
-            return false;
-        }
-        finally
-        {
-
-        }
+        return null;
     }
-    public static bool PerformPassiveAuthStep2(Org.BouncyCastle.X509.X509Certificate verifiedDscCertBC, string masterListDirectoryPath)
-    {
-        return VerifyDscTrustChainWithPem(verifiedDscCertBC, masterListDirectoryPath);
-    }
+
 }
