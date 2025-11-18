@@ -433,7 +433,7 @@ public class ClientSession(ICommunicator comm)
         // so chip is cloned
         (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg1)).UnwrapOrThrow();
 
-        Log.Info("Chip Authentication Completed");
+        Log.Info("Chip Authentication Completed!");
 
         // // Send general authenticate
         // var caResponse = (await _cmd.GeneralAuthenticateMapping(0x81, terminalEphemeralPublicKey)).UnwrapOrThrow();
