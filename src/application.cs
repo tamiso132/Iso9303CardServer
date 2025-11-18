@@ -39,7 +39,7 @@ public class ClientSession(ICommunicator comm)
             (await _cmd.SelectDefaultMF(MessageType.NonSecureMessage)).UnwrapOrThrow();
 
             await SetupSecureMessaging();
-            //await SetupPassiveAuthentication();
+            await SetupPassiveAuthentication();
 
             // Chose CA or AA here
             // if DG15 only -> AA
