@@ -24,6 +24,7 @@ using Org.BouncyCastle.Utilities;
 using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Asn1.X509;
+using Org.BouncyCastle.X509;
 namespace App;
 
 
@@ -123,30 +124,18 @@ public class ClientSession(ICommunicator comm)
     {
         var response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod)).UnwrapOrThrow();
 
-        byte[] sodrawBytes = response.data;
 
         SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
+
         Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
         Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
-
-        var tags = TagReader.ReadTagData(sodrawBytes, [0x77, 0x30, 0x31, 0xA0, 0xA3, 0xA1]);
-        //   tags.PrintAll(); Felsök
-        var data = tags[0].Children[0].Children.FilterByTag(0xA0)[0].Data;
-        var cmsTags = TagReader.ReadTagData(data, [0x30]);
-        //  cmsTags.PrintAll(); Felsök
-
-        // Skriver in all data i filen EFSodDumpcmstag.bin, First step of passive authentication
-        File.WriteAllBytes("EFSodDumpcmstag.bin", cmsTags[0].GetHeaderFormat());
-        byte[] binBytes = tags[0].Data;
-
-        Org.BouncyCastle.X509.X509Certificate dscCertBouncyCastle = SodHelper.ReadSodData(binBytes)!; // Helper to find and print SOD information
 
 
 
         Log.Info("Starting Passive authentication...");
 
         string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
-        if (!SodHelper.PerformPassiveAuthStep2(dscCertBouncyCastle, masterListPath))
+        if (!SodHelper.PerformPassiveAuthStep2(sodFile.DocumentSignerCertificate, masterListPath))
         {
             Log.Error("STEP 2 Failed for passive authentication");
             return;
@@ -159,7 +148,7 @@ public class ClientSession(ICommunicator comm)
             if (dg.DataGroupNumber == 3 || dg.DataGroupNumber == 4)
             {
                 //NEED EAC TO READ THOSE DG
-                Log.Info($"Found DG: {dg.DataGroupNumber}, Need EAC (Extended Acess Controll) to verify this datagroup");
+                Log.Warn($"Found DG: {dg.DataGroupNumber}, Need EAC (Extended Acess Controll) to verify this datagroup");
                 continue;
             }
 
