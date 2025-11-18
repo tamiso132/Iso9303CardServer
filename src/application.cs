@@ -40,14 +40,15 @@ public class ClientSession(ICommunicator comm)
             (await _cmd.SelectDefaultMF(MessageType.NonSecureMessage)).UnwrapOrThrow();
 
             await SetupSecureMessaging();
-            await SetupPassiveAuthentication();
-
+            // 
             // Chose CA or AA here
             // if DG15 only -> AA
             // if DG14 only -> CA
             // if DG15 AND DG 14 -> CA (Must)
 
-            //await SetupChipAuthentication();
+            await SetupChipAuthentication();
+            await SetupPassiveAuthentication();
+
 
         }
 
@@ -439,7 +440,7 @@ public class ClientSession(ICommunicator comm)
         // so chip is cloned
         (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg1)).UnwrapOrThrow();
 
-        Log.Info("Chip Authentication Completed");
+        Log.Info("Chip Authentication Completed!");
 
         // // Send general authenticate
         // var caResponse = (await _cmd.GeneralAuthenticateMapping(0x81, terminalEphemeralPublicKey)).UnwrapOrThrow();
