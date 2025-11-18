@@ -15,26 +15,6 @@ using Org.BouncyCastle.Crypto.Parameters;
 using System.Security.Cryptography;
 using System.Numerics;
 
-// Load the ML file (DER encoded)
-// byte[] mlBytes = [File.ReadAllBytes("masterlist-cscas/C=AT,O=GV,OU=BMI,CN=CSCA-AUSTRIA56.pem")];
-
-// // Step 1: unwrap CMS chain
-// var cmsChain = new System.Collections.Generic.List<byte[]>();
-// byte[] currentBytes = mlBytes;
-
-// var cert = X509CertificateLoader.LoadCertificate(currentBytes);
-// Log.Info(cert.IssuerName.Name);
-
-// if (!TestClass.TestLengthThing())
-// {
-//     Log.Error("ERROR, ");
-// }
-// return;
-
-var correct = File.ReadAllBytes("dg14.txt");
-var wrong = File.ReadAllBytes("dg14Wrong.txt");
-
-TestClass.PrintByteComparison(correct, wrong);
 
 var config = File.ReadAllLines("config.txt");
 string? ip = null;
