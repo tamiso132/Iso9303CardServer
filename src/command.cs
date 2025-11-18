@@ -141,10 +141,14 @@ public abstract record MessageType
                         var ivParameter2 = new ParametersWithIV(new KeyParameter(command.encKey), respIv2);
                         cipher2.Init(false, ivParameter2);
                         combData = [.. combData, .. cipher2.DoFinal(encryptedData2).TruncateData()];
+                        cipher2.Reset();
 
 
 
                     }
+
+                    Log.Info("CombDataLen: " + combData.Length);
+                    Log.Info("DataPacketLen: " + DataPacketLen);
                     // debug purpose only
                     var checkTags = TagReader.ReadTagData(combData); // should crash if not correclty 
 
@@ -236,8 +240,7 @@ public abstract record MessageType
                 Log.Error("macFormat: " + BitConverter.ToString(macFormat));
                 Log.Error("swHeader: " + BitConverter.ToString(swTag[0].GetHeaderFormat()));
                 Log.Info("oh well, Kobry for now");
-                //  throw new Exception("Autentication Token Failed");
-                return true;
+                throw new Exception("Autentication Token Failed");
             }
             return isValid;
 
@@ -769,13 +772,22 @@ public class Command<T>(ICommunicator communicator, T encryption)
         byte[] leHeader = [];
         if (le > 0)
         {
-            byte[] leData = le.IntoLeExtended();
-            bool isExtended = (leData[0]) != 0x00;
-            if (isExtended)
-                leHeader = [leTag, (byte)leData.Length, .. leData];
-            // leHeader = [leTag, (byte)leData.Length, .. leData];
+            byte[] leBytes;
+
+            // ISO 7816-4: If Le <= 255, use 1 byte. If > 255, use 2 bytes.
+            if (le <= 255)
+            {
+                leBytes = [(byte)le];
+            }
             else
-                leHeader = [leTag, 1, leData[1]];
+            {
+                // HERE is where you use your helper
+                leBytes = le.IntoLeExtended();
+            }
+
+            // Construct DO '97'
+            // Tag 97, Length (1 or 2), Value...
+            leHeader = new AsnBuilder().AddCustomTag(0x97, leBytes).Build();
         }
 
         byte[] dataHeader = [];
@@ -788,26 +800,14 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         byte[] seqCounterHeader = sequenceCounter.ToPaddedLength(16);
 
-
-        //  Log.Info("CmdHeader: " + BitConverter.ToString(cmdHeader));
-        //  Log.Info("SeqCounterHeader: " + BitConverter.ToString(seqCounterHeader));
-        // Log.Info("DataHeader: " + BitConverter.ToString(dataHeader));
-        // Log.Info("IV: " + BitConverter.ToString(iv));
-
         byte[] N = Util.AlignData([.. seqCounterHeader, .. cmdHeader, .. dataHeader, .. leHeader], 16);
         //  Log.Info("N: " + BitConverter.ToString(N));
         byte[] token = CalculateCMAC(N);
         byte[] macHeader = [macTag, 0x08, .. token];
         int length = dataHeader.Length + macHeader.Length + leHeader.Length;
 
-        //  Log.Info("macHeader: " + BitConverter.ToString(macHeader));
-
         byte[] extendedLen = leHeader.Length > 3 ? [0x00, 0x00] : [0x00];
         byte[] package = [0x0C, ins, p1, p2, (byte)(length), .. dataHeader, .. leHeader, .. macHeader, .. extendedLen];
-        //int payloadLen = dataHeader.Length + macHeader.Length + leHeader.Length;
-        // byte[] package = [0x0C, ins, p1, p2, (byte)payloadLen, .. dataHeader, .. leHeader, .. macHeader];
-
-        // add sequence +2 for response - must be even
 
 
         return package;

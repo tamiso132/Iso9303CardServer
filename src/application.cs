@@ -152,6 +152,7 @@ public class ClientSession(ICommunicator comm)
             }
 
 
+
             EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
             response = (await _cmd.ReadBinary(MessageType.SecureMessage, dgID)).UnwrapOrThrow();
 
@@ -159,14 +160,20 @@ public class ClientSession(ICommunicator comm)
             byte[] dgData = response.data;
             byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
 
+            if (dg.DataGroupNumber == 14)
+            {
+                File.WriteAllBytes("dg14Wrong.txt", dgData);
+            }
+
+
             // Log.Info($"Chip Hash says: {BitConverter.ToString(dg.Hash)}");
             // Log.Info($"Calculated Hashvalue: {BitConverter.ToString(calculatedHashData)}");
 
             // Manipulerad hash går inte genom detta steg
+            TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
             if (!calculatedHashData.SequenceEqual(dg.Hash))
             {
                 Log.Error($"Hash wrong for DG{dg.DataGroupNumber}, PA failed");
-                TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                 return;
             }
             //   Log.Info($"Hashvalue ok for DG {dg.DataGroupNumber}");

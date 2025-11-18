@@ -30,6 +30,12 @@ using System.Numerics;
 //     Log.Error("ERROR, ");
 // }
 // return;
+
+var correct = File.ReadAllBytes("dg14.txt");
+var wrong = File.ReadAllBytes("dg14Wrong.txt");
+
+TestClass.PrintByteComparison(correct, wrong);
+
 var config = File.ReadAllLines("config.txt");
 string? ip = null;
 string? port = null;

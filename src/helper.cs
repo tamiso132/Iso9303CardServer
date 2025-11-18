@@ -203,10 +203,27 @@ public static class BIgIntegerExtension
 {
     public static byte[] ToPaddedLength(this BigInteger value, int length)
     {
+        // 1. Get the bytes (These are Little Endian in .NET!)
+        byte[] bytes = value.ToByteArray(isUnsigned: true);
 
-        var sscBA = value.ToByteArray(isUnsigned: true);
-        var remainder = length - sscBA.Length;
-        return new byte[remainder].Concat(sscBA).ToArray();
+        // 2. CRITICAL: Reverse them to get Big Endian
+        Array.Reverse(bytes);
+
+        // 3. Right-Align in the target buffer
+        if (bytes.Length < length)
+        {
+            byte[] padded = new byte[length];
+            // Copy bytes to the END of the padded array
+            Buffer.BlockCopy(bytes, 0, padded, length - bytes.Length, bytes.Length);
+            return padded;
+        }
+        else if (bytes.Length > length)
+        {
+            // Safety: If number is too big, take the last 'length' bytes
+            return bytes[^length..];
+        }
+
+        return bytes;
     }
 }
 
