@@ -25,6 +25,8 @@ using Org.BouncyCastle.Asn1.X9;
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Asn1.X509;
 using Org.BouncyCastle.X509;
+using Org.BouncyCastle.Crypto.Signers;
+using Org.BouncyCastle.Crypto.Digests;
 namespace App;
 
 
@@ -39,16 +41,19 @@ public class ClientSession(ICommunicator comm)
         {
             (await _cmd.SelectDefaultMF(MessageType.NonSecureMessage)).UnwrapOrThrow();
 
+
+
             await SetupSecureMessaging();
-            // 
+            await SetupChipAuthentication();
+
+
+
             // Chose CA or AA here
             // if DG15 only -> AA
             // if DG14 only -> CA
             // if DG15 AND DG 14 -> CA (Must)
-
-            await SetupChipAuthentication();
+            await PerformActiveAuthentication();
             await SetupPassiveAuthentication();
-
 
         }
 
@@ -222,6 +227,80 @@ public class ClientSession(ICommunicator comm)
         // 7. Construct the usable RSA Public Key object for verification
         return new RsaKeyParameters(false, modulus, exponent);
 
+    }
+
+    public async Task PerformActiveAuthentication()
+    {
+        Log.Info("--- Startar Aktiv Autentisering ---");
+
+        // 1. HÄMTA PUBLIK NYCKEL
+        // Vi återanvänder din befintliga metod för att läsa DG15 och parsa nyckeln.
+        RsaKeyParameters rsaPublicKey;
+        try
+        {
+            // Din nuvarande Setup-metod returnerar RsaKeyParameters
+            rsaPublicKey = await SetupActiveAuthentication();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("Kunde inte hämta publik nyckel (AA stöds kanske inte): " + ex.Message);
+            return;
+        }
+
+        // 2. SKAPA UTMANING (CHALLENGE)
+        // Enligt ICAO 9303 ska challengen vara 8 bytes slumpmässig data.
+        byte[] challenge = new RandomNumberProvider().GetNextBytes(8);
+        Log.Info("Genererad Challenge: " + BitConverter.ToString(challenge));
+
+        // 3. SKICKA TILL CHIPPET
+        // Vi använder SecureMessage eftersom vi redan har en krypterad session (efter PACE/CA).
+        var result = await _cmd.InternalAuthenticate(MessageType.SecureMessage, challenge);
+
+        if (!result.IsSuccess)
+        {
+            Log.Error("Internal Authenticate misslyckades: " + result.Error.ErrorMessage());
+            return;
+        }
+
+        byte[] signatureFromChip = result.Value.data;
+        Log.Info("Signatur från chip: " + BitConverter.ToString(signatureFromChip));
+
+        // 4. VERIFIERA SIGNATUREN
+        // Vi kollar om signaturen är giltig med hjälp av BouncyCastle.
+        bool isGenuine = VerifyRsaSignature(rsaPublicKey, challenge, signatureFromChip);
+
+        if (isGenuine)
+        {
+            Log.Info("✅ AKTIV AUTENTISERING LYCKADES! Chippet är äkta.");
+        }
+        else
+        {
+            Log.Error("❌ AKTIV AUTENTISERING MISSLYCKADES! Signaturen stämmer inte. Möjlig klon!");
+        }
+    }
+
+    // Hjälpmetod för BouncyCastle-verifieringen
+    private bool VerifyRsaSignature(RsaKeyParameters pubKey, byte[] challenge, byte[] signature)
+    {
+        try
+        {
+            // ICAO specificerar ISO9796-2 för RSA-signaturer i AA.
+            // Parametrar: RSA Engine, SHA1 Digest (vanligast för AA), och 'true' för implicit padding.
+            var signer = new Iso9796d2Signer(new RsaEngine(), new Sha1Digest(), true);
+
+            signer.Init(false, pubKey); // false = "Verify mode" (vi skapar inte en signatur, vi kollar den)
+
+            // Mata in originaldatan (vår challenge) som chippet skulle ha signerat
+            signer.BlockUpdate(challenge, 0, challenge.Length);
+
+            // Kontrollera om signaturen matchar
+            return signer.VerifySignature(signature);
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Kryptografiskt fel vid verifiering: " + ex.Message);
+            return false;
+        }
     }
 
     public async Task SetupChipAuthentication()

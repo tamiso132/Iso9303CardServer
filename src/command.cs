@@ -290,6 +290,8 @@ public abstract record MessageType
 
     }
 
+
+
 }
 
 
@@ -857,6 +859,19 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     // Initialise SSC to pace starting value
     public BigInteger sequenceCounter = 1;
+
+    public async Task<TResult> InternalAuthenticate(MessageType type, byte[] challenge)
+    {
+        Log.Info("Skickar Internal Authenticate (AA)...");
+
+        // INS: 0x88 = Internal Authenticate
+        // Data: Din slumpmässiga challenge (8 bytes)
+        // Le: 0x00 = Vi förväntar oss ett svar (signaturen)
+        byte[] cmd = type.FormatCommand(this, 0x88, 0x00, 0x00, challenge, le: 0x00);
+
+        return await SendPackageDecodeResponse(type, cmd);
+    }
+
 }
 
 
