@@ -27,6 +27,7 @@ using Org.BouncyCastle.Asn1.X509;
 using Org.BouncyCastle.X509;
 using Org.BouncyCastle.Crypto.Signers;
 using Org.BouncyCastle.Crypto.Digests;
+using System.Data.SqlTypes;
 namespace App;
 
 
@@ -42,23 +43,33 @@ public class ClientSession(ICommunicator comm)
             (await _cmd.SelectDefaultMF(MessageType.NonSecureMessage)).UnwrapOrThrow();
 
 
-
+            // Secure Messaging
             await SetupSecureMessaging();
-            await SetupChipAuthentication();
+
+            // Passive autentication and decide if CA or AA
+            AuthMethod nextMethod = await SetupPassiveAuthentication();
 
 
 
-            // Chose CA or AA here
-            // if DG15 only -> AA
-            // if DG14 only -> CA
-            // if DG15 AND DG 14 -> CA (Must)
-            await PerformActiveAuthentication();
-            await SetupPassiveAuthentication();
+            if (nextMethod == AuthMethod.CA)
+            {
+                Log.Info("Using Chip Authentication....");
+                await SetupChipAuthentication();
+            }
+            else if(nextMethod == AuthMethod.AA)
+            {
+                Log.Info("Using Active Authentication....");
+                //Chip Authentication
+                await SetupActiveAuthentication();
+            }
+            else
+            {
+                Log.Warn("No extended authentication method avalible (CA/AA)");
+            }
 
         }
 
         Log.Info("All commands completed without a problem");
-
     }
 
     public async Task SetupSecureMessaging()
@@ -125,10 +136,12 @@ public class ClientSession(ICommunicator comm)
         Log.Info("Secure Messaging Established using: PACE, Session started.");
     }
 
-    public async Task SetupPassiveAuthentication()
+    public async Task<AuthMethod> SetupPassiveAuthentication()
     {
         var response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod)).UnwrapOrThrow();
 
+        bool dg15Find = false;
+        bool dg14Find = false;
 
         SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
 
@@ -143,7 +156,7 @@ public class ClientSession(ICommunicator comm)
         if (!SodHelper.PerformPassiveAuthStep2(sodFile.DocumentSignerCertificate, masterListPath))
         {
             Log.Error("STEP 2 Failed for passive authentication");
-            return;
+            return AuthMethod.None;
         }
 
         Log.Info("PA step 3 start...");
@@ -156,6 +169,17 @@ public class ClientSession(ICommunicator comm)
                 Log.Warn($"Found DG: {dg.DataGroupNumber}, Need EAC (Extended Acess Controll) to verify this datagroup");
                 continue;
             }
+
+            if (dg.DataGroupNumber == 15)
+            {
+                dg15Find = true;
+            }
+
+            if (dg.DataGroupNumber == 14)
+            {
+                dg14Find = true;
+            }
+
 
 
 
@@ -180,13 +204,35 @@ public class ClientSession(ICommunicator comm)
             {
                 TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
                 Log.Error($"Hash wrong for DG{dg.DataGroupNumber}, PA failed");
-                return;
+                return AuthMethod.None;
             }
             //   Log.Info($"Hashvalue ok for DG {dg.DataGroupNumber}");
         }
         Log.Info("Step 3 PA OK");
         Log.Info("Full Passive Authentication Complete!");
+
+        // Chose CA or AA here
+        // if DG15 only -> AA
+        // if DG14 only -> CA
+        // if DG15 AND DG 14 -> CA (Must)
+
+        if (dg14Find)
+        {
+            Log.Info("DG14 in chip, use CA");
+            return AuthMethod.CA;
+        }
+
+        if (dg15Find)
+        {
+            Log.Info("DG15 ONLY, use AA");
+            return AuthMethod.AA;
+        }
+
+        Log.Info("Neither DG14 or DG15 in chip, cant use CA or AA");
+        return AuthMethod.None;
+
     }
+
 
     public async Task<RsaKeyParameters> SetupActiveAuthentication()
     {
@@ -536,6 +582,8 @@ public class ClientSession(ICommunicator comm)
     private readonly Command<ServerEncryption> _cmd = new(comm, new ServerEncryption());
 }
 
+
+
 public class ServerEncryption : IServerFormat
 {
 
@@ -560,4 +608,9 @@ public class ServerEncryption : IServerFormat
 
 };
 
-
+public enum AuthMethod
+{
+    None,
+    AA, // Active Authentication
+    CA  // Chip Authentication
+}
