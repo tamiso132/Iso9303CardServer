@@ -148,8 +148,6 @@ public class ClientSession(ICommunicator comm)
         Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
         Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
 
-
-
         Log.Info("Starting Passive authentication...");
 
         string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
@@ -216,11 +214,11 @@ public class ClientSession(ICommunicator comm)
         // if DG14 only -> CA
         // if DG15 AND DG 14 -> CA (Must)
 
-        if (dg14Find)
-        {
-            Log.Info("DG14 in chip, use CA");
-            return AuthMethod.CA;
-        }
+        // if (dg14Find)
+        // {
+        //     Log.Info("DG14 in chip, use CA");
+        //     return AuthMethod.CA;
+        // }
 
         if (dg15Find)
         {
@@ -238,7 +236,7 @@ public class ClientSession(ICommunicator comm)
     {
         var dg15Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg15)).UnwrapOrThrow();
         Log.Info(BitConverter.ToString(dg15Response.data));
-        var root = TagReader.ReadTagData(dg15Response.data, [0x30, 0x31, 0x6F, 0x03]); //Parse
+        var root = TagReader.ReadTagData(dg15Response.data, [0x30, 0x31, 0x6F]); //Parse
 
         Log.Info(root.ToStringFormat());
 
@@ -363,30 +361,7 @@ public class ClientSession(ICommunicator comm)
         //  var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
 
         var objects = root.FindChild(0x31);
-        // // Log.Info(root.ToStringFormat());
-
-
-        // var keyAgreement = publicKeyInfo.FindChild(0x06)!.Data.ToOidStr(); //OID tag, find algorithm
-
-        // var keyID = keyAgreement[^1]; // if  2 = ECDH, if 1 = DH
-
-        // var subjectPublicKeyInfo = publicKeyInfo.FindChild(0x30);
-        // var algoritmIdentifier = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x06); // only used when SUBJECT PUBLIC KEY INFO, is MISSING
-        // var explicitParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!;
-
-
-
-
-        // var p = explicitParameters.Children[1].FindChild(0x02)!.Data[1..]; // remove 00
-        // var a = explicitParameters.Children[2].Children[0].Data;
-        // var b = explicitParameters.Children[2].Children[1].Data;
-        // var g = explicitParameters.Children[3].Data;
-        // var n = explicitParameters.Children[4].Data[1..];// remove 0x00
-        // var h = explicitParameters.Children[5].Data;
-
-
-
-
+    
         var chipAuthOidBytes = Array.Empty<byte>();
         byte[] pubKey = [];
         byte[] p = [];
