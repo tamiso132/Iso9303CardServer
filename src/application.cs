@@ -60,7 +60,7 @@ public class ClientSession(ICommunicator comm)
             {
                 Log.Info("Using Active Authentication....");
                 //Chip Authentication
-                await SetupActiveAuthentication();
+                await PerformActiveAuthentication();
             }
             else
             {
@@ -259,7 +259,7 @@ public class ClientSession(ICommunicator comm)
 
         // 5. Parse the inner key structure (The actual RSA key)
         //    Skip the 0x00 unused bits byte at the start of the BIT STRING's data.
-        var rawKeyBytes = subjectPublicKey.GetBytes().Skip(1).ToArray();
+        var rawKeyBytes = subjectPublicKey.GetBytes();
 
         // The rawKeyBytes now starts with the inner SEQUENCE (Tag 0x30) that holds Modulus and Exponent.
         var innerKeySequence = Asn1Sequence.GetInstance(rawKeyBytes);
