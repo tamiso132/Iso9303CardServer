@@ -161,7 +161,6 @@ public class ClientSession(ICommunicator comm)
         {
             Log.Error("STEP 2 Failed for passive authentication");
             return AuthMethod.None;
-            
         
         }
 
