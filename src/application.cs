@@ -330,7 +330,7 @@ public class ClientSession(ICommunicator comm)
         {
             // ICAO specificerar ISO9796-2 för RSA-signaturer i AA.
             // Parametrar: RSA Engine, SHA1 Digest (vanligast för AA), och 'true' för implicit padding.
-            var signer = new Iso9796d2Signer(new RsaEngine(), new Sha1Digest(), true);
+            var signer = new Iso9796d2Signer(new RsaEngine(), new Sha256Digest(), true);
 
             signer.Init(false, pubKey); // false = "Verify mode" (vi skapar inte en signatur, vi kollar den)
 
