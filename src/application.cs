@@ -50,8 +50,7 @@ public class ClientSession(ICommunicator comm)
             await SetupSecureMessaging();
 
             // Passive autentication and decide if CA or AA
-            await SetupActiveAuthentication();
-            return;
+
             AuthMethod nextMethod = await SetupPassiveAuthentication();
 
 
@@ -70,6 +69,7 @@ public class ClientSession(ICommunicator comm)
                 Log.Warn("No extended authentication method avalible (CA/AA)");
             }
 
+            await SetupActiveAuthentication();
         }
 
         Log.Info("All commands completed without a problem");
