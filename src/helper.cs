@@ -470,7 +470,7 @@ public static class SodHelper
                 Log.Warn("DSC is expired or not yet valid (Standard for Passive Auth).");
             }
 
-            return true; // TODO Change to true if we want to check AA/CA is working
+            return false; // TODO Change to true if we want to check AA/CA is working
         }
         catch (Exception ex)
         {

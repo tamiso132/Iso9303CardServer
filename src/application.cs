@@ -31,6 +31,7 @@ using System.Data.SqlTypes;
 using Org.BouncyCastle.Crypto;
 using System.Runtime.Intrinsics.Arm;
 using System;
+using System.Diagnostics;
 namespace App;
 
 
@@ -62,14 +63,16 @@ public class ClientSession(ICommunicator comm)
             else if (nextMethod == AuthMethod.AA)
             {
                 Log.Info("Using Active Authentication....");
-                //Chip Authentication
+                
+                await SetupActiveAuthentication();
             }
             else
             {
                 Log.Warn("No extended authentication method avalible (CA/AA)");
+                //return;
             }
 
-            await SetupActiveAuthentication();
+            
         }
 
         Log.Info("All commands completed without a problem");
@@ -158,6 +161,8 @@ public class ClientSession(ICommunicator comm)
         {
             Log.Error("STEP 2 Failed for passive authentication");
             return AuthMethod.None;
+            
+        
         }
 
         Log.Info("PA step 3 start...");
@@ -217,11 +222,11 @@ public class ClientSession(ICommunicator comm)
         // if DG14 only -> CA
         // if DG15 AND DG 14 -> CA (Must)
 
-        // if (dg14Find)
-        // {
-        //     Log.Info("DG14 in chip, use CA");
-        //     return AuthMethod.CA;
-        // }
+        if (dg14Find)
+        {
+            Log.Info("DG14 in chip, use CA");
+            return AuthMethod.CA;
+        }
 
         if (dg15Find)
         {
