@@ -31,6 +31,7 @@ using System.Data.SqlTypes;
 using Org.BouncyCastle.Crypto;
 using System.Runtime.Intrinsics.Arm;
 using System;
+using System.Diagnostics;
 namespace App;
 
 
@@ -62,14 +63,16 @@ public class ClientSession(ICommunicator comm)
             else if (nextMethod == AuthMethod.AA)
             {
                 Log.Info("Using Active Authentication....");
-                //Chip Authentication
+                
+                await SetupActiveAuthentication();
             }
             else
             {
                 Log.Warn("No extended authentication method avalible (CA/AA)");
+                //return;
             }
 
-            await SetupActiveAuthentication();
+            
         }
         Log.Info("All commands completed without a problem");
     }
@@ -157,6 +160,7 @@ public class ClientSession(ICommunicator comm)
         {
             Log.Error("STEP 2 Failed for passive authentication");
             return AuthMethod.None;
+        
         }
 
         Log.Info("PA step 3 start...");
@@ -216,11 +220,11 @@ public class ClientSession(ICommunicator comm)
         // if DG14 only -> CA
         // if DG15 AND DG 14 -> CA (Must)
 
-        // if (dg14Find)
-        // {
-        //     Log.Info("DG14 in chip, use CA");
-        //     return AuthMethod.CA;
-        // }
+        if (dg14Find)
+        {
+            Log.Info("DG14 in chip, use CA");
+            return AuthMethod.CA;
+        }
 
         if (dg15Find)
         {
@@ -347,29 +351,7 @@ public class ClientSession(ICommunicator comm)
 
 
 
-    // Hjälpmetod för BouncyCastle-verifieringen
-    private bool VerifyRsaSignature(RsaKeyParameters pubKey, byte[] challenge, byte[] signature)
-    {
-        try
-        {
-            // ICAO specificerar ISO9796-2 för RSA-signaturer i AA.
-            // Parametrar: RSA Engine, SHA1 Digest (vanligast för AA), och 'true' för implicit padding.
-            var signer = new Iso9796d2Signer(new RsaEngine(), new Sha256Digest(), true);
-
-            signer.Init(false, pubKey); // false = "Verify mode" (vi skapar inte en signatur, vi kollar den)
-
-            // Mata in originaldatan (vår challenge) som chippet skulle ha signerat
-            signer.BlockUpdate(challenge, 0, challenge.Length);
-
-            // Kontrollera om signaturen matchar
-            return signer.VerifySignature(signature);
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Kryptografiskt fel vid verifiering: " + ex.Message);
-            return false;
-        }
-    }
+   
 
     public async Task SetupChipAuthentication()
     {

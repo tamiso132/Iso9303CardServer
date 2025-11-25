@@ -42,23 +42,7 @@ public static class EfSodParser
     /// <summary>
     /// Privat hjälpfunktion: Konverterar en hex-sträng till en byte array.
     /// </summary>
-    private static byte[] ConvertHexStringToByteArray(string hexString)
-    {
-        string cleanHex = hexString.Replace("-", "").Replace(" ", "").Replace("\n", "").Replace("\r", "");
-        if (cleanHex.Length % 2 != 0)
-        {
-            throw new ArgumentException("Hex-strängen har ett udda antal tecken.");
-        }
-
-        byte[] data = new byte[cleanHex.Length / 2];
-        for (int i = 0; i < data.Length; i++)
-        {
-            string byteValue = cleanHex.Substring(i * 2, 2);
-            data[i] = Convert.ToByte(byteValue, 16);
-        }
-        return data;
-    }
-
+    
     /// <summary>
     /// Huvudingångspunkt för att parsa en EF.SOD hex-sträng.
     /// </summary>
