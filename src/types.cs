@@ -1,6 +1,4 @@
 // sealed -> means no inheritance allowed
-
-
 using System.Collections;
 using ErrorHandling;
 using Helper;
@@ -9,8 +7,6 @@ using Interfaces;
 namespace Type;
 
 using TResult = Result<Type.ResponseCommand>;
-
-
 
 
 public sealed class EfIdGlobal : IEfID
