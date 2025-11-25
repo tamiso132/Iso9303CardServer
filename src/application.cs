@@ -28,6 +28,9 @@ using Org.BouncyCastle.X509;
 using Org.BouncyCastle.Crypto.Signers;
 using Org.BouncyCastle.Crypto.Digests;
 using System.Data.SqlTypes;
+using Org.BouncyCastle.Crypto;
+using System.Runtime.Intrinsics.Arm;
+using System;
 namespace App;
 
 
@@ -47,8 +50,9 @@ public class ClientSession(ICommunicator comm)
             await SetupSecureMessaging();
 
             // Passive autentication and decide if CA or AA
+            await SetupActiveAuthentication();
+            return;
             AuthMethod nextMethod = await SetupPassiveAuthentication();
-
 
 
             if (nextMethod == AuthMethod.CA)
@@ -56,7 +60,7 @@ public class ClientSession(ICommunicator comm)
                 Log.Info("Using Chip Authentication....");
                 await SetupChipAuthentication();
             }
-            else if(nextMethod == AuthMethod.AA)
+            else if (nextMethod == AuthMethod.AA)
             {
                 Log.Info("Using Active Authentication....");
                 //Chip Authentication
@@ -232,7 +236,7 @@ public class ClientSession(ICommunicator comm)
     }
 
 
-    public async Task<RsaKeyParameters> SetupActiveAuthentication()
+    public async Task SetupActiveAuthentication()
     {
         var dg15Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg15)).UnwrapOrThrow();
         Log.Info(BitConverter.ToString(dg15Response.data));
@@ -256,72 +260,122 @@ public class ClientSession(ICommunicator comm)
 
         // Log the successful identification
         Log.Info($"AA Protocol Identified. OID: {oid}. Ready for RSA signature operation.");
+        var rsa = RSA.Create();
+        rsa.ImportSubjectPublicKeyInfo(root[0].Data, out int byteRead);
+        Log.Info("byte read: " + byteRead);
+        RSAParameters p = rsa.ExportParameters(false);
+
+
+        var rndMsg = new RandomNumberProvider().GetNextBytes(8);
+
+        var sig = (await _cmd.AAStepOne(rndMsg)).UnwrapOrThrow();
+        Log.Info("SigLength: " + sig.data.Length + "\n" + BitConverter.ToString(sig.data));
+
+
+        BigInteger exponent = new BigInteger([.. p.Exponent!.Reverse()], false);
+        BigInteger modulus = new BigInteger([.. p.Modulus!.Reverse(), 0x00], false);
+
+        Log.Info(modulus.ToString());
+        Log.Info(exponent.ToString());
+        var rsaParam = new RsaKeyParameters(false, modulus, exponent);
+        // bool AAState = rsa.VerifyData(rndMsg, sig.data, HashAlgorithmName.SHA1, RSASignaturePadding.Pss);
+        // new RsaEngine().
+
+        IAsymmetricBlockCipher rsaEngine = new RsaEngine();
+
+        try
+        {
+            rsaEngine.Init(false, rsaParam);
+            var decrypted = rsaEngine.ProcessBlock(sig.data, 0, sig.data.Length);
+
+            // 2. Determine Algorithm from Trailer
+            byte[] trailer = decrypted[^2..];
+            string shaAlgName = "";
+            int digestLen;
+            int trailerLen = 2;
+
+            // Check which Hash Algorithm was used based on the last byte
+            if (trailer.SequenceEqual([(byte)0x38, (byte)0xCC])) // 256
+            {
+                // Case: SHA-1
+                // Structure: [Header] [M1] [Digest(20)] [Trailer(1)]
+                digestLen = 224 / 8;
+                shaAlgName = HashAlgorithmName.SHA1.Name!;
+                Log.Info("224?");
+
+            }
+            else if (trailer.SequenceEqual([(byte)0x34, (byte)0xCC]))
+            {
+                // Case: SHA-256 (usually)
+                // Structure: [Header] [M1] [Digest(32)] [HashID(1)] [Trailer(1)]
+                shaAlgName = HashAlgorithmName.SHA256.Name!;
+                digestLen = 256 / 8;
+                Log.Info("256?");
+            }
+            else
+            {
+                throw new Exception($"Unknown Trailer: {trailer:X2}");
+            }
+
+            // 3. Extract Digest and M1 using dynamic offsets
+            // Slicing: [Start .. End]
+            // End index is calculated from the END of the array (^)
+            byte[] digest = decrypted[^(digestLen + trailerLen)..^trailerLen];
+            byte[] m1 = decrypted[1..^(digestLen + trailerLen)]; // +1 skips Header(0x6A)
+
+            // 4. Reconstruct the Message (M* = M1 + M2)
+            byte[] m = [.. m1, .. rndMsg];
+
+            // 5. Calculate Hash (Must match the algorithm!)
+            byte[] calDigest;
+            calDigest = HashCalculator.CalculateSHAHash(shaAlgName, m);
+
+            // 6. Logging & Comparison
+            Log.Info("RawTrailer: " + BitConverter.ToString(decrypted[^2..]));
+            Log.Info("Decrypted: " + BitConverter.ToString(decrypted));
+            Log.Info("M: " + BitConverter.ToString(m));
+            Log.Info("M1: " + BitConverter.ToString(m1));
+            Log.Info($"Trailer   : {trailer:X2} (Algo detected: {(digestLen == 20 ? "SHA-1" : "SHA-256")})");
+            Log.Info($"Digest(IC): {BitConverter.ToString(digest)}");
+            Log.Info($"Digest(Me): {BitConverter.ToString(calDigest)}");
+
+            bool match = calDigest.SequenceEqual(digest);
+            Log.Info($"MATCH     : {match}");
+
+            // SHA1 -> 20 bytes
+            // sha256 -> 256/8
+            //sha192 -> etc etc
+        }
+
+        /*
+        Hash function SHA-224 SHA-256 SHA-384 SHA-512
+        Trailer field 0x38CC 0x34CC 0x36CC 0x35CC
+*/
+
+        catch
+        {
+            Log.Info("fuck");
+        }
+
+
 
         // 5. Parse the inner key structure (The actual RSA key)
         //    Skip the 0x00 unused bits byte at the start of the BIT STRING's data.
-        var rawKeyBytes = subjectPublicKey.GetBytes().Skip(1).ToArray();
+        // var rawKeyBytes = subjectPublicKey.GetBytes().Skip(1).ToArray();
 
-        // The rawKeyBytes now starts with the inner SEQUENCE (Tag 0x30) that holds Modulus and Exponent.
-        var innerKeySequence = Asn1Sequence.GetInstance(rawKeyBytes);
+        // // The rawKeyBytes now starts with the inner SEQUENCE (Tag 0x30) that holds Modulus and Exponent.
+        // var innerKeySequence = Asn1Sequence.GetInstance(rawKeyBytes);
 
-        // 6. Extract Modulus (n) and Exponent (e)
-        var modulus = DerInteger.GetInstance(innerKeySequence[0]).PositiveValue;
-        var exponent = DerInteger.GetInstance(innerKeySequence[1]).PositiveValue;
+        // // 6. Extract Modulus (n) and Exponent (e)
+        // var modulus = DerInteger.GetInstance(innerKeySequence[0]).PositiveValue;
+        // var exponent = DerInteger.GetInstance(innerKeySequence[1]).PositiveValue;
 
-        // 7. Construct the usable RSA Public Key object for verification
-        return new RsaKeyParameters(false, modulus, exponent);
+        // // 7. Construct the usable RSA Public Key object for verification
+        // return new RsaKeyParameters(false, modulus, exponent);
 
     }
 
-    public async Task PerformActiveAuthentication()
-    {
-        Log.Info("--- Startar Aktiv Autentisering ---");
 
-        // 1. HÄMTA PUBLIK NYCKEL
-        // Vi återanvänder din befintliga metod för att läsa DG15 och parsa nyckeln.
-        RsaKeyParameters rsaPublicKey;
-        try
-        {
-            // Din nuvarande Setup-metod returnerar RsaKeyParameters
-            rsaPublicKey = await SetupActiveAuthentication();
-        }
-        catch (Exception ex)
-        {
-            Log.Warn("Kunde inte hämta publik nyckel (AA stöds kanske inte): " + ex.Message);
-            return;
-        }
-
-        // 2. SKAPA UTMANING (CHALLENGE)
-        // Enligt ICAO 9303 ska challengen vara 8 bytes slumpmässig data.
-        byte[] challenge = new RandomNumberProvider().GetNextBytes(8);
-        Log.Info("Genererad Challenge: " + BitConverter.ToString(challenge));
-
-        // 3. SKICKA TILL CHIPPET
-        // Vi använder SecureMessage eftersom vi redan har en krypterad session (efter PACE/CA).
-        var result = await _cmd.InternalAuthenticate(MessageType.SecureMessage, challenge);
-
-        if (!result.IsSuccess)
-        {
-            Log.Error("Internal Authenticate misslyckades: " + result.Error.ErrorMessage());
-            return;
-        }
-
-        byte[] signatureFromChip = result.Value.data;
-        Log.Info("Signatur från chip: " + BitConverter.ToString(signatureFromChip));
-
-        // 4. VERIFIERA SIGNATUREN
-        // Vi kollar om signaturen är giltig med hjälp av BouncyCastle.
-        bool isGenuine = VerifyRsaSignature(rsaPublicKey, challenge, signatureFromChip);
-
-        if (isGenuine)
-        {
-            Log.Info("✅ AKTIV AUTENTISERING LYCKADES! Chippet är äkta.");
-        }
-        else
-        {
-            Log.Error("❌ AKTIV AUTENTISERING MISSLYCKADES! Signaturen stämmer inte. Möjlig klon!");
-        }
-    }
 
     // Hjälpmetod för BouncyCastle-verifieringen
     private bool VerifyRsaSignature(RsaKeyParameters pubKey, byte[] challenge, byte[] signature)
@@ -361,7 +415,7 @@ public class ClientSession(ICommunicator comm)
         //  var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
 
         var objects = root.FindChild(0x31);
-    
+
         var chipAuthOidBytes = Array.Empty<byte>();
         byte[] pubKey = [];
         byte[] p = [];

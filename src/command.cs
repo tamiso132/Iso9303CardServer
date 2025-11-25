@@ -150,7 +150,7 @@ public abstract record MessageType
                     Log.Info("CombDataLen: " + combData.Length);
                     Log.Info("DataPacketLen: " + DataPacketLen);
                     // debug purpose only
-                    var checkTags = TagReader.ReadTagData(combData); // should crash if not correclty 
+                    //   var checkTags = TagReader.ReadTagData(combData); // should crash if not correclty 
 
 
                     ResponseCommand respRet = new(0x90, 0x00, combData);
@@ -162,29 +162,7 @@ public abstract record MessageType
 
 
 
-                respCommand.data = fullData[0.._le];
-
-
-
-
-                // must get the rest of the bytes
-                if (DataPacketLen > _le)
-                {
-                    Log.Info("Before: " + BitConverter.ToString(respCommand.data));
-                    command.sequenceCounter += BigInteger.One;
-                    byte[] fullResp = (await command.SendPackageRaw(FormatCommand(command, _ins, _p1, _p2, _data, le: DataPacketLen))).Value;
-
-                    Log.Info("DataPacketLen: " + DataPacketLen + ", Data: " + BitConverter.ToString(fullResp));
-                    respCommand = (await ParseCommand(command, fullResp)).Value;
-
-                    throw new Exception("Test");
-                }
-
-                else
-                {
-
-                    // Log.Info("DecryptedData: " + BitConverter.ToString(respCommand.data));
-                }
+                respCommand.data = fullData;
             }
             // make ready for next command
             command.sequenceCounter += BigInteger.One;
@@ -350,6 +328,14 @@ public class Command<T>(ICommunicator communicator, T encryption)
             this._appSelected = appID;
 
         return result;
+    }
+
+
+    public async Task<TResult> AAStepOne(byte[] ifd)
+    {
+        byte[] cmd = MessageType.SecureMessage.FormatCommand(this, 0x88, 0x00, 0x00, data: ifd, le: 0xC0);
+
+        return await SendPackageDecodeResponse(MessageType.SecureMessage, cmd);
     }
 
 
