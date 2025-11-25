@@ -56,7 +56,7 @@ public class ClientSession(ICommunicator comm)
                 Log.Info("Using Chip Authentication....");
                 await SetupChipAuthentication();
             }
-            else if(nextMethod == AuthMethod.AA)
+            else if (nextMethod == AuthMethod.AA)
             {
                 Log.Info("Using Active Authentication....");
                 //Chip Authentication
@@ -231,6 +231,32 @@ public class ClientSession(ICommunicator comm)
 
     }
 
+     // I application.cs
+
+    public void DebugDecryptSignature(RsaKeyParameters pubKey, byte[] signature)
+    {
+        try
+        {
+            Log.Info("--- DEBUG: Raw RSA Decrypt ---");
+
+            // Använd ren RSA-motor utan padding/logik
+            var engine = new Org.BouncyCastle.Crypto.Engines.RsaEngine();
+            engine.Init(false, pubKey); // false = decrypt (med publik nyckel för att verifiera signatur)
+
+            // Dekryptera signaturen matematiskt
+            byte[] decrypted = engine.ProcessBlock(signature, 0, signature.Length);
+
+            Log.Info($"Decrypted Data (EM): {BitConverter.ToString(decrypted)}");
+
+            // Tips: ISO 9796-2 ska börja med 0x6A och sluta med en hash eller trailer (t.ex. 34CC).
+            // Om det är PKCS#1 v1.5 börjar det med 00 01 FF ...
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Debug decrypt failed: {ex.Message}");
+        }
+    }
+
 
     public async Task<RsaKeyParameters> SetupActiveAuthentication()
     {
@@ -309,6 +335,8 @@ public class ClientSession(ICommunicator comm)
         byte[] signatureFromChip = result.Value.data;
         Log.Info("Signatur från chip: " + BitConverter.ToString(signatureFromChip));
 
+        DebugDecryptSignature(rsaPublicKey, signatureFromChip);
+
         // 4. VERIFIERA SIGNATUREN
         // Vi kollar om signaturen är giltig med hjälp av BouncyCastle.
         bool isGenuine = VerifyRsaSignature(rsaPublicKey, challenge, signatureFromChip);
@@ -361,7 +389,7 @@ public class ClientSession(ICommunicator comm)
         //  var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
 
         var objects = root.FindChild(0x31);
-    
+
         var chipAuthOidBytes = Array.Empty<byte>();
         byte[] pubKey = [];
         byte[] p = [];
@@ -580,6 +608,8 @@ public class ServerEncryption : IServerFormat
         Console.WriteLine("Error: " + packet.Type.ToString());
         return Result<byte[]>.Fail(new Error.Parse("Decoding packet failed, does not have correct server format"));
     }
+
+   
 
 };
 
