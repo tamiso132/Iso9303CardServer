@@ -64,7 +64,6 @@ public class ClientSession(ICommunicator comm)
             {
                 Log.Info("Using Active Authentication....");
                 //Chip Authentication
-                await SetupActiveAuthentication();
             }
             else
             {
@@ -235,10 +234,37 @@ public class ClientSession(ICommunicator comm)
 
     }
 
+    // I application.cs
+
+    public void DebugDecryptSignature(RsaKeyParameters pubKey, byte[] signature)
+    {
+        try
+        {
+            Log.Info("--- DEBUG: Raw RSA Decrypt ---");
+
+            // Använd ren RSA-motor utan padding/logik
+            var engine = new Org.BouncyCastle.Crypto.Engines.RsaEngine();
+            engine.Init(false, pubKey); // false = decrypt (med publik nyckel för att verifiera signatur)
+
+            // Dekryptera signaturen matematiskt
+            byte[] decrypted = engine.ProcessBlock(signature, 0, signature.Length);
+
+            Log.Info($"Decrypted Data (EM): {BitConverter.ToString(decrypted)}");
+
+            // Tips: ISO 9796-2 ska börja med 0x6A och sluta med en hash eller trailer (t.ex. 34CC).
+            // Om det är PKCS#1 v1.5 börjar det med 00 01 FF ...
+        }
+        catch (Exception ex)
+        {
+            Log.Error($"Debug decrypt failed: {ex.Message}");
+        }
+    }
+
 
     public async Task SetupActiveAuthentication()
     {
         var dg15Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg15)).UnwrapOrThrow();
+
         Log.Info(BitConverter.ToString(dg15Response.data));
         var root = TagReader.ReadTagData(dg15Response.data, [0x30, 0x31, 0x6F]); //Parse
 
@@ -384,7 +410,7 @@ public class ClientSession(ICommunicator comm)
         {
             // ICAO specificerar ISO9796-2 för RSA-signaturer i AA.
             // Parametrar: RSA Engine, SHA1 Digest (vanligast för AA), och 'true' för implicit padding.
-            var signer = new Iso9796d2Signer(new RsaEngine(), new Sha1Digest(), true);
+            var signer = new Iso9796d2Signer(new RsaEngine(), new Sha256Digest(), true);
 
             signer.Init(false, pubKey); // false = "Verify mode" (vi skapar inte en signatur, vi kollar den)
 
@@ -634,6 +660,8 @@ public class ServerEncryption : IServerFormat
         Console.WriteLine("Error: " + packet.Type.ToString());
         return Result<byte[]>.Fail(new Error.Parse("Decoding packet failed, does not have correct server format"));
     }
+
+
 
 };
 

@@ -853,7 +853,7 @@ public class Command<T>(ICommunicator communicator, T encryption)
         // INS: 0x88 = Internal Authenticate
         // Data: Din slumpmässiga challenge (8 bytes)
         // Le: 0x00 = Vi förväntar oss ett svar (signaturen)
-        byte[] cmd = type.FormatCommand(this, 0x88, 0x00, 0x00, challenge, le: 0x00);
+        byte[] cmd = type.FormatCommand(this, 0x88, 0x00, 0x00, challenge, le: 0xC0);
 
         return await SendPackageDecodeResponse(type, cmd);
     }
