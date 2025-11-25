@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Console;
 using Org.BouncyCastle.Asn1.X509;
 using Org.BouncyCastle.Cms;
 using Org.BouncyCastle.Crypto;
+using Org.BouncyCastle.Crypto.Digests;
 using Org.BouncyCastle.Crypto.Modes;
 using Org.BouncyCastle.OpenSsl;
 using Org.BouncyCastle.Security;
@@ -405,10 +406,19 @@ public static class StringExtension
         throw new NotSupportedException($"The OID {oidString} is not a supported hash algorithm.");
     }
 }
-
+public enum HashAlgoType
+{
+    Sha1,
+    Sha224, // Requires Bouncy Castle
+    Sha256,
+    Sha384,
+    Sha512
+}
 
 public static class HashCalculator
 {
+
+
     /// <summary>
     /// Computes the hash of the input data using the specified algorithm name.
     /// </summary>
@@ -416,6 +426,8 @@ public static class HashCalculator
     /// <param name="inputData">The data to be hashed (as a byte array).</param>
     /// <returns>The computed hash as a byte array.</returns>
     /// <exception cref="NotSupportedException">Thrown if the algorithm name is not supported by .NET.</exception>
+    /// 
+    /// 
     public static byte[] CalculateSHAHash(string algorithmName, byte[] inputData)
     {
         // 1. Create the HashAlgorithm instance dynamically
@@ -431,6 +443,38 @@ public static class HashCalculator
         }
 
         throw new Exception("NOT IMPLEMENTED HASH");
+    }
+
+    public static byte[] ComputeHash(HashAlgoType algo, byte[] data)
+    {
+        if (data == null || data.Length == 0)
+            throw new ArgumentException("Data cannot be empty");
+
+        return algo switch
+        {
+            // Standard .NET (Fast & Native)
+            HashAlgoType.Sha1 => SHA1.HashData(data),
+            HashAlgoType.Sha256 => SHA256.HashData(data),
+            HashAlgoType.Sha384 => SHA384.HashData(data),
+            HashAlgoType.Sha512 => SHA512.HashData(data),
+
+            // Non-Standard (Use Bouncy Castle)
+            HashAlgoType.Sha224 => ComputeSHA224(data),
+
+
+            _ => throw new NotSupportedException($"Algorithm {algo} is not implemented.")
+        };
+    }
+
+    private static byte[] ComputeSHA224(byte[] data)
+    {
+        var digest = new Sha224Digest();
+        byte[] result = new byte[digest.GetDigestSize()];
+
+        digest.BlockUpdate(data, 0, data.Length);
+        digest.DoFinal(result, 0);
+
+        return result;
     }
 
 }

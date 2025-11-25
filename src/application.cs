@@ -71,7 +71,6 @@ public class ClientSession(ICommunicator comm)
 
             await SetupActiveAuthentication();
         }
-
         Log.Info("All commands completed without a problem");
     }
 
@@ -261,143 +260,88 @@ public class ClientSession(ICommunicator comm)
     }
 
 
+    // TODO, måste även fixa för ECDSA. Just nu är RSA hårdkodat
     public async Task SetupActiveAuthentication()
     {
         var dg15Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg15)).UnwrapOrThrow();
+        var root = TagReader.ReadTagData(dg15Response.data, [0x30, 0x31, 0x6F]);
 
-        Log.Info(BitConverter.ToString(dg15Response.data));
-        var root = TagReader.ReadTagData(dg15Response.data, [0x30, 0x31, 0x6F]); //Parse
-
-        Log.Info(root.ToStringFormat());
-
-        // 2.Parse the outer SEQUENCE(The SubjectPublicKeyInfo container: Tag 0x30)
-        var outerSequence = Asn1Sequence.GetInstance(root[0].Data);
-
-        // 3. Extract components: Algorithm Identifier and the Key Data
-        var algorithmIdentifier = Org.BouncyCastle.Asn1.X509.AlgorithmIdentifier.GetInstance(outerSequence[0]);
-        var subjectPublicKey = DerBitString.GetInstance(outerSequence[1]);
-
-        // 4. Identify and validate the OID (This is your key check)
-        string oid = algorithmIdentifier.Algorithm.Id;
-        if (oid != "1.2.840.1015.13.1.1.1" && oid != "1.2.840.113549.1.1.1")
-        {
-            throw new NotSupportedException($"Unsupported Signature OID for Active Authentication: {oid}");
-        }
-
-        // Log the successful identification
-        Log.Info($"AA Protocol Identified. OID: {oid}. Ready for RSA signature operation.");
         var rsa = RSA.Create();
-        rsa.ImportSubjectPublicKeyInfo(root[0].Data, out int byteRead);
-        Log.Info("byte read: " + byteRead);
+        rsa.ImportSubjectPublicKeyInfo(root[0].Data, out int _);
         RSAParameters p = rsa.ExportParameters(false);
 
 
-        var rndMsg = new RandomNumberProvider().GetNextBytes(8);
+        var ifd = new RandomNumberProvider().GetNextBytes(8);
 
-        var sig = (await _cmd.AAStepOne(rndMsg)).UnwrapOrThrow();
+        var sig = (await _cmd.AAStepOne(ifd)).UnwrapOrThrow();
         Log.Info("SigLength: " + sig.data.Length + "\n" + BitConverter.ToString(sig.data));
 
 
-        BigInteger exponent = new BigInteger([.. p.Exponent!.Reverse()], false);
-        BigInteger modulus = new BigInteger([.. p.Modulus!.Reverse(), 0x00], false);
+        BigInteger exponent = new([.. p.Exponent!.Reverse()], false);
+        BigInteger modulus = new([.. p.Modulus!.Reverse(), 0x00], false);
 
-        Log.Info(modulus.ToString());
-        Log.Info(exponent.ToString());
         var rsaParam = new RsaKeyParameters(false, modulus, exponent);
-        // bool AAState = rsa.VerifyData(rndMsg, sig.data, HashAlgorithmName.SHA1, RSASignaturePadding.Pss);
-        // new RsaEngine().
-
-        IAsymmetricBlockCipher rsaEngine = new RsaEngine();
+        var rsaEngine = new RsaEngine();
 
         try
         {
             rsaEngine.Init(false, rsaParam);
             var decrypted = rsaEngine.ProcessBlock(sig.data, 0, sig.data.Length);
-
+            HashAlgoType hashOP;
             // 2. Determine Algorithm from Trailer
             byte[] trailer = decrypted[^2..];
-            string shaAlgName = "";
             int digestLen;
             int trailerLen = 2;
 
-            // Check which Hash Algorithm was used based on the last byte
-            if (trailer.SequenceEqual([(byte)0x38, (byte)0xCC])) // 256
+            if (trailer.SequenceEqual([(byte)0x38, (byte)0xCC]))
             {
-                // Case: SHA-1
-                // Structure: [Header] [M1] [Digest(20)] [Trailer(1)]
                 digestLen = 224 / 8;
-                shaAlgName = HashAlgorithmName.SHA1.Name!;
-                Log.Info("224?");
+                hashOP = HashAlgoType.Sha224;
 
+            }
+            else if (trailer.SequenceEqual([(byte)0x36, (byte)0xCC]))
+            {
+                hashOP = HashAlgoType.Sha384;
+                digestLen = 384 / 8;
+            }
+            else if (trailer.SequenceEqual([(byte)0x35, (byte)0xCC]))
+            {
+                hashOP = HashAlgoType.Sha512;
+                digestLen = 512 / 8;
             }
             else if (trailer.SequenceEqual([(byte)0x34, (byte)0xCC]))
             {
-                // Case: SHA-256 (usually)
-                // Structure: [Header] [M1] [Digest(32)] [HashID(1)] [Trailer(1)]
-                shaAlgName = HashAlgorithmName.SHA256.Name!;
+                hashOP = HashAlgoType.Sha256;
                 digestLen = 256 / 8;
-                Log.Info("256?");
             }
+
             else
             {
                 throw new Exception($"Unknown Trailer: {trailer:X2}");
             }
 
-            // 3. Extract Digest and M1 using dynamic offsets
-            // Slicing: [Start .. End]
-            // End index is calculated from the END of the array (^)
             byte[] digest = decrypted[^(digestLen + trailerLen)..^trailerLen];
             byte[] m1 = decrypted[1..^(digestLen + trailerLen)]; // +1 skips Header(0x6A)
 
             // 4. Reconstruct the Message (M* = M1 + M2)
-            byte[] m = [.. m1, .. rndMsg];
+            byte[] m = [.. m1, .. ifd];
 
             // 5. Calculate Hash (Must match the algorithm!)
             byte[] calDigest;
-            calDigest = HashCalculator.CalculateSHAHash(shaAlgName, m);
+            calDigest = HashCalculator.ComputeHash(hashOP, m);
 
-            // 6. Logging & Comparison
-            Log.Info("RawTrailer: " + BitConverter.ToString(decrypted[^2..]));
-            Log.Info("Decrypted: " + BitConverter.ToString(decrypted));
-            Log.Info("M: " + BitConverter.ToString(m));
-            Log.Info("M1: " + BitConverter.ToString(m1));
-            Log.Info($"Trailer   : {trailer:X2} (Algo detected: {(digestLen == 20 ? "SHA-1" : "SHA-256")})");
-            Log.Info($"Digest(IC): {BitConverter.ToString(digest)}");
-            Log.Info($"Digest(Me): {BitConverter.ToString(calDigest)}");
+            if (calDigest.SequenceEqual(digest))
+            {
+                Log.Info("Active Authentication is succesful!");
+            }
 
-            bool match = calDigest.SequenceEqual(digest);
-            Log.Info($"MATCH     : {match}");
-
-            // SHA1 -> 20 bytes
-            // sha256 -> 256/8
-            //sha192 -> etc etc
         }
-
-        /*
-        Hash function SHA-224 SHA-256 SHA-384 SHA-512
-        Trailer field 0x38CC 0x34CC 0x36CC 0x35CC
-*/
 
         catch
         {
             Log.Info("fuck");
+            throw new Exception("");
         }
-
-
-
-        // 5. Parse the inner key structure (The actual RSA key)
-        //    Skip the 0x00 unused bits byte at the start of the BIT STRING's data.
-        // var rawKeyBytes = subjectPublicKey.GetBytes().Skip(1).ToArray();
-
-        // // The rawKeyBytes now starts with the inner SEQUENCE (Tag 0x30) that holds Modulus and Exponent.
-        // var innerKeySequence = Asn1Sequence.GetInstance(rawKeyBytes);
-
-        // // 6. Extract Modulus (n) and Exponent (e)
-        // var modulus = DerInteger.GetInstance(innerKeySequence[0]).PositiveValue;
-        // var exponent = DerInteger.GetInstance(innerKeySequence[1]).PositiveValue;
-
-        // // 7. Construct the usable RSA Public Key object for verification
-        // return new RsaKeyParameters(false, modulus, exponent);
 
     }
 
