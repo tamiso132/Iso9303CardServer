@@ -373,59 +373,19 @@ public class ClientSession(ICommunicator comm)
             //sha192 -> etc etc
         }
 
-        /*
-        Hash function SHA-224 SHA-256 SHA-384 SHA-512
-        Trailer field 0x38CC 0x34CC 0x36CC 0x35CC
-*/
+
 
         catch
         {
-            Log.Info("fuck");
+            Log.Info("...");
         }
 
-
-
-        // 5. Parse the inner key structure (The actual RSA key)
-        //    Skip the 0x00 unused bits byte at the start of the BIT STRING's data.
-        // var rawKeyBytes = subjectPublicKey.GetBytes().Skip(1).ToArray();
-
-        // // The rawKeyBytes now starts with the inner SEQUENCE (Tag 0x30) that holds Modulus and Exponent.
-        // var innerKeySequence = Asn1Sequence.GetInstance(rawKeyBytes);
-
-        // // 6. Extract Modulus (n) and Exponent (e)
-        // var modulus = DerInteger.GetInstance(innerKeySequence[0]).PositiveValue;
-        // var exponent = DerInteger.GetInstance(innerKeySequence[1]).PositiveValue;
-
-        // // 7. Construct the usable RSA Public Key object for verification
-        // return new RsaKeyParameters(false, modulus, exponent);
 
     }
 
 
 
-    // Hjälpmetod för BouncyCastle-verifieringen
-    private bool VerifyRsaSignature(RsaKeyParameters pubKey, byte[] challenge, byte[] signature)
-    {
-        try
-        {
-            // ICAO specificerar ISO9796-2 för RSA-signaturer i AA.
-            // Parametrar: RSA Engine, SHA1 Digest (vanligast för AA), och 'true' för implicit padding.
-            var signer = new Iso9796d2Signer(new RsaEngine(), new Sha256Digest(), true);
-
-            signer.Init(false, pubKey); // false = "Verify mode" (vi skapar inte en signatur, vi kollar den)
-
-            // Mata in originaldatan (vår challenge) som chippet skulle ha signerat
-            signer.BlockUpdate(challenge, 0, challenge.Length);
-
-            // Kontrollera om signaturen matchar
-            return signer.VerifySignature(signature);
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Kryptografiskt fel vid verifiering: " + ex.Message);
-            return false;
-        }
-    }
+   
 
     public async Task SetupChipAuthentication()
     {

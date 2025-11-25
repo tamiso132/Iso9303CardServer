@@ -232,31 +232,7 @@ public static class BIgIntegerExtension
 // TODO Remove??
 public static class ByteArrayExtension
 {
-    public static void PrintByteComparison(this byte[] correct, byte[] b)
-    {
-        int length = Math.Max(b.Length, correct.Length);
-
-        // First line: compared array, red for mismatches
-        for (int i = 0; i < length; i++)
-        {
-            byte bVal = i < b.Length ? b[i] : (byte)0;
-            byte cVal = i < correct.Length ? correct[i] : (byte)0;
-
-            if (i >= correct.Length || bVal != cVal)
-                Console.ForegroundColor = ConsoleColor.Red;
-            Console.Write($"{bVal:X2} ");
-            Console.ResetColor();
-        }
-        Console.WriteLine();
-
-        // Second line: correct array
-        for (int i = 0; i < length; i++)
-        {
-            byte cVal = i < correct.Length ? correct[i] : (byte)0;
-            Console.Write($"{cVal:X2} ");
-        }
-        Console.WriteLine();
-    }
+    
 
     public static string ToOidStr(this byte[] oid)
     {
@@ -291,10 +267,7 @@ public static class ByteArrayExtension
 //TODO Remove??
 public static class IntExtensions
 {
-    public static string ToHex(this int value, int digits = 2)
-    {
-        return value.ToString($"X{digits}");
-    }
+    
 
     public static byte[] IntoLeExtended(this int value)
     {
