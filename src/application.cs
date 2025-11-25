@@ -261,6 +261,7 @@ public class ClientSession(ICommunicator comm)
     public async Task<RsaKeyParameters> SetupActiveAuthentication()
     {
         var dg15Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg15)).UnwrapOrThrow();
+        
         Log.Info(BitConverter.ToString(dg15Response.data));
         var root = TagReader.ReadTagData(dg15Response.data, [0x30, 0x31, 0x6F]); //Parse
 
@@ -319,8 +320,11 @@ public class ClientSession(ICommunicator comm)
 
         // 2. SKAPA UTMANING (CHALLENGE)
         // Enligt ICAO 9303 ska challengen vara 8 bytes slumpmässig data.
+
         byte[] challenge = new RandomNumberProvider().GetNextBytes(8);
         Log.Info("Genererad Challenge: " + BitConverter.ToString(challenge));
+
+
 
         // 3. SKICKA TILL CHIPPET
         // Vi använder SecureMessage eftersom vi redan har en krypterad session (efter PACE/CA).
