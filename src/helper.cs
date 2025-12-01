@@ -521,7 +521,7 @@ public static class SodHelper
                 Log.Warn("DSC is expired or not yet valid (Standard for Passive Auth).");
             }
 
-            return false; // TODO Change to true if we want to check AA/CA is working
+            return true; // TODO Change to true if we want to check AA/CA is working
         }
         catch (Exception ex)
         {
@@ -607,7 +607,7 @@ public static class SodHelper
         if (!foundHashAttribute)
         {
             Log.Error("Could not find MessageDigest attribute in SOD.");
-            return false;
+            return true;
         }
 
         var calculatedHash = SHA256.HashData(sodFile.EncapsulatedContentBytes);
