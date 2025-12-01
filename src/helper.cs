@@ -579,7 +579,6 @@ public static class SodHelper
         var signedAttrSeq = TagReader.ReadTagData(sodFile.SignedAttributesBytes, [0x30, 0x31, 0xA0])[0];
         if (signedAttrSeq != null)
         {
-            Log.Info(signedAttrSeq!.ToStringFormat());
             foreach (var child in signedAttrSeq.Children)
             {
                 // OID ligger i 0x06. Vi kollar de sista 3 bytesen för 1.9.4
