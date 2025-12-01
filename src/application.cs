@@ -327,13 +327,6 @@ public class ClientSession(ICommunicator comm)
         byte[] dg14Bytes = dg14Response.data;
 
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
-<<<<<<< HEAD
-=======
-
-        //  Log.Info(root.ToStringFormat());
-        //  var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
-
->>>>>>> 84a865781a0cca51f73ba3f1db277ff325b9eec4
         var objects = root.FindChild(0x31);
 
         var chipAuthOidBytes = Array.Empty<byte>();
