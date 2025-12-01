@@ -399,8 +399,7 @@ public static class HashCalculator
     /// <param name="inputData">The data to be hashed (as a byte array).</param>
     /// <returns>The computed hash as a byte array.</returns>
     /// <exception cref="NotSupportedException">Thrown if the algorithm name is not supported by .NET.</exception>
-    /// 
-    /// 
+    
     public static byte[] CalculateSHAHash(string algorithmName, byte[] inputData)
     {
         // 1. Create the HashAlgorithm instance dynamically
@@ -507,7 +506,7 @@ public static class SodHelper
             // 4. VALIDITY (Warning only for Passports)
             try
             {
-                dscCert.CheckValidity();
+                dscCert.CheckValidity(); // Check valid date
             }
             catch (Exception)
             {

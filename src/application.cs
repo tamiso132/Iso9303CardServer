@@ -249,12 +249,12 @@ public class ClientSession(ICommunicator comm)
             var engine = new Org.BouncyCastle.Crypto.Engines.RsaEngine();
             engine.Init(false, pubKey); // false = decrypt (med publik nyckel för att verifiera signatur)
 
-            // Dekryptera signaturen matematiskt
+            // Dekryptera signaturen 
             byte[] decrypted = engine.ProcessBlock(signature, 0, signature.Length);
 
             Log.Info($"Decrypted Data (EM): {BitConverter.ToString(decrypted)}");
 
-            // Tips: ISO 9796-2 ska börja med 0x6A och sluta med en hash eller trailer (t.ex. 34CC).
+            // ISO 9796-2 ska börja med 0x6A och sluta med en hash eller trailer (t.ex. 34CC).
             // Om det är PKCS#1 v1.5 börjar det med 00 01 FF ...
         }
         catch (Exception ex)
@@ -343,7 +343,7 @@ public class ClientSession(ICommunicator comm)
 
         catch
         {
-            Log.Info("fuck");
+            Log.Info("bad");
             throw new Exception("");
         }
 
@@ -358,8 +358,6 @@ public class ClientSession(ICommunicator comm)
         // Read and store DG14
         var dg14Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg14)).UnwrapOrThrow();
         byte[] dg14Bytes = dg14Response.data;
-
-
 
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
 

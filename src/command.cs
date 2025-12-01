@@ -851,8 +851,10 @@ public class Command<T>(ICommunicator communicator, T encryption)
         Log.Info("Skickar Internal Authenticate (AA)...");
 
         // INS: 0x88 = Internal Authenticate
-        // Data: Din slumpmässiga challenge (8 bytes)
+        // Data: Slumpmässig challenge (8 bytes)
         // Le: 0x00 = Vi förväntar oss ett svar (signaturen)
+
+        // FormatCommand bygger APDU:n: [CLA, INS, P1, P2, Lc, DATA, Le]
         byte[] cmd = type.FormatCommand(this, 0x88, 0x00, 0x00, challenge, le: 0xC0);
 
         return await SendPackageDecodeResponse(type, cmd);
