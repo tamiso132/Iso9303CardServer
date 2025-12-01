@@ -55,7 +55,6 @@ public class ClientSession(ICommunicator comm)
 
             AuthMethod nextMethod = await SetupPassiveAuthentication();
 
-
             if (nextMethod == AuthMethod.CA)
             {
                 Log.Info("Using Chip Authentication....");
@@ -291,9 +290,20 @@ public class ClientSession(ICommunicator comm)
     }
 
 
-
-
-
+    /// <summary>
+    /// Utför Chip Authentication (CA) enligt ICAO 9303.
+    /// Syftet är att bevisa att chippet innehar den privata nyckeln som motsvarar den publika nyckeln i DG14.
+    /// </summary>
+    /// <remarks>
+    /// Processen sker i tre steg:
+    /// 1. Läsning: Hämtar chippets publika nyckel och kurvparametrar från DG14.
+    /// 2. Nyckelutbyte (ECDH): Terminalen och chippet kommer överens om en ny "Shared Secret".
+    /// 3. Kanalbyte: Sessionen byter krypteringsnycklar från PACE/BAC till de nya CA-nycklarna.
+    /// 
+    /// Verifieringen sker implicit: Om chippet inte har rätt privat nyckel, kommer de framräknade 
+    /// sessionsnycklarna inte matcha. Då misslyckas nästa läskommando (ReadBinary DG1) pga MAC-fel.
+    /// </remarks>
+    /// <exception cref="Exception">Kastas om DG14 saknas, om parametrar inte stöds, eller om autentiseringen misslyckas (MAC-fel).</exception>
     public async Task SetupChipAuthentication()
     {
         // Read and store DG14
@@ -316,9 +326,6 @@ public class ClientSession(ICommunicator comm)
         byte[] n = [];
         byte[] h = [];
         byte? keyID = null;
-
-        byte[] encodedParameters = [];
-
 
 
         foreach (var objectP in objects!.Children) // first find protocol
@@ -386,7 +393,6 @@ public class ClientSession(ICommunicator comm)
 
                 var domainParameters = subjectPublicKeyInfo.FindChild(0x30)!.FindChild(0x30);
 
-                encodedParameters = subjectPublicKeyInfo.FindChild(0x30).FindChild(0x30)!.Data;
 
 
                 var sequences = domainParameters!.Children.FilterByTag(0x30);
@@ -452,15 +458,7 @@ public class ClientSession(ICommunicator comm)
             hAsn1     // Children[5]
         ).GetDerEncoded()!;
 
-        //  TestClass.PrintByteComparison(explicitParametersDer, encodedParameters); 
-
-        //  Log.Info("DerEncodedStructure: " + BitConverter.ToString(explicitParametersDer));
-
-
-        ECDH ecdh = new(DomainParameter.GetFromDerEncoded(explicitParametersDer)); //Create curve using parameters taken from DG14
-                                                                                   //ecdh.PrintECParameters(); ec parameters seem correct
-                                                                                   // ecdh.GenerateEphemeralKeys(new RandomNumberProvider()); // Generate temporary keys
-                                                                                   //  ecdh.CalculateSharedSecret(publicKey);
+        ECDH ecdh = new(DomainParameter.GetFromDerEncoded(explicitParametersDer));
 
         ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
 
@@ -476,25 +474,11 @@ public class ClientSession(ICommunicator comm)
         _cmd.SetEncryption(tuple.Item2, tuple.Item1);
 
 
-        byte[] terminalEphemeralPublicKey = ecdh.PublicKey; // K_pub_T 
-
-        Log.Info("Send general authenticate CA");
-
-
-        // if error, it means different shared secret, aka ENC and MAC should fail as they are derived from shared secret
+        // if error, it means different shared secret, aka ENC and MAC should fail as they are derived from different shared secret
         // so chip is cloned
         (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg1)).UnwrapOrThrow();
 
         Log.Info("Chip Authentication Completed!");
-
-        // // Send general authenticate
-        // var caResponse = (await _cmd.GeneralAuthenticateMapping(0x81, terminalEphemeralPublicKey)).UnwrapOrThrow();
-
-
-
-
-
-
     }
 
 
@@ -525,9 +509,6 @@ public class ServerEncryption : IServerFormat
         Console.WriteLine("Error: " + packet.Type.ToString());
         return Result<byte[]>.Fail(new Error.Parse("Decoding packet failed, does not have correct server format"));
     }
-
-
-
 };
 
 public enum AuthMethod
