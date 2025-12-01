@@ -658,6 +658,7 @@ public static class SodHelper
             if (dg.DataGroupNumber == 2)
             {
                 Log.Warn($"Skipping verification of DG{dg.DataGroupNumber} (Very big file that holds the image of the person)");
+                continue;
             }
 
             // 2. Flaggor för nästa steg
