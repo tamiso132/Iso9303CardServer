@@ -18,7 +18,7 @@ namespace Parser;
 
 
 
-//EFCOM
+//EFCOM read, find existing datagroups and read LDS version
 public class ImplEfCom : IEfParser<ImplEfCom.Info>
 {
 
@@ -137,3 +137,109 @@ public struct ImplEFDir : IEfParser<ImplEFDir.Info>
 
 
 
+<<<<<<< HEAD
+=======
+
+        // Digest Algorithm
+        var digestSeq = outerSeq.ReadSequence();
+        var digestOid = digestSeq.ReadObjectIdentifier();
+        ef.DigestAlgorithm = digestOid;
+        if (digestSeq.HasData)
+            digestSeq.ReadNull();
+
+
+
+        // Sequence of sequence
+        var dgHashesSeq = outerSeq.ReadSequence();
+        while (dgHashesSeq.HasData)
+        {
+            var dgEntrySeq = dgHashesSeq.ReadSequence();
+            var dgNum = (int)dgEntrySeq.ReadInteger();
+            var dgHash = dgEntrySeq.ReadOctetString();
+
+            ef.DataGroupHashes.Add(new DataGroupHashEntry { DataGroupNumber = dgNum, HashValue = dgHash });
+
+        }
+
+        // Läs sekvensen som innehåller LDSVersionInfo, Finns redan?
+        var ldsVersionSeq = outerSeq.ReadSequence();
+        ef.LdsVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString);    // ldsVersion
+        ef.UnicodeVersion = ldsVersionSeq.ReadCharacterString(UniversalTagNumber.PrintableString); // unicodeVersion
+
+
+
+        return ef;
+        // throw new NotImplementedException();
+
+
+    }
+
+
+
+}
+
+
+
+// public class TLV
+// {
+//     public int Tag { get; set; }
+//     public int Length { get; set; }
+//     public byte[] Value { get; set; }
+
+// }
+
+
+// Data Groups parsing 
+// Data Groups: DG1, DG11, DG12, DG14, DG16
+// TODO Remove?
+
+
+// public static class TLVParser
+// {
+//     public static List<TLV> Parse(byte[] data)
+//     {
+//         var result = new List<TLV>();
+//         int index = 0;
+
+//         while (index < data.Length)
+//         {
+//             int tag = data[index++];
+//             int length = data[index++];
+
+//             if (length > 0x80)
+//             {
+//                 int lengthBytes = length & 0x77;
+//                 length = 0;
+//                 for (int i = 0; i < lengthBytes; i++)
+//                 {
+//                     length = (length << 8) | data[index++];
+//                 }
+//             }
+
+//             byte[] value = new byte[length];
+//             Array.Copy(data, index, value, 0, length);
+//             index += length;
+
+//             result.Add(new TLV { Tag = tag, Length = length, Value = value });
+//         }
+//         return result;
+//     }
+
+//     public class Dg1Info
+//     {
+//         public int DocumentCode { get; set; }
+//         public int State { get; set; }
+//         public List<byte> DocumentNumber { get; } = new();
+//         public byte[] DateOfBirth { get; set; } = Array.Empty<byte>();
+//         public int Gender { get; set; }
+//         public byte[] DateExpire { get; set; } = Array.Empty<byte>();
+//         public byte[] Nationality { get; set; } = Array.Empty<byte>();
+//         public string Name { get; set; } = "";
+//         internal Dg1Info() { }
+//     }
+
+
+
+
+// }
+>>>>>>> 9e41a8d31895f3f5868f6df44d0b10403e193c96

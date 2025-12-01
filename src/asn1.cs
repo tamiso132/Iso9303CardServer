@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Razor.TagHelpers;
 using Type;
 using WebSocketSharp;
 
-
+// Build data using ASN1-structure
 public struct AsnBuilder()
 {
     private List<byte> _data = [];
