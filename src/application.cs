@@ -32,6 +32,7 @@ using Org.BouncyCastle.Crypto;
 using System.Runtime.Intrinsics.Arm;
 using System;
 using System.Diagnostics;
+using Org.BouncyCastle.Security;
 namespace App;
 
 
@@ -63,7 +64,7 @@ public class ClientSession(ICommunicator comm)
             else if (nextMethod == AuthMethod.AA)
             {
                 Log.Info("Using Active Authentication....");
-                
+
                 await SetupActiveAuthentication();
             }
             else
@@ -72,7 +73,7 @@ public class ClientSession(ICommunicator comm)
                 //return;
             }
 
-            
+
         }
         Log.Info("All commands completed without a problem");
     }
@@ -83,14 +84,6 @@ public class ClientSession(ICommunicator comm)
 
         var infos = response.Parse<ImplCardAccess, ImplCardAccess.Info>().EncryptInfos;
         var info = infos[0];
-        // foreach (var i in infos)
-        // {
-        //     i.PrintInfo();
-        //     if (i.OrgOid[^2] == 6) // CAM
-        //     {
-        //         info = i;
-        //     }
-        // }
 
         info.PrintInfo();
 
@@ -126,8 +119,6 @@ public class ClientSession(ICommunicator comm)
 
         _cmd.SetEncryption(tuple.Item2, tuple.Item1);
 
-        Log.Info("hello: " + BitConverter.ToString(info.OrgOid));
-
         if (!(await _cmd.GeneralAuthenticateMutual(icPublicKey, _ecdh.PublicKey, info.OrgOid)).UnwrapOrThrow())
         {
             Log.Error("AuthenticationToken was not correctly calculated");
@@ -145,88 +136,43 @@ public class ClientSession(ICommunicator comm)
     {
         var response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Sod)).UnwrapOrThrow();
 
-        bool dg15Find = false;
-        bool dg14Find = false;
 
         SodContent sodFile = EfSodParser.ParseFromHexString(response.data);
+        if (!SodHelper.CheckSodIntegrity(sodFile))
+            throw new Exception("Sod file has been manipulated");
 
-        Log.Info("Nr of data groups in EF.SOD: " + sodFile.DataGroupHashes.Count.ToString());
+
         Log.Info("Using algorithm: " + sodFile.HashAlgorithmOid.GetAlgorithmName());
-
         Log.Info("Starting Passive authentication...");
 
         string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
-        if (!SodHelper.PerformPassiveAuthStep2(sodFile.DocumentSignerCertificate, masterListPath))
+        if (!SodHelper.VerifyChipSignature(sodFile.DocumentSignerCertificate, masterListPath))
         {
             Log.Error("STEP 2 Failed for passive authentication");
             return AuthMethod.None;
-        
+
         }
 
         Log.Info("PA step 3 start...");
+        var (success, foundDg14, foundDg15) = await SodHelper.VerifyDataGroups(_cmd, sodFile);
 
-        foreach (var dg in sodFile.DataGroupHashes)
-        {
-            if (dg.DataGroupNumber == 3 || dg.DataGroupNumber == 4)
-            {
-                //NEED EAC TO READ THOSE DG
-                Log.Warn($"Found DG: {dg.DataGroupNumber}, Need EAC (Extended Acess Controll) to verify this datagroup");
-                continue;
-            }
-
-            if (dg.DataGroupNumber == 15)
-            {
-                dg15Find = true;
-            }
-
-            if (dg.DataGroupNumber == 14)
-            {
-                dg14Find = true;
-            }
+        if (!success)
+            throw new Exception("Dg files have been manipulated");
 
 
 
-
-            EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
-            response = (await _cmd.ReadBinary(MessageType.SecureMessage, dgID)).UnwrapOrThrow();
-
-
-            byte[] dgData = response.data;
-            byte[] calculatedHashData = HashCalculator.CalculateSHAHash(sodFile.HashAlgorithmOid.GetAlgorithmName(), dgData);
-
-            if (dg.DataGroupNumber == 14)
-            {
-                File.WriteAllBytes("dg14Wrong.txt", dgData);
-            }
-
-
-            // Log.Info($"Chip Hash says: {BitConverter.ToString(dg.Hash)}");
-            // Log.Info($"Calculated Hashvalue: {BitConverter.ToString(calculatedHashData)}");
-
-            // Manipulerad hash går inte genom detta steg
-            if (!calculatedHashData.SequenceEqual(dg.Hash))
-            {
-                TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
-                Log.Error($"Hash wrong for DG{dg.DataGroupNumber}, PA failed");
-                return AuthMethod.None;
-            }
-            //   Log.Info($"Hashvalue ok for DG {dg.DataGroupNumber}");
-        }
-        Log.Info("Step 3 PA OK");
         Log.Info("Full Passive Authentication Complete!");
 
         // Chose CA or AA here
-        // if DG15 only -> AA
-        // if DG14 only -> CA
-        // if DG15 AND DG 14 -> CA (Must)
 
-        if (dg14Find)
+
+        if (foundDg14)
         {
             Log.Info("DG14 in chip, use CA");
             return AuthMethod.CA;
         }
 
-        if (dg15Find)
+        if (foundDg15)
         {
             Log.Info("DG15 ONLY, use AA");
             return AuthMethod.AA;
@@ -351,7 +297,7 @@ public class ClientSession(ICommunicator comm)
 
 
 
-   
+
 
     public async Task SetupChipAuthentication()
     {
