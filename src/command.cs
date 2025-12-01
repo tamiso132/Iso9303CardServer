@@ -459,14 +459,12 @@ public class Command<T>(ICommunicator communicator, T encryption)
     public async Task<TResult> GeneralAuthenticateChipMapping(MessageType type, byte innerTag, byte[] publicKey)
     {
         Log.Info("General Authentication Mapping");
-        // TODO, check if length is bigger then 128
         byte[] innerSequence = [innerTag, (byte)publicKey.Length, .. publicKey];
         byte[] data = [0x7C, (byte)innerSequence.Length, .. innerSequence];
 
         byte[] nonSecureDebug = MessageType.NonSecureMessage.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x00);
         byte[] cmdFormat = type.FormatCommand(this, 0x86, 0x00, 0x00, data, le: 0x02);
 
-        Log.Info("unencrypted format: " + BitConverter.ToString(nonSecureDebug));
 
         //Log.Info("Write: " + BitConverter.ToString(raw));
 

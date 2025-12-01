@@ -326,10 +326,6 @@ public class ClientSession(ICommunicator comm)
         byte[] dg14Bytes = dg14Response.data;
 
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
-
-        Log.Info(root.ToStringFormat());
-        //  var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
-
         var objects = root.FindChild(0x31);
 
         var chipAuthOidBytes = Array.Empty<byte>();
@@ -477,7 +473,6 @@ public class ClientSession(ICommunicator comm)
 
         ecdh.GenerateEphemeralKeys(new RandomNumberProvider());
 
-        Log.Info(BitConverter.ToString(ecdh.PublicKey));
 
         (await _cmd.MseSetAT_ChipAuthentication(MessageType.SecureMessage, chipAuthOidBytes, keyID)).UnwrapOrThrow();
         (await _cmd.GeneralAuthenticateChipMapping(MessageType.SecureMessage, 0x80, ecdh.PublicKey)).UnwrapOrThrow(); // should return 0x7C00 -> empty dynamic auth data

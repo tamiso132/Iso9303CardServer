@@ -403,7 +403,7 @@ public static class HashCalculator
     /// <param name="inputData">The data to be hashed (as a byte array).</param>
     /// <returns>The computed hash as a byte array.</returns>
     /// <exception cref="NotSupportedException">Thrown if the algorithm name is not supported by .NET.</exception>
-    
+
     public static byte[] CalculateSHAHash(string algorithmName, byte[] inputData)
     {
         // 1. Create the HashAlgorithm instance dynamically
@@ -565,7 +565,6 @@ public static class SodHelper
         {
             // BouncyCastle-namn för PSS: "SHA256withRSAandMGF1"
             string pssAlgo = $"{hashPart}withRSAandMGF1";
-            Log.Info($"Attempt 1 failed. Attempt 2: Trying {pssAlgo} (PSS)...");
 
             ISigner pssSigner = SignerUtilities.GetSigner(pssAlgo);
             pssSigner.Init(false, publicKey);
@@ -577,10 +576,10 @@ public static class SodHelper
 
         // Din TagReader-logik för att hitta attributet
         // Vi filtrerar fram 0xA0 (SignedAttributes)
-        var signedAttrSeq = TagReader.ReadTagData(sodFile.SignedAttributesBytes, [0x30, 0xA0]).FilterByTag(0xA0).FirstOrDefault();
-
+        var signedAttrSeq = TagReader.ReadTagData(sodFile.SignedAttributesBytes, [0x30, 0x31, 0xA0])[0];
         if (signedAttrSeq != null)
         {
+            Log.Info(signedAttrSeq!.ToStringFormat());
             foreach (var child in signedAttrSeq.Children)
             {
                 // OID ligger i 0x06. Vi kollar de sista 3 bytesen för 1.9.4
