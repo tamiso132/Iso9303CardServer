@@ -1,4 +1,5 @@
 using Helper;
+using Org.BouncyCastle.Utilities;
 
 // TODO remove entire file?
 public class DataGroupHash
@@ -75,9 +76,7 @@ public static class EfSodParser
         0x77  // [Application 23] Wrapper
     };
 
-    /// <summary>
-    /// Privat hjälpfunktion: Konverterar en hex-sträng till en byte array.
-    /// </summary>
+  
 
     /// <summary>
     /// Huvudingångspunkt för att parsa en EF.SOD hex-sträng.
@@ -87,12 +86,8 @@ public static class EfSodParser
         var content = new SodContent();
         byte[] rawData = hexString;
 
-        // 1. Bygg det primära T(L)V-trädet
-        // Din TagReader kommer att hantera 0x77-taggen automatiskt om den finns,
-        // eftersom vi la till 0x77 i sequenceTags.
         var rootTags = TagReader.ReadTagData(rawData, sequenceTags);
 
-        // 2. Starta navigationen
         // Hitta ContentInfo (0x30), som antingen är root eller barn till 0x77
         var contentInfo = rootTags.FilterByTag(0x30).FirstOrDefault();
         if (contentInfo == null)
@@ -122,7 +117,6 @@ public static class EfSodParser
         var dsCert = certsWrapper?.Children.FilterByTag(0x30).FirstOrDefault(); // Det första (och enda) certifikatet
         if (dsCert != null)
         {
-            // Använd din GetHeaderFormat för att återskapa hela certifikatets DER-data
             content.DocumentSignerCertificate = dsCert.GetHeaderFormat();
         }
 
@@ -137,7 +131,6 @@ public static class EfSodParser
 
             if (sigOctetString != null && sigOctetString.Data.Length > 0)
             {
-                // För OCTET STRING finns ingen "unused bits" byte. Ta allt.
                 content.Signature = sigOctetString.Data;
             }
             else
@@ -151,7 +144,6 @@ public static class EfSodParser
                 }
             }
 
-            // (Hämta SignedAttributes som du gjorde innan)
             var signedAttrsTag = signerInfoSeq.Children.FilterByTag(0xA0).FirstOrDefault();
             if (signedAttrsTag != null)
                 content.SignedAttributesBytes = signedAttrsTag.GetHeaderFormat();
@@ -169,9 +161,6 @@ public static class EfSodParser
 
         content.EncapsulatedContentBytes = eContentOctetString.Data;
 
-        // --- VIKTIGT STEG ---
-        // Datan *inuti* denna OCTET STRING är en ny TLV-struktur.
-        // Vi måste anropa din TagReader *igen* på den datan.
         var ldsRootTags = TagReader.ReadTagData(eContentOctetString.Data, sequenceTags);
 
         var ldsSeq = ldsRootTags.FilterByTag(0x30).FirstOrDefault();
@@ -190,6 +179,7 @@ public static class EfSodParser
                 {
                     // Konvertera DG-numret (INTEGER) från big-endian bytes
                     int dgNumber = 0;
+                    
                     for (int j = 0; j < dgNumTag.Data.Length; j++)
                     {
                         dgNumber = (dgNumber << 8) | dgNumTag.Data[j];
