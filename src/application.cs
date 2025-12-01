@@ -204,7 +204,22 @@ public class ClientSession(ICommunicator comm)
     }
 
 
-    // TODO, måste även fixa för ECDSA. Just nu är RSA hårdkodat
+    /// <summary>
+    /// Utför Active Authentication (AA) för att säkerställa att chippet inte är en klon.
+    /// </summary>
+    /// <remarks>
+    /// Funktionen använder "Challenge-Response"-metodik enligt ISO 9796-2:
+    /// 1. Hämtar chippets publika RSA-nyckel från DG15.
+    /// 2. Genererar en slumpmässig utmaning (8 bytes) och skickar till chippet (INTERNAL AUTHENTICATE).
+    /// 3. Verifierar att chippet har signerat utmaningen korrekt med sin skyddade privata nyckel.
+    /// </remarks>
+    /// <exception cref="Exception">Kastas om signaturen är ogiltig, vilket indikerar ett falskt chip.</exception>
+    /// <returns>
+    /// Om funktionen slutförs utan fel innebär det:
+    /// Chippet är ÄKTA (Originalet). Det har bevisat att det innehar den privata nyckel 
+    /// som motsvarar den publika nyckeln i DG15. Detta skyddar mot kloning, 
+    /// eftersom en kopia av datan inte får med sig den privata nyckeln från hårdvaran.
+    /// </returns>
     public async Task SetupActiveAuthentication()
     {
         var dg15Response = (await _cmd.ReadBinary(MessageType.SecureMessage, EfIdAppSpecific.Dg15)).UnwrapOrThrow();
@@ -276,7 +291,7 @@ public class ClientSession(ICommunicator comm)
 
             if (calDigest.SequenceEqual(digest))
             {
-                Log.Info("Active Authentication is succesful!");
+                Log.Info("Active Authentication is successful!");
             }
 
         }
