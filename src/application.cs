@@ -140,7 +140,7 @@ public class ClientSession(ICommunicator comm)
         Log.Info("Starting Passive authentication...");
 
         string masterListPath = Path.Combine(Environment.CurrentDirectory, "masterlist-cscas"); // Directory to masterlist 
-        
+
         if (!SodHelper.VerifyChipSignature(sodFile.DocumentSignerCertificate, masterListPath))
         {
             Log.Error("STEP 2 Failed for passive authentication");
@@ -328,7 +328,7 @@ public class ClientSession(ICommunicator comm)
 
         var root = TagReader.ReadTagData(dg14Bytes, [0x30, 0x31, 0x6E]).FilterByTag(0x6E)[0]; //Parse
 
-        Log.Info(root.ToStringFormat());
+        //  Log.Info(root.ToStringFormat());
         //  var publicKeyInfo = root.FindChild(0x31).FindChild(0x30)!;
 
         var objects = root.FindChild(0x31);
