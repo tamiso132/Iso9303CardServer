@@ -552,7 +552,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
         var tags = TagReader.ReadTagData(result.Value.data, [0x7f, 0x30, 0x31]);
         var chipToken = tags.Find(0x7C).FindChild(0x86)!.Data;
-        Log.Info(tags.ToStringFormat());
 
         // Asn1Object obj = stream.ReadObject();  // top-level object
         // var chipToken = obj.GetDerEncoded()[4..]; // ic publickey
@@ -685,7 +684,6 @@ public class Command<T>(ICommunicator communicator, T encryption)
 
     private bool CMacCheck(byte[] chipToken, byte[] data)
     {
-        Log.Info(BitConverter.ToString(data));
         var engine = new CMac(new AesEngine(), 64);
         var calculatedToken = new byte[8];
 

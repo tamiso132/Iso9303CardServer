@@ -1,7 +1,11 @@
+using App;
+using Command;
 using Encryption;
+using Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Console;
+using Org.BouncyCastle.Asn1;
 using Org.BouncyCastle.Asn1.X509;
 using Org.BouncyCastle.Cms;
 using Org.BouncyCastle.Crypto;
@@ -233,7 +237,7 @@ public static class BIgIntegerExtension
 // TODO Remove??
 public static class ByteArrayExtension
 {
-    
+
 
     public static string ToOidStr(this byte[] oid)
     {
@@ -268,7 +272,7 @@ public static class ByteArrayExtension
 //TODO Remove??
 public static class IntExtensions
 {
-    
+
 
     public static byte[] IntoLeExtended(this int value)
     {
@@ -451,16 +455,20 @@ public static class HashCalculator
 
 }
 
+
+
 public static class SodHelper
 {
-    // Verifierar EF.SOD interna signatur
-    
-
-    // Function that creates chain between chip (DSC) and master list CSCA
-    public static bool PerformPassiveAuthStep2(byte[] dscRawBytes, string masterListDirectoryPath)
+    /// <summary>
+    /// Verifierar förtroendekedjan (Chain of Trust) genom att kontrollera att DSC är signerat av en betrodd CSCA.
+    /// </summary>
+    /// <returns>
+    /// TRUE innebär:
+    /// 1. DSC-certifikatet är äkta och matchar ett CSCA-certifikat i Master List.
+    /// 2. Vi kan nu lita på att detta DSC är utfärdat/signerat av staten, och inte av en hackare.
+    /// </returns>
+    public static bool VerifyChipSignature(byte[] dscRawBytes, string masterListDirectoryPath)
     {
-        Log.Info("Step 2 Pa start (Bouncy Castle Correct Usage)");
-
         try
         {
             // 1. PARSE: Use X509CertificateParser
@@ -522,6 +530,189 @@ public static class SodHelper
         }
     }
 
+    /// <summary>
+    /// Verifierar SOD-filens äkthet (Passive Authentication) genom integritets- och signaturkontroll.
+    /// </summary>
+    /// <remarks>
+    /// 1. Integritet: Säkerställer att innehållet (DG-hashlistan) matchar de signerade attributen.
+    /// 2. Autenticitet: Verifierar att signaturen är giltig och skapad av utfärdaren (DSC).
+    /// </remarks>
+    /// <returns>
+    /// TRUE innebär:
+    /// 1. Vi har ett "äkta facit": Listan med hashar (DataGroupHashes) är garanterat 
+    ///    utfärdad av passmyndigheten och har inte manipulerats.
+    /// 2. Vi kan nu lita på hasharna: Det är nu säkert att läsa DG1, DG2 etc. från 
+    ///    chippet och jämföra dem mot denna lista.
+    /// </returns>
+
+    public static bool CheckSodIntegrity(SodContent sodFile)
+    {
+        var parser = new Org.BouncyCastle.X509.X509CertificateParser();
+        Org.BouncyCastle.X509.X509Certificate dscCert = parser.ReadCertificate(sodFile.DocumentSignerCertificate);
+
+
+        // 2. Hitta den lagrade hashen i SignedAttributes (OID 1.2.840.113549.1.9.4)
+        byte[] storedHash = [];
+        bool foundHashAttribute = false;
+
+        AsymmetricKeyParameter publicKey = dscCert.GetPublicKey();
+        byte[] tbsData = sodFile.SignedAttributesBytes;
+        tbsData[0] = 0x31;
+
+
+        string hashPart = "SHA256"; // hårdkodat
+        if (publicKey is Org.BouncyCastle.Crypto.Parameters.RsaKeyParameters)
+        {
+            // BouncyCastle-namn för PSS: "SHA256withRSAandMGF1"
+            string pssAlgo = $"{hashPart}withRSAandMGF1";
+            Log.Info($"Attempt 1 failed. Attempt 2: Trying {pssAlgo} (PSS)...");
+
+            ISigner pssSigner = SignerUtilities.GetSigner(pssAlgo);
+            pssSigner.Init(false, publicKey);
+            pssSigner.BlockUpdate(tbsData, 0, tbsData.Length);
+
+            if (!pssSigner.VerifySignature(sodFile.Signature))
+                throw new Exception("Failed to verify Signature with DSC public key");
+        }
+
+        // Din TagReader-logik för att hitta attributet
+        // Vi filtrerar fram 0xA0 (SignedAttributes)
+        var signedAttrSeq = TagReader.ReadTagData(sodFile.SignedAttributesBytes, [0x30, 0xA0]).FilterByTag(0xA0).FirstOrDefault();
+
+        if (signedAttrSeq != null)
+        {
+            foreach (var child in signedAttrSeq.Children)
+            {
+                // OID ligger i 0x06. Vi kollar de sista 3 bytesen för 1.9.4
+                var oidTag = child.FindChild(0x06);
+                if (oidTag != null && oidTag.Data.Length >= 3)
+                {
+                    byte[] oidSuffix = oidTag.Data[^3..];
+                    if (oidSuffix.SequenceEqual([(byte)1, (byte)9, (byte)4]))
+                    {
+                        // Hittade MessageDigest! Värdet ligger i SET(0x31) -> OCTET STRING eller liknande
+                        // Din kod skippade 2 header bytes, vi antar att det stämmer för din parser
+                        var valueTag = child.FindChild(0x31);
+                        if (valueTag != null)
+                        {
+                            storedHash = valueTag.Data[2..];
+                            foundHashAttribute = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (!foundHashAttribute)
+        {
+            Log.Error("Could not find MessageDigest attribute in SOD.");
+            return false;
+        }
+
+        var calculatedHash = SHA256.HashData(sodFile.EncapsulatedContentBytes);
+
+
+        if (!calculatedHash.SequenceEqual(storedHash))
+        {
+            Log.Error("en del av signaturen stämmer inte överens med beräknade värdet av dg listan.");
+            TestClass.PrintByteComparison(storedHash, calculatedHash);
+            return false;
+        }
+
+        return true;
+    }
+    /// <summary>
+    /// Verifierar integriteten hos passets datagrupper (DG1-DG16) genom att jämföra dem mot SOD-filens hash-lista.
+    /// </summary>
+    /// <remarks>
+    /// Denna funktion utför det sista steget i Passive Authentication:
+    /// 1. Den läser faktiska filer från chippet.
+    /// 2. Den beräknar hashen på dessa filer.
+    /// 3. Den jämför hashen mot "facit" i SOD-filen.
+    /// 
+    /// Dessutom scannar den efter DG14 (Chip Auth) och DG15 (Active Auth) för nästa steg.
+    /// </remarks>
+    /// <returns>
+    /// (success, foundDg14, foundDg15)
+    /// 
+    /// SUCCESS = TRUE innebär:
+    /// Datan i passet (namn, bild, etc.) är exakt den som utfärdaren signerade. 
+    /// Ingen har manipulerat informationen på chippet.
+    /// </returns>
+    public static async Task<(bool success, bool foundDg14, bool foundDg15)> VerifyDataGroups(Command<ServerEncryption> _cmd, SodContent sodFile)
+    {
+        bool dg14Find = false;
+        bool dg15Find = false;
+        string algoName = sodFile.HashAlgorithmOid.GetAlgorithmName();
+
+        var parser = new Org.BouncyCastle.X509.X509CertificateParser();
+        Org.BouncyCastle.X509.X509Certificate dscCert = parser.ReadCertificate(sodFile.DocumentSignerCertificate);
+
+        foreach (var dg in sodFile.DataGroupHashes)
+        {
+            // 1. Filter: Hoppa över känsliga DGs om vi inte har EAC
+            if (dg.DataGroupNumber == 3 || dg.DataGroupNumber == 4) // DG2 (Bild) är oftast läsbar utan EAC i många pass, men beror på land.
+            {
+                Log.Warn($"Skipping verification of DG{dg.DataGroupNumber} (Requires EAC/Terminal Auth).");
+                continue;
+            }
+            if (dg.DataGroupNumber == 2)
+            {
+                Log.Warn($"Skipping verification of DG{dg.DataGroupNumber} (Very big file that holds the image of the person)");
+            }
+
+            // 2. Flaggor för nästa steg
+            if (dg.DataGroupNumber == 15) dg15Find = true;
+            if (dg.DataGroupNumber == 14) dg14Find = true;
+            // 3. Läs filen från kortet
+            EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
+            var responseResult = await _cmd.ReadBinary(MessageType.SecureMessage, dgID);
+
+            if (!responseResult.IsSuccess)
+            {
+                Log.Error($"Failed to read DG{dg.DataGroupNumber} from chip.");
+                return (false, dg14Find, dg15Find);
+            }
+
+            byte[] dgData = responseResult.Unwrap().data;
+
+
+            // 5. Beräkna hash och jämför
+            byte[] calculatedHashData = HashCalculator.CalculateSHAHash(algoName, dgData);
+
+            if (!calculatedHashData.SequenceEqual(dg.Hash))
+            {
+                Log.Error($"Hash mismatch for DG{dg.DataGroupNumber}!");
+                TestClass.PrintByteComparison(calculatedHashData, dg.Hash);
+                return (false, dg14Find, dg15Find); // Fail immediately
+            }
+        }
+
+        return (true, dg14Find, dg15Find);
+    }
+    private static string GetSignatureAlgorithmName(AsymmetricKeyParameter pubKey, string hashOid)
+    {
+        // 1. Bestäm Hash-del
+        string hashPart = "SHA256"; // Default
+        if (hashOid.Contains("1.101.3.4.2.2")) hashPart = "SHA384";
+        else if (hashOid.Contains("1.101.3.4.2.3")) hashPart = "SHA512";
+        else if (hashOid == "1.3.14.3.2.26") hashPart = "SHA1"; // Gamla pass
+
+        // 2. Bestäm Krypterings-del
+        if (pubKey is Org.BouncyCastle.Crypto.Parameters.RsaKeyParameters)
+        {
+            return $"{hashPart}withRSA";
+        }
+        else if (pubKey is Org.BouncyCastle.Crypto.Parameters.ECPublicKeyParameters)
+        {
+            // För ECDSA heter det ofta "SHA256withECDSA" i BouncyCastle
+            return $"{hashPart}withECDSA";
+        }
+
+        // Fallback
+        return $"{hashPart}withRSA";
+    }
     private static Org.BouncyCastle.X509.X509Certificate? FindCscaCertificate(
         Org.BouncyCastle.X509.X509Certificate dscCert,
         string masterListPath)

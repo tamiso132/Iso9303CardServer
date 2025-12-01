@@ -10,10 +10,46 @@ public class DataGroupHash
 
 public class SodContent
 {
+    /// <summary>
+    /// OID-strängen som berättar vilken algoritm
+    /// som ska användas för att hasha EncapsulatedContentBytes.
+    /// </summary>
     public string HashAlgorithmOid { get; set; }
+
+    /// <summary>
+    /// Den parsade listan av hash-värden för varje Data Group (DG1, DG2, etc.) som finns i ldsSecurityObject.
+    /// Dessa jämförs mot de faktiska hasharna av filerna vi läser från chippet för att garantera att datan är äkta.
+    /// </summary>
     public List<DataGroupHash> DataGroupHashes { get; set; } = new List<DataGroupHash>();
+
+    /// <summary>
+    /// Document Signer (DS)-certifikatet (X.509) som hittades i SOD-filen.
+    /// Från detta extraherar vi den Publika Nyckeln (Public Key) som krävs för att verifiera Signaturen.
+    /// Detta certifikat måste i sin tur valideras mot landets CSCA (Master List).
+    /// </summary>
     public byte[] DocumentSignerCertificate { get; set; }
+
+    /// <summary>
+    /// Den kryptografiska signaturen (bytes) extraherad från SignerInfo.
+    /// Detta är resultatet av att utfärdaren signerade 'SignedAttributesBytes' med sin privata nyckel.
+    /// </summary>
     public byte[] Signature { get; set; }
+
+    // NEW REQUIRED FIELDS FOR VERIFICATION
+    /// <summary>
+    /// Rådatan (bytes) för hela ldsSecurityObject (eContent).
+    /// VERIFIERING STEG 1: Du måste hasha denna blob (med HashAlgorithmOid) och jämföra resultatet 
+    /// med hash-värdet som ligger inbäddat i 'SignedAttributesBytes' (under attributet MessageDigest).
+    /// </summary>
+    public byte[] EncapsulatedContentBytes { get; set; }
+
+    /// <summary>
+    /// Rådatan (bytes) för SignedAttributes-strukturen (inklusive Tag 0xA0 och Length).
+    /// VERIFIERING STEG 2: Signaturen ovan är skapad över just denna blob.
+    /// OBS: Innan du skickar denna till en 'Verify'-funktion måste du ofta byta 
+    /// den första byten (Tag) från 0xA0 (Context Specific) till 0x31 (SET OF).
+    /// </summary>
+    public byte[] SignedAttributesBytes { get; set; }
 
     public override string ToString()
     {
@@ -42,7 +78,7 @@ public static class EfSodParser
     /// <summary>
     /// Privat hjälpfunktion: Konverterar en hex-sträng till en byte array.
     /// </summary>
-    
+
     /// <summary>
     /// Huvudingångspunkt för att parsa en EF.SOD hex-sträng.
     /// </summary>
@@ -80,6 +116,7 @@ public static class EfSodParser
             content.HashAlgorithmOid = BitConverter.ToString(algOid.Data).Replace("-", ".");
         }
 
+
         // 5. Hämta Certifikat ([1] 0xA1)
         var certsWrapper = signedDataChildren.FilterByTag(0xA0).FirstOrDefault();
         var dsCert = certsWrapper?.Children.FilterByTag(0x30).FirstOrDefault(); // Det första (och enda) certifikatet
@@ -92,16 +129,34 @@ public static class EfSodParser
         // 6. Hämta Signatur (sista 0x31 SET)
         var signerInfosSet = signedDataChildren.FilterByTag(0x31).LastOrDefault();
         var signerInfoSeq = signerInfosSet?.Children.FilterByTag(0x30).FirstOrDefault();
+
         if (signerInfoSeq != null)
         {
-            // Signaturen är en 0x03 BIT STRING
-            var sigBitString = signerInfoSeq.Children.FilterByTag(0x03).FirstOrDefault();
-            if (sigBitString != null && sigBitString.Data.Length > 0)
+            // 1. Leta först efter OCTET STRING (0x04) - Detta är standard för Pass (RSA/ECDSA)
+            var sigOctetString = signerInfoSeq.Children.FilterByTag(0x04).FirstOrDefault();
+
+            if (sigOctetString != null && sigOctetString.Data.Length > 0)
             {
-                // Första byten i en BIT STRING är "unused bits", hoppa över den
-                content.Signature = sigBitString.Data.Skip(1).ToArray();
+                // För OCTET STRING finns ingen "unused bits" byte. Ta allt.
+                content.Signature = sigOctetString.Data;
             }
+            else
+            {
+                // 2. Fallback: Leta efter BIT STRING (0x03)
+                var sigBitString = signerInfoSeq.Children.FilterByTag(0x03).FirstOrDefault();
+                if (sigBitString != null && sigBitString.Data.Length > 0)
+                {
+                    // För BIT STRING är första byten "unused bits". Hoppa över den.
+                    content.Signature = sigBitString.Data.Skip(1).ToArray();
+                }
+            }
+
+            // (Hämta SignedAttributes som du gjorde innan)
+            var signedAttrsTag = signerInfoSeq.Children.FilterByTag(0xA0).FirstOrDefault();
+            if (signedAttrsTag != null)
+                content.SignedAttributesBytes = signedAttrsTag.GetHeaderFormat();
         }
+
 
         // 7. Hämta DG Hashes (från EncapContentInfo, den första 0x30-sekvensen)
         var encapContentInfo = signedDataChildren.FilterByTag(0x30).FirstOrDefault();
@@ -111,6 +166,8 @@ public static class EfSodParser
         {
             throw new InvalidOperationException("Hittade inte eContent [0xA0] -> [0x04] (LDSSecurityObject).");
         }
+
+        content.EncapsulatedContentBytes = eContentOctetString.Data;
 
         // --- VIKTIGT STEG ---
         // Datan *inuti* denna OCTET STRING är en ny TLV-struktur.
@@ -146,6 +203,8 @@ public static class EfSodParser
                 }
             }
         }
+
+
 
         return content;
     }
