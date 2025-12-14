@@ -649,8 +649,8 @@ public static class SodHelper
 
         foreach (var dg in sodFile.DataGroupHashes)
         {
-            // 1. Filter: Hoppa över känsliga DGs om vi inte har EAC
-            if (dg.DataGroupNumber == 3 || dg.DataGroupNumber == 4) // DG2 (Bild) är oftast läsbar utan EAC i många pass, men beror på land.
+            // 1. Filter: Hoppa över känsliga DGs eftersom vi ej har behörighet
+            if (dg.DataGroupNumber == 3 || dg.DataGroupNumber == 4) 
             {
                 Log.Warn($"Skipping verification of DG{dg.DataGroupNumber} (Requires EAC/Terminal Auth).");
                 continue;
@@ -664,7 +664,7 @@ public static class SodHelper
             // 2. Flaggor för nästa steg
             if (dg.DataGroupNumber == 15) dg15Find = true;
             if (dg.DataGroupNumber == 14) dg14Find = true;
-            // 3. Läs filen från kortet
+
             EfIdAppSpecific dgID = dg.DataGroupNumber.IntoDgFileID();
             var responseResult = await _cmd.ReadBinary(MessageType.SecureMessage, dgID);
 
@@ -677,7 +677,6 @@ public static class SodHelper
             byte[] dgData = responseResult.Unwrap().data;
 
 
-            // 5. Beräkna hash och jämför
             byte[] calculatedHashData = HashCalculator.CalculateSHAHash(algoName, dgData);
 
             if (!calculatedHashData.SequenceEqual(dg.Hash))
