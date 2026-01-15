@@ -93,7 +93,7 @@ If you are debugging the verification process, the logic flows through these fil
     * *Reads DG1/DG2 etc., hashes them, and checks against the SOD hash list.*
 6.  **Clone Detection**     * `application.cs` -> `SetupActiveAuthentication` (RSA/ECDSA signature challenge) OR `SetupChipAuthentication`.
 
-## 📦 Dependencies
+## Dependencies
 
 * **BouncyCastle** (`Org.BouncyCastle`): Used heavily for X.509 certificates, ASN.1 parsing, and Cryptographic primitives (RSA, ECDSA, CMAC, ECDH).
 * **System.IO.Ports / NFC Reader Library**: (Implementation specific to `ICommunicator`).
