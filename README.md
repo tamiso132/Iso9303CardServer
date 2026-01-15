@@ -12,11 +12,11 @@ This project implements a C# library for reading and verifying **Electronic Mach
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 The codebase is organized into logical layers. Here is where to find specific functionality:
 
-### 🔐 1. Authentication & Security Logic
+###  1. Authentication & Security Logic
 *Core logic for verifying the passport's authenticity and calculating hashes.*
 
 * **`Helper/helper.cs`** (Specifically `class SodHelper`)
@@ -33,7 +33,7 @@ The codebase is organized into logical layers. Here is where to find specific fu
         * `EncryptionInfo`: Maps OIDs to specific algorithms (Brainpool, NIST, AES, etc.).
         * `ECDH`: Handling of Elliptic Curve Diffie-Hellman key agreement.
 
-### 📡 2. Communication & Protocols
+###  2. Communication & Protocols
 *Logic for talking to the NFC chip and wrapping commands in Secure Messaging.*
 
 * **`Command/command.cs`**
@@ -51,7 +51,7 @@ The codebase is organized into logical layers. Here is where to find specific fu
 * **`Interfaces/interfaces.cs`**
     * Defines contracts for `ICommunicator` (NFC/USB abstraction) and `IServerFormat`.
 
-### 📝 3. Parsing & Data Models
+### 3. Parsing & Data Models
 *Logic for decoding the raw byte streams from the chip.*
 
 * **`Parser/sodparsertest.cs`** (`class EfSodParser`)
@@ -65,7 +65,7 @@ The codebase is organized into logical layers. Here is where to find specific fu
 * **`Asn1/asn1.cs`**
     * **Role**: Helper for **building** ASN.1 structures (used when sending commands to the chip) and a generic node parser.
 
-### 🛠 4. Utilities & Error Handling
+### 4. Utilities & Error Handling
 * **`Helper/helper.cs`** (General Utils):
     * `MrzUtils`: Calculates check digits for MRZ keys.
     * `HashCalculator`: Dynamically switches between SHA-1, SHA-256, SHA-384, etc., based on OIDs.
@@ -75,7 +75,7 @@ The codebase is organized into logical layers. Here is where to find specific fu
 
 ---
 
-## 🧩 Authentication Flow
+##  Authentication Flow
 
 If you are debugging the verification process, the logic flows through these files in this order:
 
